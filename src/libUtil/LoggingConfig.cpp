@@ -13,6 +13,69 @@
 
 #include "ProgressAwareSink.h"
 
+struct LoggingLoggersConfig {
+  std::string name;
+  std::string level;
+  std::string sink;
+};
+
+struct LoggingSinkConfig {
+  std::string file_name;
+  std::string level;
+  std::string name;
+  std::string pattern;
+};
+
+struct LoggingConfig {
+  std::string level;
+  std::vector<LoggingLoggersConfig> log_config;
+  std::string pattern;
+  bool report_loggers;
+  std::vector<LoggingSinkConfig> sinks;
+};
+
+void to_json(json& j, const LoggingLoggersConfig& c) {
+  j = json{{"name", c.name},
+           {"level", c.level},
+           {"sink", c.sink}};
+}
+
+void from_json(const json& j, LoggingLoggersConfig& c) {
+  j.at("name").get_to(c.name);
+  j.at("level").get_to(c.level);
+  j.at("sink").get_to(c.sink);
+}
+
+void to_json(json& j, const LoggingSinkConfig& c) {
+  j = json{{"name", c.name},
+           {"file_name", c.file_name},
+           {"level", c.level},
+           {"pattern", c.pattern}};
+}
+
+void from_json(const json& j, LoggingSinkConfig& c) {
+  j.at("name").get_to(c.name);
+  j.at("file_name").get_to(c.file_name);
+  j.at("level").get_to(c.level);
+  j.at("pattern").get_to(c.pattern);
+}
+
+void to_json(json& j, const LoggingConfig& c) {
+  j = json{{"level", c.level},
+           {"log_config", c.log_config},
+           {"pattern", c.pattern},
+           {"report_loggers", c.report_loggers},
+           {"sinks", c.sinks}};
+}
+
+void from_json(const json& j, LoggingConfig& c) {
+  j.at("level").get_to(c.level);
+  j.at("log_config").get_to(c.log_config);
+  j.at("pattern").get_to(c.pattern);
+  j.at("report_loggers").get_to(c.report_loggers);
+  j.at("sinks").get_to(c.sinks);
+}
+
 // spdlog::level::level_enum, but then construction doesn't work?
 static const std::map<std::string, int> level_map = {
   {"off", SPDLOG_LEVEL_OFF},
