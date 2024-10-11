@@ -162,7 +162,7 @@ namespace LCB_FELIX {
 
     tx.releaseFifo();
 
-    while(!tx.isCmdEmpty());
+    tx.waitCmdEmpty();
 
     // Enable the trickle configuration elinks
     tx.setCmdEnable(elinks_trickle);
@@ -182,7 +182,7 @@ namespace LCB_FELIX {
       tx.releaseFifo();
     }
 
-    while(!tx.isCmdEmpty());
+    tx.waitCmdEmpty();
 
   } // write_trickle_memory
 
