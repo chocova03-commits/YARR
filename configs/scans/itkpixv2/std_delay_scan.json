@@ -2,15 +2,12 @@
   "scan": {
     "analysis": {
       "0": {
-        "algorithm": "DelayAnalysis"
-      },
-     "1": {
-        "algorithm": "ParameterAnalysis"
-      },
-     "2": {
         "algorithm": "OccupancyAnalysis"
       },
-      "n_count": 3
+     "1": {
+	    "algorithm": "InjDelayTune"
+      },
+      "n_count": 2
     },
     "histogrammer": {
       "0": {
@@ -46,20 +43,22 @@
     "loops": [
       {
         "config": {
+          "max": 63,
+          "min": 0,
+          "step": 1,
+	        "pixelReg": 0,
+	        "rstPixelReg": true,
+          "parameter":"InjFineDelay"
+        },
+        "loopAction": "Itkpixv2GlobalFeedback"
+      },
+      {
+        "config": {
           "max": 64,
           "min": 0,
           "step": 1
         },
         "loopAction": "Itkpixv2ParMaskLoop"
-      },
-      {
-        "config": {
-          "max": 63,
-          "min": 0,
-          "step": 1,
-          "parameter":"InjFineDelay"
-        },
-        "loopAction": "StdParameterLoop"
       },
       {
         "config": {
@@ -72,7 +71,7 @@
       },
       {
         "config": {
-          "count": 10,
+          "count": 5,
           "delay": 56,
           "extTrigger": false,
           "frequency": 5000,
@@ -91,9 +90,10 @@
     "prescan": {
         "InjDigEn": 0,
         "InjVcalMed": 200,
-	"InjVcalHigh": 3000,
+	      "InjVcalHigh": 3000,
         "InjVcalRange": 1,
-        "Latency": 50
+        "Latency": 51,
+        "InjFineDelay": 0
     }
   }
 }

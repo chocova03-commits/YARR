@@ -89,8 +89,7 @@
         "InjDigEn": 0,
         "InjVcalMed": 500,
         "InjVcalRange": 1,
-        "Latency": 50,
-	"InjFineDelay": 40
+        "Latency": 51
     }
   }
 }
