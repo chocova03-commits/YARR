@@ -23,6 +23,7 @@ struct PixelFeedbackParams {
 struct FeedbackParams {
     bool step;
     bool binary;
+    bool final;
 
     PixelFeedbackParams &pixel() {
         return std::get<PixelFeedbackParams>(data);
@@ -34,8 +35,8 @@ struct FeedbackParams {
 
     std::variant<GlobalFeedbackParams, PixelFeedbackParams> data;
 
-    FeedbackParams(bool step, bool binary, std::variant<GlobalFeedbackParams, PixelFeedbackParams> &&data)
-      : step(step), binary(binary), data(std::move(data)) {}
+    FeedbackParams(bool step, bool binary, bool final, std::variant<GlobalFeedbackParams, PixelFeedbackParams> &&data)
+      : step(step), binary(binary), final(final), data(std::move(data)) {}
 };
 
 // Make it shared so controller can still observe
@@ -48,6 +49,7 @@ class GlobalFeedbackBase {
         virtual void feedback(unsigned channel, double sign, bool last) = 0;
         virtual void feedbackBinary(unsigned channel, double sign, bool last) = 0; // TODO Algorithm should be selected in scan
         virtual void feedbackStep(unsigned channel, double sign, bool last) {}
+	    virtual void feedbackFinal(unsigned channel, double value, bool last) {}
 };
 
 class GlobalFeedbackReceiver : public GlobalFeedbackBase {
@@ -77,6 +79,7 @@ class GlobalFeedbackSender : public GlobalFeedbackBase {
         void feedback(unsigned channel, double sign, bool last) override;
         void feedbackBinary(unsigned channel, double sign, bool last) override;
         void feedbackStep(unsigned channel, double sign, bool last) override;
+	    void feedbackFinal(unsigned channel, double value, bool last) override;
 
     private:
         FeedbackClipboard *clip;

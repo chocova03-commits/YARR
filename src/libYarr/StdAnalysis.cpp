@@ -69,6 +69,10 @@ namespace {
         StdDict::registerAnalysis("DelayAnalysis",
                 []() { return std::unique_ptr<AnalysisAlgorithm>(new DelayAnalysis());});
 
+    bool inj_del_registered =
+        StdDict::registerAnalysis("InjDelayTune",
+                []() { return std::unique_ptr<AnalysisAlgorithm>(new InjDelayTune());});
+
     bool np_registered =
         StdDict::registerAnalysis("NPointGain",
                 []() { return std::unique_ptr<AnalysisAlgorithm>(new NPointGain());});
@@ -1361,7 +1365,9 @@ void OccPixelThresholdTune::processHistogram(HistogramBase *h) {
         alog->info("[{}] Mean Occupancy = {}", id, mean/(nCol*nRow*(double)injections));
         alog->info("[{}] RMS = {}", id, occDist->getStdDev());
 
-        fb->feedback(this->id, std::move(fbHisto));
+        
+
+	    fb->feedback(this->id, std::move(fbHisto));
         output->pushData(std::move(occMaps[ident]));
         output->pushData(std::move(occDist));
         innerCnt[ident] = 0;
@@ -1372,6 +1378,125 @@ void OccPixelThresholdTune::processHistogram(HistogramBase *h) {
         occMaps[ident] = nullptr;
     }
 
+}
+
+void InjDelayTune::init(const ScanLoopInfo *s) {
+    n_count = 1;
+    n_param_loop = 1;
+    param_loop_max = 1;
+    n_filled_bins = 0;
+    step = 1;
+    finishedFeedback= false;
+
+    for (unsigned n=0; n<s->size(); n++) {
+        auto l = s->getLoop(n);
+	unsigned cnt = (l->getMax() - l->getMin())/l->getStep();
+        if (!(l->isDataLoop() || l->isTriggerLoop() || l->isMaskLoop())) {
+            loops.push_back(n);
+            loopMax.push_back((unsigned)l->getMax());
+	    if (l->isParameterLoop() || l->isGlobalFeedbackLoop()){
+	      n_param_loop = n_param_loop * cnt;
+	      param_loop_max = l->getMax();
+          step = l->getStep();
+	    }
+        } else {
+            if (cnt == 0)
+                cnt = 1;
+            n_count = n_count*cnt;
+        }
+
+        if (l->isTriggerLoop()) {
+            auto trigLoop = dynamic_cast<const StdTriggerAction*>(l);
+            if(trigLoop == nullptr) {
+                alog->error("InjDelayTune: loop declared as trigger does not have a count");
+            } else {
+                injections = trigLoop->getTrigCnt();
+            }
+        }
+        if (l->isGlobalFeedbackLoop()) {
+            fb.reset(new GlobalFeedbackSender(feedback));
+        }
+    }
+
+    
+}
+
+void InjDelayTune::processHistogram(HistogramBase *h) {
+    // Check if right Histogram
+    if (h->getName() != OccupancyMap::outputName())
+        return;
+
+    // Select correct output container
+    unsigned long ident = 0;
+    unsigned long offset = 1;
+
+    // Determine identifier
+    std::string name = "OccupancyMap";
+    for (unsigned n=0; n<loops.size(); n++) {
+        ident += h->getStat().get(loops[n])*offset;
+        offset *= loopMax[n];
+        name += "-" + std::to_string(h->getStat().get(loops[n]));
+    }
+
+    if (delayDist == nullptr){
+      Histo1d *hhh = new Histo1d("OccVsDelay", param_loop_max, 0.5, param_loop_max + 0.5);
+      hhh->setXaxisTitle("InjFineDelay");
+      hhh->setYaxisTitle("Occupancy");
+      delayDist.reset(hhh);
+    }
+
+    // Check if Histogram exists
+    if (occMaps[ident] == nullptr) {
+      Histo2d *hh = new Histo2d(name, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5);
+      hh->setXaxisTitle("Column");
+      hh->setYaxisTitle("Row");
+      hh->setZaxisTitle("Hits");
+      occMaps[ident].reset(hh);
+    }
+
+    // Add up Histograms
+    occMaps[ident]->add(*(Histo2d*)h);
+    innerCnt[ident]++;
+
+    // Got all data, finish up Analysis
+    if (innerCnt[ident] == n_count) {
+
+        double sum =0;
+        for( unsigned int ibin =0; ibin < ( nCol * nRow); ++ibin){
+            sum += occMaps[ident]->getBin(ibin);
+        }
+        sum = sum / (nCol * nRow * injections);
+        delayDist->setBin(ident*step, sum);
+        output->pushData(std::move(occMaps[ident]));
+        innerCnt[ident] = 0;
+        occMaps[ident] = nullptr;
+
+        if (!finishedFeedback){
+            fb->feedbackStep(this->id, step, false);
+            if(n_filled_bins>n_param_loop){
+                double mean = delayDist->getMean();
+                double stdv = delayDist->getStdDev();
+
+                // We want to set injection to happen 1/5 of the way into the bc window
+                // Assuming the delay curve is a uniform distribution, it should have a std of width/sqrt(12)
+                // So width = sqrt(12)*stdev. 1/5 of time into the window will be (mean - 3*width/10)
+                // Or mean - 3*sqrt(12)*stdev/10 ~= mean - 1.03*stdev
+                // Use the ceil of this number just to be sure we are not too early
+                double delay_to_set = ceil(mean - 3.0*sqrt(12)*stdv/10.0);
+
+                output->pushData(std::move(delayDist));
+                fb->feedbackFinal(this->id, delay_to_set, true);
+                finishedFeedback = true;
+                delayDist=nullptr;
+            }
+
+        }
+        n_filled_bins++;
+    }
+}
+
+void InjDelayTune::end() {
+    
 }
 
 // TODO exclude every loop

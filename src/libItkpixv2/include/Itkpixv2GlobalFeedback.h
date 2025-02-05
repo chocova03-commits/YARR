@@ -26,6 +26,7 @@ class Itkpixv2GlobalFeedback : public LoopActionBase, public GlobalFeedbackRecei
 
         // TODO should probably register a single function
         void feedback(unsigned channel, double sign, bool last = false) override;
+	    void feedbackFinal(unsigned channel, double value, bool last = false) override;
         void feedbackBinary(unsigned channel, double sign, bool last = false) override;
         void feedbackStep(unsigned channel, double sign, bool last = false) override;
 
