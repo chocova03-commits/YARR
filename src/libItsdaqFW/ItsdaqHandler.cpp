@@ -48,6 +48,9 @@ public:
     receiver = std::thread( [&] () { ReceiverMain(); });
   }
 
+  void ProcessPacket(const std::array<char, 1500> &buffer,
+                     size_t output_bytes);
+
   UdpSocket sock;
 
   std::unique_ptr<RawData> GetData();
@@ -82,6 +85,12 @@ ItsdaqHandler::~ItsdaqHandler() {
 
 void ItsdaqHandler::reconfigure(uint32_t remote, uint16_t srcPort, uint16_t dstPort) {
   priv->reconfigure(remote, srcPort, dstPort);
+}
+
+void ItsdaqHandler::ProcessPacket(const std::array<char, 1500> &buffer,
+                                  size_t output_bytes)
+{
+  priv->ProcessPacket(buffer, output_bytes);
 }
 
 void ItsdaqHandler::SendOpcode(uint16_t opcode, uint16_t *data, uint16_t length)
@@ -268,7 +277,7 @@ void ItsdaqPrivate::QueueData(uint16_t *start, size_t len) {
 
     startOffset = i;
     partial_buffer.clear();
-  }
+  } // Loop over data in packet
 
   if(!partial_buffer.empty()) {
     logger->trace("QueueData: Partial data, storing to next packet");
@@ -277,6 +286,90 @@ void ItsdaqPrivate::QueueData(uint16_t *start, size_t len) {
 
 std::unique_ptr<RawData> ItsdaqPrivate::GetData() {
   return rawData.popData();
+}
+
+void ItsdaqPrivate::ProcessPacket(const std::array<char, 1500> &buffer,
+                                  size_t output_bytes)
+{
+  uint16_t *buf16 = (uint16_t*)buffer.data();
+
+  uint16_t opcode = htons(buf16[4]);
+
+  if((opcode == 0x50) || (opcode == 0x10) || (opcode == 0x78)
+     || (opcode == 0xf2)) {
+    // Ignore acks
+    logger->debug("Ignore ack {:x}", opcode);
+    return;
+  }
+
+  logger->debug("Received opcode {:x}", opcode);
+
+  for(size_t b_o = 0; b_o < output_bytes/2; b_o ++ ) {
+    buf16[b_o] = ntohs(buf16[b_o]);
+  }
+
+  if(opcode == 0x19 || opcode == 0x15 || opcode == 0xf9) {
+    logger->debug("Report FW {} block",
+                  (opcode==0x15)?"register":((opcode==0x19)?"status":"sysstat"));
+    std::array<uint16_t, 4> line_data;
+    for(int i=0; i<(output_bytes/2)-7; i++) {
+      line_data[i%4] = buf16[i+7];
+      if((i % 4) == 3)  {
+        logger->debug(" {:2}: {:04x} {:04x} {:04x} {:04x}", i-3,
+                      line_data[0], line_data[1],
+                      line_data[2], line_data[3]);
+      }
+    }
+    if(opcode == 0x19) {
+      std::vector<uint16_t> status_regs;
+
+      for(int i=0; i<(output_bytes/2)-7; i++) {
+        status_regs.push_back(buf16[i+7]);
+      }
+
+      latest_status_regs = status_regs;
+    }
+    if(opcode == 0xf9) {
+      std::vector<uint16_t> status_regs;
+
+      for(int i=0; i<(output_bytes/2)-7; i++) {
+        status_regs.push_back(buf16[i+7]);
+      }
+
+      latest_sys_status_regs = status_regs;
+    }
+
+    return;
+  }
+
+#if 0
+  for(int i=0; i<output_bytes/2; i++) {
+    std::cout << " " << Utils::hexify(buf16[i]);
+    if((opcode & 0xf000) == 0xd000) {
+      if(i<10) continue;
+      if(((i-10) % 4) < 3) continue;
+    }
+    std::cout << "\n";
+  }
+#endif
+
+  // Strip off header (including opcode number)
+  int offset = 7;
+
+  if(output_bytes < offset * 2) {
+    logger->debug("Data too small to be queued ({})", output_bytes);
+    return;
+  }
+
+  if((opcode & 0xf000) != 0xd000) {
+    logger->info("Ignore unknown opcode {:x}", opcode);
+    return;
+  }
+
+  // Don't pass CRC word
+  QueueData(buf16 + offset, (output_bytes/2) - (offset+1));
+
+  logger->debug("Queued opcode data {:x} {}", buf16[4], opcode);
 }
 
 void ItsdaqPrivate::ReceiverMain() {
@@ -296,86 +389,7 @@ void ItsdaqPrivate::ReceiverMain() {
     if(success) {
       packet_count ++;
       bytes_count += output_bytes;
-
-      uint16_t *buf16 = (uint16_t*)buffer.data();
-
-      uint16_t opcode = htons(buf16[4]);
-
-      if((opcode == 0x50) || (opcode == 0x10) || (opcode == 0x78)
-         || (opcode == 0xf2)) {
-        // Ignore acks
-        logger->debug("Ignore ack {:x}", opcode);
-        continue;
-      }
-
-      logger->debug("Received opcode {:x}", opcode);
-
-      for(size_t b_o = 0; b_o < output_bytes/2; b_o ++ ) {
-        buf16[b_o] = ntohs(buf16[b_o]);
-      }
-
-      if(opcode == 0x19 || opcode == 0x15 || opcode == 0xf9) {
-        logger->debug("Report FW {} block",
-                      (opcode==0x15)?"register":((opcode==0x19)?"status":"sysstat"));
-        std::array<uint16_t, 4> line_data;
-        for(int i=0; i<(output_bytes/2)-7; i++) {
-          line_data[i%4] = buf16[i+7];
-          if((i % 4) == 3)  {
-            logger->debug(" {:2}: {:04x} {:04x} {:04x} {:04x}", i-3,
-                          line_data[0], line_data[1],
-                          line_data[2], line_data[3]);
-          }
-        }
-        if(opcode == 0x19) {
-          std::vector<uint16_t> status_regs;
-
-          for(int i=0; i<(output_bytes/2)-7; i++) {
-            status_regs.push_back(buf16[i+7]);
-          }
-
-          latest_status_regs = status_regs;
-        }
-        if(opcode == 0xf9) {
-          std::vector<uint16_t> status_regs;
-
-          for(int i=0; i<(output_bytes/2)-7; i++) {
-            status_regs.push_back(buf16[i+7]);
-          }
-
-          latest_sys_status_regs = status_regs;
-        }
-
-        continue;
-      }
-
-#if 0
-      for(int i=0; i<output_bytes/2; i++) {
-        std::cout << " " << Utils::hexify(buf16[i]);
-        if((opcode & 0xf000) == 0xd000) {
-          if(i<10) continue;
-          if(((i-10) % 4) < 3) continue;
-        }
-        std::cout << "\n";
-      }
-#endif
-
-      // Strip off header (including opcode number)
-      int offset = 7;
-
-      if(output_bytes < offset * 2) {
-        logger->debug("Data too small to be queued ({})", output_bytes);
-        continue;
-      }
-
-      if((opcode & 0xf000) != 0xd000) {
-        logger->info("Ignore unknown opcode {:x}", opcode);
-        continue;
-      }
-
-      // Don't pass CRC word
-      QueueData(buf16 + offset, (output_bytes/2) - (offset+1));
-
-      logger->debug("Queued opcode data {:x} {}", buf16[4], opcode);
+      ProcessPacket(buffer, output_bytes);
     }
   }
 

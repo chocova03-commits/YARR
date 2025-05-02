@@ -32,6 +32,10 @@ public:
 
   void reconfigure(uint32_t remote, uint16_t srcPort, uint16_t dstPort);
 
+  /// Pass in a packet (for testing)
+  void ProcessPacket(const std::array<char, 1500> &buffer,
+                     size_t output_bytes);
+
   ~ItsdaqHandler();
 
   const std::vector<uint16_t> &LatestStatus();
