@@ -27,6 +27,11 @@ SCAN_CFG=configs/scans/star/full_scan_trim_at_pedestal.json
 
 runScan
 
+CONTROLLER=configs/controller/starEmu/emuCfg_star_gen_sd.json
+SCAN_CFG=configs/scans/star/std_strobeDelayScan.json
+
+runScan
+
 CONTROLLER=configs/controller/starEmu/emuCfg_star_gen_bvt.json
 SCAN_CFG=configs/scans/star/std_vt50scan.json
 
