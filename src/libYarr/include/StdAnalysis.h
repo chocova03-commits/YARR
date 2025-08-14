@@ -43,8 +43,8 @@ class OccupancyAnalysis : public AnalysisAlgorithm {
         unsigned n_count;
         unsigned injections;
 	double LowThr, HighThr;
-        std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
-        std::map<unsigned, unsigned> innerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
 };
 
 class HistogramArchiver : public AnalysisAlgorithm {

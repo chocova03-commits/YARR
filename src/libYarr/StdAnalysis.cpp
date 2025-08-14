@@ -136,34 +136,32 @@ void OccupancyAnalysis::processHistogram(HistogramBase *h) {
     if (h->getName() != OccupancyMap::outputName())
         return;
 
-    // Select correct output container
-    unsigned long ident = 0;
-    unsigned long offset = 1;
+    LoopStatus loopStatus = h->getStat();
+    LoopStatus::UID uid = loopStatus.uniqueID();
 
-    // Determine identifier
+    // Get histogram name
     std::string name = "OccupancyMap";
     std::string name2 = "EnMask";
     for (unsigned n=0; n<loops.size(); n++) {
-        ident += h->getStat().get(loops[n])*offset;
-        offset *= loopMax[n];
         name += "-" + std::to_string(h->getStat().get(loops[n]));
         name2 += "-" + std::to_string(h->getStat().get(loops[n]));
     }
 
+
     // Check if Histogram exists
-    if (occMaps[ident] == nullptr) {
+    if (occMaps[uid] == nullptr) {
         std::unique_ptr<Histo2d> hh(new Histo2d(name, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5));
         hh->setXaxisTitle("Column");
         hh->setYaxisTitle("Row");
         hh->setZaxisTitle("Hits");
-        occMaps[ident] = std::move(hh);
+        occMaps[uid] = std::move(hh);
     }
 
     // Add up Histograms
-    occMaps[ident]->add(*(Histo2d*)h);
-    innerCnt[ident]++;
+    occMaps[uid]->add(*(Histo2d*)h);
+    innerCnt[uid]++;
     // Got all data, finish up Analysis
-    if (innerCnt[ident] == n_count) {
+    if (innerCnt[uid] == n_count) {
         std::unique_ptr<Histo2d> mask(new Histo2d(name2, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5));
         mask->setXaxisTitle("Column");
         mask->setYaxisTitle("Rows");
@@ -172,8 +170,8 @@ void OccupancyAnalysis::processHistogram(HistogramBase *h) {
         unsigned failed_cnt = 0;
         for(unsigned col=1; col<=nCol; col++) {
             for (unsigned row=1; row<=nRow; row++) {
-                unsigned i = occMaps[ident]->binNum(col, row);
-		if (occMaps[ident]->getBin(i) >= LowThr && occMaps[ident]->getBin(i) <= HighThr) {
+                unsigned i = occMaps[uid]->binNum(col, row);
+		if (occMaps[uid]->getBin(i) >= LowThr && occMaps[uid]->getBin(i) <= HighThr) {
                     mask->setBin(i, 1);
                 } else {
                     failed_cnt++;
@@ -194,8 +192,8 @@ void OccupancyAnalysis::processHistogram(HistogramBase *h) {
                 nBadPixelsInCCol = nColsInCCol*nRow;
                 for (unsigned col = 1; col<=nColsInCCol; col++){
                     for (unsigned row = 1; row<=nRow; row++){
-                        unsigned i = occMaps[ident]->binNum(coreCol*nColsInCCol+col, row);
-                        if (occMaps[ident]->getBin(i) >= LowThr && occMaps[ident]->getBin(i) <= HighThr) {
+                        unsigned i = occMaps[uid]->binNum(coreCol*nColsInCCol+col, row);
+                        if (occMaps[uid]->getBin(i) >= LowThr && occMaps[uid]->getBin(i) <= HighThr) {
                             nBadPixelsInCCol -= 1;
                         }
                     }
@@ -220,7 +218,7 @@ void OccupancyAnalysis::processHistogram(HistogramBase *h) {
 
         alog->info("\033[1m\033[31m[{}][{}] Total number of failing pixels: {}\033[0m", id, feCfg->getName(), failed_cnt);
         output->pushData(std::move(mask)); // TODO push this mask to the specific configuration
-        output->pushData(std::move(occMaps[ident]));
+        output->pushData(std::move(occMaps[uid]));
 
 
         //delete occMaps[ident];
