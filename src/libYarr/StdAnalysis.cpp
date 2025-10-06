@@ -403,29 +403,30 @@ void TotAnalysis::processHistogram(HistogramBase *h) {
     if (occInnerCnt[uid] == n_count &&
             totInnerCnt[uid] == n_count &&
             tot2InnerCnt[uid] == n_count) {
-        std::unique_ptr<Histo2d> meanTotMap(new Histo2d("MeanTotMap-"+loopStatus.toString(), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5)); // ELISE: Check this
+        std::string loopStatusString = loopStatus.toString(loops);
+        std::unique_ptr<Histo2d> meanTotMap(new Histo2d("MeanTotMap-"+loopStatusString, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5)); // ELISE: Check this
         meanTotMap->setXaxisTitle("Column");
         meanTotMap->setYaxisTitle("Row");
         meanTotMap->setZaxisTitle("Mean ToT ["+tot_unit+"]");
-        std::unique_ptr<Histo2d> sumTotMap(new Histo2d("SumTotMap-"+loopStatus.toString(), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5));
+        std::unique_ptr<Histo2d> sumTotMap(new Histo2d("SumTotMap-"+loopStatusString, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5));
         sumTotMap->setXaxisTitle("Column");
         sumTotMap->setYaxisTitle("Row");
         sumTotMap->setZaxisTitle("Mean ToT ["+tot_unit+"]");
-        std::unique_ptr<Histo2d> sumTot2Map(new Histo2d("MeanTot2Map-"+loopStatus.toString(), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5));
+        std::unique_ptr<Histo2d> sumTot2Map(new Histo2d("MeanTot2Map-"+loopStatusString, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5));
         sumTot2Map->setXaxisTitle("Column");
         sumTot2Map->setYaxisTitle("Row");
         sumTot2Map->setZaxisTitle("Mean ToT^2 ["+tot_unit+"^2]");
-        std::unique_ptr<Histo2d> sigmaTotMap(new Histo2d("SigmaTotMap-"+loopStatus.toString(), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5));
+        std::unique_ptr<Histo2d> sigmaTotMap(new Histo2d("SigmaTotMap-"+loopStatusString, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5));
         sigmaTotMap->setXaxisTitle("Column");
         sigmaTotMap->setYaxisTitle("Row");
         sigmaTotMap->setZaxisTitle("Sigma ToT ["+tot_unit+"]");
-        std::unique_ptr<Histo1d> meanTotDist(new Histo1d("MeanTotDist-"+loopStatus.toString(), tot_bins_n, tot_bins_x_lo + 0.5, tot_bins_x_hi + 0.5));
+        std::unique_ptr<Histo1d> meanTotDist(new Histo1d("MeanTotDist-"+loopStatusString, tot_bins_n, tot_bins_x_lo + 0.5, tot_bins_x_hi + 0.5));
         meanTotDist->setXaxisTitle("Mean ToT ["+tot_unit+"]");
         meanTotDist->setYaxisTitle("Number of Pixels");
-        std::unique_ptr<Histo1d> sigmaTotDist(new Histo1d("SigmaTotDist-"+loopStatus.toString(), tot_sigma_bins_n, tot_sigma_bins_x_lo, tot_sigma_bins_x_hi));
+        std::unique_ptr<Histo1d> sigmaTotDist(new Histo1d("SigmaTotDist-"+loopStatusString, tot_sigma_bins_n, tot_sigma_bins_x_lo, tot_sigma_bins_x_hi));
         sigmaTotDist->setXaxisTitle("Sigma ToT ["+tot_unit+"]");
         sigmaTotDist->setYaxisTitle("Number of Pixels");
-        std::unique_ptr<Histo1d> tempMeanTotDist(new Histo1d("MeanTotDistFine-"+loopStatus.toString(), tot_bins_n*10, tot_bins_x_lo + 0.05, tot_bins_x_hi + 0.05));
+        std::unique_ptr<Histo1d> tempMeanTotDist(new Histo1d("MeanTotDistFine-"+loopStatusString, tot_bins_n*10, tot_bins_x_lo + 0.05, tot_bins_x_hi + 0.05));
 
         meanTotMap->add(*totMaps[uid]);
         meanTotMap->divide(*occMaps[uid]);
@@ -449,7 +450,7 @@ void TotAnalysis::processHistogram(HistogramBase *h) {
             }
         }
 
-        alog->info("\033[1;33m[{}][{}][{}] ToT Mean = {} +- {}\033[0m", id, feCfg->getName(), loopStatus.toString(),  meanTotDist->getMean(), meanTotDist->getStdDev()); // ELISE: Check this
+        alog->info("\033[1;33m[{}][{}][{}] ToT Mean = {} +- {}\033[0m", id, feCfg->getName(), loopStatusString,  meanTotDist->getMean(), meanTotDist->getStdDev()); // ELISE: Check this
 
         if (globalFb != nullptr) {
             double mean = 0;
@@ -1552,7 +1553,7 @@ void TagAnalysis::processHistogram(HistogramBase *h) {
 
     // Got all data, finish up Analysis
     if (tagDistInnerCnt[uid] == n_count && tagMapInnerCnt[uid] == n_count && occInnerCnt[uid] == n_count) {
-        std::unique_ptr<Histo2d> meanTagMap(new Histo2d("MeanTagMap-"+loopStatus.toString(), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5)); // ELISE: Check this
+        std::unique_ptr<Histo2d> meanTagMap(new Histo2d("MeanTagMap-"+loopStatus.toString(loops), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5)); // ELISE: Check this
         meanTagMap->setXaxisTitle("Column");
         meanTagMap->setYaxisTitle("Row");
         meanTagMap->setZaxisTitle("Mean Tag");
