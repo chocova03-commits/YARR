@@ -664,6 +664,7 @@ void ScurveFitter::init(const ScanLoopInfo *s) {
                 alog->error("ScurveFitter: loop declared as pixel feedback, does not implement feedback");
             }
         }
+        prevUid[n] = l->getMin(); // Is it ok to initialize to the min? 
     }
 
     for (unsigned i=vcalMin; i<=vcalMax; i+=vcalStep) {
@@ -671,7 +672,6 @@ void ScurveFitter::init(const ScanLoopInfo *s) {
     }
     cnt = 0;
     n_failedfit =0;
-    prevOuter = 0;
 }
 
 void ScurveFitter::loadConfig(const json &j) {
@@ -730,45 +730,45 @@ bool ScurveFitter::fitSuccess(const double (&fit_params)[n_fit_params], const do
            // should be within specified range
 }
 
-void ScurveFitter::createFitResultHistograms(const unsigned long& outerIdent, const LoopStatus& loopStatus) {
-    auto hh2 = std::make_unique<Histo2d>("ThresholdMap-" + std::to_string(outerIdent), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5, loopStatus);
+void ScurveFitter::createFitResultHistograms(LoopStatus::UID uid, const LoopStatus& loopStatus) {
+    auto hh2 = std::make_unique<Histo2d>("ThresholdMap", nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5, loopStatus);
     hh2->setXaxisTitle("Column");
     hh2->setYaxisTitle("Row");
     hh2->setZaxisTitle("Threshold [e]");
-    thrMap[outerIdent] = std::move(hh2);
+    thrMap[uid] = std::move(hh2);
 
-    hh2 = std::make_unique<Histo2d>("NoiseMap-"+std::to_string(outerIdent), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5, loopStatus);
+    hh2 = std::make_unique<Histo2d>("NoiseMap", nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5, loopStatus);
     hh2->setXaxisTitle("Column");
     hh2->setYaxisTitle("Row");
     hh2->setZaxisTitle("Noise [e]");
-    sigMap[outerIdent] = std::move(hh2);
+    sigMap[uid] = std::move(hh2);
 
-    auto hh1 = std::make_unique<Histo1d>("Chi2Dist-"+std::to_string(outerIdent), 51, chi2Min-0.025, chi2Max+0.025, loopStatus);
+    auto hh1 = std::make_unique<Histo1d>("Chi2Dist", 51, chi2Min-0.025, chi2Max+0.025, loopStatus);
     hh1->setXaxisTitle("Fit Chi/ndf");
     hh1->setYaxisTitle("Number of Pixels");
-    chiDist[outerIdent] = std::move(hh1);
+    chiDist[uid] = std::move(hh1);
 
-    hh2 = std::make_unique<Histo2d>("Chi2Map-"+std::to_string(outerIdent), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5, loopStatus);
+    hh2 = std::make_unique<Histo2d>("Chi2Map", nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5, loopStatus);
     hh2->setXaxisTitle("Column");
     hh2->setYaxisTitle("Row");
     hh2->setZaxisTitle("Chi2");
-    chi2Map[outerIdent] = std::move(hh2);
+    chi2Map[uid] = std::move(hh2);
 
-    hh2 = std::make_unique<Histo2d>("StatusMap-"+std::to_string(outerIdent), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5, loopStatus);
+    hh2 = std::make_unique<Histo2d>("StatusMap", nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5, loopStatus);
     hh2->setXaxisTitle("Column");
     hh2->setYaxisTitle("Row");
     hh2->setZaxisTitle("Fit Status");
-    statusMap[outerIdent] = std::move(hh2);
+    statusMap[uid] = std::move(hh2);
 
-    hh1 = std::make_unique<Histo1d>("StatusDist-"+std::to_string(outerIdent), 11, -0.5, 10.5, loopStatus);
+    hh1 = std::make_unique<Histo1d>("StatusDist", 11, -0.5, 10.5, loopStatus);
     hh1->setXaxisTitle("Fit Status ");
     hh1->setYaxisTitle("Number of Pixels");
-    statusDist[outerIdent] = std::move(hh1);
+    statusDist[uid] = std::move(hh1);
 
-    hh1 = std::make_unique<Histo1d>("TimePerFitDist-"+std::to_string(outerIdent), 201, -1, 401, loopStatus);
+    hh1 = std::make_unique<Histo1d>("TimePerFitDist", 201, -1, 401, loopStatus);
     hh1->setXaxisTitle("Fit Time [us]");
     hh1->setYaxisTitle("Number of Pixels");
-    timeDist[outerIdent] = std::move(hh1);
+    timeDist[uid] = std::move(hh1);
 }
 
 void ScurveFitter::processHistogram(HistogramBase *h) {
@@ -780,51 +780,42 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
     auto hh = dynamic_cast<Histo2d*>(h);
     LoopStatus loopStatus = hh->getStat();
 
-    unsigned long outerIdent = 0;
-    unsigned long outerOffset = 1;
-    for (unsigned n=0; n<loops.size(); n++) {
-        outerIdent += loopStatus.get(loops[n])*outerOffset;
-        outerOffset *= loopMax[n];
-    }
-    medCnt[outerIdent]++;
+    // Get unique ID from LoopStatus
+    LoopStatus::UID uid = loopStatus.maskedUniqueID(vcalLoop);
+    medCnt[uid]++;
 
     unsigned long offset = nCol * nRow;
     unsigned vcal = loopStatus.get(vcalLoop);
+    std::string loopStatusString = loopStatus.toString(loops);
     for(unsigned col=1; col<=nCol; col++) {
         for (unsigned row=1; row<=nRow; row++) {
+            // Use bin number as identifier
             unsigned bin = hh->binNum(col, row);
             if (hh->getBin(bin) != 0 || reverse) {
-                // Select correct output container
-                unsigned long ident = bin;
-                // Determine identifier
                 std::string name = "Scurve";
                 name += "-" + std::to_string(col) + "-" + std::to_string(row);
-                // Check for other loops
-                for (unsigned n=0; n<loops.size(); n++) {
-                    ident += loopStatus.get(loops[n])*offset;
-                    offset *= loopMax[n];
-                    name += "-" + std::to_string(loopStatus.get(loops[n]));
+                // Add outer loop to name, if present
+                if (!loopStatusString.empty()){
+                    name += "-" + loopStatusString;
                 }
 
                 // Check if Histogram exists
-                if (histos[ident] == nullptr) {
+                if (histos[{uid, bin}] == nullptr) {
                     auto hhh = std::make_unique<Histo1d>(name, vcalBins+1, vcalMin-((double)vcalStep/2.0), vcalMax+((double)vcalStep/2.0));
                     hhh->setXaxisTitle("Vcal");
                     hhh->setYaxisTitle("Occupancy");
-                    histos[ident] = std::move(hhh);
-                    innerCnt[ident] = 0;
+                    histos[{uid, bin}] = std::move(hhh);
                 }
 
                 // Add up Histograms
                 double thisBin = hh->getBin(bin);
-                histos[ident]->fill(vcal, thisBin);
-                innerCnt[ident]++;
+                histos[{uid, bin}]->fill(vcal, thisBin);
 
                 // Got all data, finish up Analysis
                 // TODO This requires the loop to run from low to high and a hit in the last bin
                 if (vcal >= vcalMax) {
                     // Scale histos
-                    //histos[ident]->scale(1.0/(double)injections);
+                    //histos[{uid, bin}]->scale(1.0/(double)injections);
                     lm_status_struct status;
                     lm_control_struct control;
                     control = lm_control_float;
@@ -839,18 +830,18 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
 
                     if (use_scurvegauss) {
                         // mean and sigma calculated rather than fitted, implementation libUtil/scurvegauss.cpp
-                        scurvegauss(par, vcalBins, &x[0], histos[ident]->getData());
+                        scurvegauss(par, vcalBins, &x[0], histos[{uid, bin}]->getData());
                     }
                     else if (reverse) {
-                        lmcurve(n_par, par, vcalBins, &x[0], histos[ident]->getData(), reverseScurveFct, &control, &status);
+                        lmcurve(n_par, par, vcalBins, &x[0], histos[{uid, bin}]->getData(), reverseScurveFct, &control, &status);
                     } else {
-                        lmcurve(n_par, par, vcalBins, &x[0], histos[ident]->getData(), scurveFct, &control, &status);
+                        lmcurve(n_par, par, vcalBins, &x[0], histos[{uid, bin}]->getData(), scurveFct, &control, &status);
                     }
 
                     end = std::chrono::high_resolution_clock::now();
                     std::chrono::microseconds fitTime = std::chrono::duration_cast<std::chrono::microseconds>(end-start);
-                    if (thrMap[outerIdent] == nullptr) {
-                        createFitResultHistograms(outerIdent, loopStatus);
+                    if (thrMap[uid] == nullptr) {
+                        createFitResultHistograms(uid, loopStatus);
                     }
 
                     double chi2= status.fnorm/(double)(vcalBins - n_par);
@@ -859,23 +850,23 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                     if (use_scurvegauss) chi2 = 1.;
 
                     if (fitSuccess(par, chi2)) {
-                        thrMap[outerIdent]->setBin(bin, feCfg->toCharge(par[0], useScap, useLcap));
+                        thrMap[uid]->setBin(bin, feCfg->toCharge(par[0], useScap, useLcap));
                         // Reudce effect of vcal offset on this, don't want to probe at low vcal
-                        sigMap[outerIdent]->setBin(bin, feCfg->toCharge(par[0]+par[1], useScap, useLcap)-feCfg->toCharge(par[0], useScap, useLcap));
-                        chiDist[outerIdent]->fill(status.fnorm/(double)status.nfev);
-                        timeDist[outerIdent]->fill(fitTime.count());
-                        chi2Map[outerIdent]->setBin(bin, chi2 );
-                        statusMap[outerIdent]->setBin(bin, status.outcome);
-                        statusDist[outerIdent]->fill(status.outcome);
+                        sigMap[uid]->setBin(bin, feCfg->toCharge(par[0]+par[1], useScap, useLcap)-feCfg->toCharge(par[0], useScap, useLcap));
+                        chiDist[uid]->fill(status.fnorm/(double)status.nfev);
+                        timeDist[uid]->fill(fitTime.count());
+                        chi2Map[uid]->setBin(bin, chi2 );
+                        statusMap[uid]->setBin(bin, status.outcome);
+                        statusDist[uid]->fill(status.outcome);
 
                     } else {
                         n_failedfit++;
-                        alog->debug("[{}] [{}] Failed fit Col({}) Row({}) Threshold({}) Chi2({}) Status({}) Entries({}) Mean({})", id, feCfg->getName(), col, row, thrMap[outerIdent]->getBin(bin), chi2, status.outcome, histos[ident]->getEntries(), histos[ident]->getMean());
+                        alog->debug("[{}] [{}] Failed fit Col({}) Row({}) Threshold({}) Chi2({}) Status({}) Entries({}) Mean({})", id, feCfg->getName(), col, row, thrMap[uid]->getBin(bin), chi2, status.outcome, histos[{uid, bin}]->getEntries(), histos[{uid, bin}]->getMean());
                     }
                     if (m_dumpDebugScurvePlots && row == nRow/2 && col%10 == 0) {
-                        output->pushData(std::move(histos[ident]));
+                        output->pushData(std::move(histos[{uid, bin}]));
                     }
-                    histos[ident].reset(nullptr);
+                    histos[{uid, bin}].reset(nullptr);
                 }
             }
         }
@@ -883,59 +874,59 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
 
     // Finished full vcal loop, if feedback loop provide TDAC feedback
     // Requires odd number of TDAC steps, optimised for 3 iterations
-    if (medCnt[outerIdent] == n_count && fb != nullptr) {
-        if (outerIdent == 0) {
-            thrTarget = thrMap[outerIdent]->getMean();
+    if (medCnt[uid] == n_count && fb != nullptr) {
+        if (uid[0] == 0) { // Might be dangerous if the outer loop is different than what we expect
+            thrTarget = thrMap[uid]->getMean();
         }
 
-        if (step[outerIdent] == nullptr) {
-            auto hh2 = std::make_unique<Histo2d>("StepMap-" + std::to_string(outerIdent), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5);
+        if (step[uid] == nullptr) {
+            auto hh2 = std::make_unique<Histo2d>("StepMap-" + loopStatusString, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5);
             hh2->setXaxisTitle("Column");
             hh2->setYaxisTitle("Row");
             hh2->setZaxisTitle("TDAC change");
-            step[outerIdent] = std::move(hh2);
+            step[uid] = std::move(hh2);
         }
 
-        if (deltaThr[outerIdent] == nullptr) {
-            auto hh2 = std::make_unique<Histo2d>("DeltaThreshold-" + std::to_string(outerIdent), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5);
+        if (deltaThr[uid] == nullptr) {
+            auto hh2 = std::make_unique<Histo2d>("DeltaThreshold-" + loopStatusString, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5);
             hh2->setXaxisTitle("Column");
             hh2->setYaxisTitle("Row");
             hh2->setZaxisTitle("Delta Threshold [e]");
-            deltaThr[outerIdent] = std::move(hh2);
+            deltaThr[uid] = std::move(hh2);
         }
 
         for(unsigned col=1; col<=nCol; col++) {
             for (unsigned row=1; row<=nRow; row++) {
-                unsigned bin = thrMap[outerIdent]->binNum(col, row);
-                step[outerIdent]->setBin(bin, 0);
-                if (thrMap[outerIdent]->getBin(bin) != 0) {
-                    double curDeltaThr = thrTarget - thrMap[outerIdent]->getBin(bin);
-                    if (outerIdent == 0) { // First time
+                unsigned bin = thrMap[uid]->binNum(col, row);
+                step[uid]->setBin(bin, 0);
+                if (thrMap[uid]->getBin(bin) != 0) {
+                    double curDeltaThr = thrTarget - thrMap[uid]->getBin(bin);
+                    if (uid[0] == 0) { // First time
                         if (curDeltaThr > 5) { // Increase Threshold
-                            step[outerIdent]->setBin(bin, -1);
+                            step[uid]->setBin(bin, -1);
                         } else if (curDeltaThr < -5) { //Decrease Threshold
-                            step[outerIdent]->setBin(bin, +1);
+                            step[uid]->setBin(bin, +1);
                         }
-                    } else if (step[prevOuter]->getBin(bin) != 0) { // Second or higher loop
-                        if (fabs(curDeltaThr) < fabs(deltaThr[prevOuter]->getBin(bin))) {
+                    } else if (step[prevUid]->getBin(bin) != 0) { // Second or higher loop
+                        if (fabs(curDeltaThr) < fabs(deltaThr[prevUid]->getBin(bin))) {
                             // Did the sign change?
-                            if ( ((curDeltaThr < 0) ? -1 : (curDeltaThr > 0)) != ((deltaThr[prevOuter]->getBin(bin) < 0) ? -1 : (deltaThr[prevOuter]->getBin(bin) > 0)) ) {
-                                step[outerIdent]->setBin(bin, 0); // Best setting
+                            if ( ((curDeltaThr < 0) ? -1 : (curDeltaThr > 0)) != ((deltaThr[prevUid]->getBin(bin) < 0) ? -1 : (deltaThr[prevUid]->getBin(bin) > 0)) ) {
+                                step[uid]->setBin(bin, 0); // Best setting
                             } else {
-                                step[outerIdent]->setBin(bin, step[prevOuter]->getBin(bin)); // Move in the same direction
+                                step[uid]->setBin(bin, step[prevUid]->getBin(bin)); // Move in the same direction
                             }
                         } else {
                             // Last setting was better
-                            step[outerIdent]->setBin(bin, step[prevOuter]->getBin(bin)*-1);
+                            step[uid]->setBin(bin, step[prevUid]->getBin(bin)*-1);
                         }
                     }
                 }
-                deltaThr[outerIdent]->setBin(bin, thrTarget - thrMap[outerIdent]->getBin(bin));
+                deltaThr[uid]->setBin(bin, thrTarget - thrMap[uid]->getBin(bin));
             }
         }
-        prevOuter = outerIdent;
-        alog->info("[{}] --> Sending feedback #{}", this->id, outerIdent);
-        fb->feedback(this->id, std::move(std::make_unique<Histo2d>(*(step[outerIdent].get()))));
+        prevUid = uid;
+        alog->info("[{}] --> Sending feedback #{}", this->id, loopStatusString);
+        fb->feedback(this->id, std::move(std::make_unique<Histo2d>(*(step[uid].get()))));
     }
 }
 
@@ -946,15 +937,17 @@ void ScurveFitter::end() {
     }
 
     // TODO Loop over outerIdent
-    for (unsigned i=0; i<thrMap.size(); i++) {
-        if (thrMap[i] != nullptr) {
+    for (auto &[uid, thrMapPtr] : thrMap) {
+        if (thrMapPtr) {
 
+            LoopStatus loopStatus = thrMapPtr->getStat();
+            std::string loopStatusString = loopStatus.toString(loops);
 
             int bin_width, xlow, xhigh, bins;
-            double thrMean = thrMap[i]->getMean();
-            double thrRms = thrMap[i]->getStdDev();
-            double sigMean = sigMap[i]->getMean();
-            double sigRms = sigMap[i]->getStdDev();
+            double thrMean = thrMap[uid]->getMean();
+            double thrRms = thrMap[uid]->getStdDev();
+            double sigMean = sigMap[uid]->getMean();
+            double sigRms = sigMap[uid]->getStdDev();
 
 
             bin_width = 10;
@@ -972,11 +965,17 @@ void ScurveFitter::end() {
             }
             bins = (xhigh-xlow)/bin_width;
 
-
-            auto hh1 = std::make_unique<Histo1d>("ThresholdDist-" + std::to_string(i), bins, xlow, xhigh);
+            // std::string idvec = "";
+            // for (auto j: uid){
+            //     if (j != 0){
+            //         idvec += std::to_string(j) + "-";
+            //     }
+            // }
+            // if (!idvec.empty()) idvec.pop_back();
+            auto hh1 = std::make_unique<Histo1d>(loopStatusString.empty() ? "ThresholdDist" : "ThresholdDist-" + loopStatusString, bins, xlow, xhigh);
             hh1->setXaxisTitle("Threshold [e]");
             hh1->setYaxisTitle("Number of Pixels");
-            thrDist[i] = std::move(hh1);
+            thrDist[uid] = std::move(hh1);
 
             bin_width = 5;
             int rSigMean = (int)(sigMean) - (int)(sigMean)%bin_width;
@@ -993,35 +992,35 @@ void ScurveFitter::end() {
             }
             bins = (xhigh-xlow)/bin_width;
 
-            hh1 = std::make_unique<Histo1d>("NoiseDist-" + std::to_string(i), bins, xlow, xhigh);
+            hh1 = std::make_unique<Histo1d>(loopStatusString.empty() ? "NoiseDist" : "NoiseDist-" + loopStatusString, bins, xlow, xhigh);
             hh1->setXaxisTitle("Noise [e]");
             hh1->setYaxisTitle("Number of Pixels");
-            sigDist[i] = std::move(hh1);
+            sigDist[uid] = std::move(hh1);
 
             for(unsigned bin=0; bin<(nCol*nRow); bin++) {
-                if (thrMap[i]->getBin(bin) != 0)
-                    thrDist[i]->fill(thrMap[i]->getBin(bin));
-                if (sigMap[i]->getBin(bin) != 0)
-                    sigDist[i]->fill(sigMap[i]->getBin(bin));
+                if (thrMap[uid]->getBin(bin) != 0)
+                    thrDist[uid]->fill(thrMap[uid]->getBin(bin));
+                if (sigMap[uid]->getBin(bin) != 0)
+                    sigDist[uid]->fill(sigMap[uid]->getBin(bin));
             }
 
             // Before moving data to clipboard
-            alog->info("\033[1;33m[{}][{}][{}] Threshold Mean = {} +- {}\033[0m", id, feCfg->getName(), i, thrMap[i]->getMean(), thrMap[i]->getStdDev());
-            alog->info("\033[1;33m[{}][{}][{}] Noise Mean = {} +- {}\033[0m", id, feCfg->getName(), i, sigMap[i]->getMean(), sigMap[i]->getStdDev());
-            alog->info("\033[1;33m[{}][{}][{}] Number of failed fits = {}\033[0m", id, feCfg->getName(), i, n_failedfit);
-            output->pushData(std::move(thrDist[i]));
-            output->pushData(std::move(thrMap[i]));
-            output->pushData(std::move(sigDist[i]));
-            output->pushData(std::move(chi2Map[i]));
-            output->pushData(std::move(statusMap[i]));
-            output->pushData(std::move(statusDist[i]));
-            output->pushData(std::move(step[i]));
-            output->pushData(std::move(deltaThr[i]));
+            alog->info("\033[1;33m[{}][{}][{}] Threshold Mean = {} +- {}\033[0m", id, feCfg->getName(), loopStatusString, thrMap[uid]->getMean(), thrMap[uid]->getStdDev()); // uid[0] is outermost loop
+            alog->info("\033[1;33m[{}][{}][{}] Noise Mean = {} +- {}\033[0m", id, feCfg->getName(), loopStatusString, sigMap[uid]->getMean(), sigMap[uid]->getStdDev());
+            alog->info("\033[1;33m[{}][{}][{}] Number of failed fits = {}\033[0m", id, feCfg->getName(), loopStatusString, n_failedfit);
+            output->pushData(std::move(thrDist[uid]));
+            output->pushData(std::move(thrMap[uid]));
+            output->pushData(std::move(sigDist[uid]));
+            output->pushData(std::move(chi2Map[uid]));
+            output->pushData(std::move(statusMap[uid]));
+            output->pushData(std::move(statusDist[uid]));
+            output->pushData(std::move(step[uid]));
+            output->pushData(std::move(deltaThr[uid]));
         }
 
-        output->pushData(std::move(sigMap[i]));
-        output->pushData(std::move(chiDist[i]));
-        output->pushData(std::move(timeDist[i]));
+        output->pushData(std::move(sigMap[uid]));
+        output->pushData(std::move(chiDist[uid]));
+        output->pushData(std::move(timeDist[uid]));
     }
 }
 
@@ -1883,7 +1882,6 @@ void DelayAnalysis::init(const ScanLoopInfo *s) {
     count = 0;
 }
 
-// ELISE: Skipping DelayAnalysis for now
 void DelayAnalysis::processHistogram(HistogramBase *h) {
     // Check if right Histogram
     if (h->getName() != L13d::outputName())

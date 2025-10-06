@@ -138,7 +138,7 @@ class ScurveFitter : public AnalysisAlgorithm {
     private:
         const static unsigned n_fit_params = 4;
         bool fitSuccess(const double (&fit_params)[n_fit_params], const double &chi2) const;
-        void createFitResultHistograms(const unsigned long& outerIdent, const LoopStatus& loopStatus);
+        void createFitResultHistograms(LoopStatus::UID uid, const LoopStatus& loopStatus);
 
         unsigned vcalLoop;
         unsigned vcalMin;
@@ -157,26 +157,25 @@ class ScurveFitter : public AnalysisAlgorithm {
         std::vector<unsigned> loops;
         std::vector<unsigned> loopMax;
 
-        std::map<unsigned, std::unique_ptr<Histo1d>> histos;
-        std::map<unsigned, std::unique_ptr<Histo2d>> thrMap;
-        std::map<unsigned, std::unique_ptr<Histo1d>> thrDist;
-        std::map<unsigned, std::unique_ptr<Histo2d>> sigMap;
-        std::map<unsigned, std::unique_ptr<Histo1d>> sigDist;
-        std::map<unsigned, std::unique_ptr<Histo1d>> chiDist;
-        std::map<unsigned, std::unique_ptr<Histo1d>> timeDist;
+        std::map<std::pair<LoopStatus::UID, unsigned>, std::unique_ptr<Histo1d>> histos;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> thrMap;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> thrDist;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> sigMap;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> sigDist;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> chiDist;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> timeDist;
 
-        std::map<unsigned, std::unique_ptr<Histo2d>> chi2Map;
-        std::map<unsigned, std::unique_ptr<Histo2d>> statusMap;
-        std::map<unsigned, std::unique_ptr<Histo1d>> statusDist;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> chi2Map;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> statusMap;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> statusDist;
 
         std::unique_ptr<PixelFeedbackSender> fb;
-        std::map<unsigned, std::unique_ptr<Histo2d>> step;
-        std::map<unsigned, std::unique_ptr<Histo2d>> deltaThr;
-        unsigned prevOuter;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> step;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> deltaThr;
+        LoopStatus::UID prevUid{};
         double thrTarget;
 
-        std::map<unsigned, unsigned> innerCnt;
-        std::map<unsigned, unsigned> medCnt;
+        std::map<LoopStatus::UID, unsigned> medCnt;
         std::map<unsigned, unsigned> vcalCnt;
         bool useScap;
         bool useLcap;
