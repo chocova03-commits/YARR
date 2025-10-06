@@ -965,13 +965,6 @@ void ScurveFitter::end() {
             }
             bins = (xhigh-xlow)/bin_width;
 
-            // std::string idvec = "";
-            // for (auto j: uid){
-            //     if (j != 0){
-            //         idvec += std::to_string(j) + "-";
-            //     }
-            // }
-            // if (!idvec.empty()) idvec.pop_back();
             auto hh1 = std::make_unique<Histo1d>(loopStatusString.empty() ? "ThresholdDist" : "ThresholdDist-" + loopStatusString, bins, xlow, xhigh);
             hh1->setXaxisTitle("Threshold [e]");
             hh1->setYaxisTitle("Number of Pixels");
@@ -1005,7 +998,7 @@ void ScurveFitter::end() {
             }
 
             // Before moving data to clipboard
-            alog->info("\033[1;33m[{}][{}][{}] Threshold Mean = {} +- {}\033[0m", id, feCfg->getName(), loopStatusString, thrMap[uid]->getMean(), thrMap[uid]->getStdDev()); // uid[0] is outermost loop
+            alog->info("\033[1;33m[{}][{}][{}] Threshold Mean = {} +- {}\033[0m", id, feCfg->getName(), loopStatusString, thrMap[uid]->getMean(), thrMap[uid]->getStdDev());
             alog->info("\033[1;33m[{}][{}][{}] Noise Mean = {} +- {}\033[0m", id, feCfg->getName(), loopStatusString, sigMap[uid]->getMean(), sigMap[uid]->getStdDev());
             alog->info("\033[1;33m[{}][{}][{}] Number of failed fits = {}\033[0m", id, feCfg->getName(), loopStatusString, n_failedfit);
             output->pushData(std::move(thrDist[uid]));

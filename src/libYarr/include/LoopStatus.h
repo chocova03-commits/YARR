@@ -127,8 +127,10 @@ class LoopStatus {
             return result;
         }
 
-        /// @brief Create a dash-separated loop status string
+        /// @brief Create a dash-separated loop status string 
         /// e.g. to be added to the name of a histogram
+        /// uses only desired loops in order to avoid unnecessary zeros in the string
+        /// @param loopsToKeep Loop indices to keep in the string
         /// @return Loop status string
         std::string toString(const std::vector<unsigned> &loopsToKeep) const {
             std::string result;
