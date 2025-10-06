@@ -404,7 +404,7 @@ void TotAnalysis::processHistogram(HistogramBase *h) {
             totInnerCnt[uid] == n_count &&
             tot2InnerCnt[uid] == n_count) {
         std::string loopStatusString = loopStatus.toString(loops);
-        std::unique_ptr<Histo2d> meanTotMap(new Histo2d("MeanTotMap-"+loopStatusString, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5)); // ELISE: Check this
+        std::unique_ptr<Histo2d> meanTotMap(new Histo2d("MeanTotMap-"+loopStatusString, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5));
         meanTotMap->setXaxisTitle("Column");
         meanTotMap->setYaxisTitle("Row");
         meanTotMap->setZaxisTitle("Mean ToT ["+tot_unit+"]");
@@ -441,7 +441,7 @@ void TotAnalysis::processHistogram(HistogramBase *h) {
         }
         if (hasVcalLoop) {
             unsigned vcal = loopStatus.get(vcalLoopIndex);
-            double currentCharge = feCfg->toCharge(vcal, useScap, useLcap); // ELISE: Check this
+            double currentCharge = feCfg->toCharge(vcal, useScap, useLcap); // This needs to be checked
             for (unsigned i=0; i<tempMeanTotDist->size(); i++) {
                 chargeVsTotMap->fill(currentCharge, (i+1)*0.1, tempMeanTotDist->getBin(i));
             }
@@ -450,7 +450,7 @@ void TotAnalysis::processHistogram(HistogramBase *h) {
             }
         }
 
-        alog->info("\033[1;33m[{}][{}][{}] ToT Mean = {} +- {}\033[0m", id, feCfg->getName(), loopStatusString,  meanTotDist->getMean(), meanTotDist->getStdDev()); // ELISE: Check this
+        alog->info("\033[1;33m[{}][{}][{}] ToT Mean = {} +- {}\033[0m", id, feCfg->getName(), loopStatusString,  meanTotDist->getMean(), meanTotDist->getStdDev()); 
 
         if (globalFb != nullptr) {
             double mean = 0;
@@ -616,8 +616,6 @@ void TotAnalysis::end() {
         output->pushData(std::move(measQRMSOut));
     }
 }
-
-// ELISE: Skipping ScurveFitter for now
 
 void ScurveFitter::init(const ScanLoopInfo *s) {
     fb = nullptr;
@@ -1553,7 +1551,7 @@ void TagAnalysis::processHistogram(HistogramBase *h) {
 
     // Got all data, finish up Analysis
     if (tagDistInnerCnt[uid] == n_count && tagMapInnerCnt[uid] == n_count && occInnerCnt[uid] == n_count) {
-        std::unique_ptr<Histo2d> meanTagMap(new Histo2d("MeanTagMap-"+loopStatus.toString(loops), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5)); // ELISE: Check this
+        std::unique_ptr<Histo2d> meanTagMap(new Histo2d("MeanTagMap-"+loopStatus.toString(loops), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5)); 
         meanTagMap->setXaxisTitle("Column");
         meanTagMap->setYaxisTitle("Row");
         meanTagMap->setZaxisTitle("Mean Tag");
