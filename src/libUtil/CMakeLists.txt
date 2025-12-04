@@ -9,6 +9,7 @@ add_library(Util SHARED
         lmcurve.cpp
         lmmin.cpp
         scurvegauss.cpp
+        LoadJson.cpp
         LoggingConfig.cpp
         SerialCom.cpp
         catch_amalgamated.cpp
@@ -22,6 +23,12 @@ target_include_directories(Util PUBLIC
 )
 target_link_libraries(Util PRIVATE Yarr_interface)
 target_link_libraries(Util PUBLIC yarrspdlog)
+
+target_compile_options(
+    Util
+  PRIVATE
+    $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-Wall>
+)
 
 if(BUILD_TESTS)
     add_subdirectory(tests)

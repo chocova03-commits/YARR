@@ -57,14 +57,14 @@ std::string ScanConsoleImpl::parseConfig(const std::vector<std::string> &args) {
     json result;
     result["status"] = "failed";
     int argc = args.size();
-    char *argv[argc+1];
+    std::vector<char *> argv(argc+1);
     for (int i = 0; i < argc; i++) {
         argv[i] = (char *) args[i].c_str();
     }
     argv[argc] = nullptr; // should be a null terminated array
     ScanOpts options;
     json scanConsoleConfig;
-    int res = ScanHelper::parseOptions(argc, argv, options);
+    int res = ScanHelper::parseOptions(argc, argv.data(), options);
     if (res==1) {
         res = ScanHelper::loadConfigFile(options, false, scanConsoleConfig);
         if (res>=0) {
@@ -86,12 +86,12 @@ int ScanConsoleImpl::init(int argc, char *argv[]) {
 
 int ScanConsoleImpl::init(const std::vector<std::string> &args) {
     int argc =  args.size();
-    char *argv[argc];
+    std::vector<char *> argv(argc);
     for(int i = 0;i<argc; i++) {
         argv[i] = (char *) args[i].c_str();
     }
     ScanOpts options;
-    int res=ScanHelper::parseOptions(argc,argv,options);
+    int res=ScanHelper::parseOptions(argc,argv.data(),options);
     if(res<=0) return res;
     return init(options);
 }
@@ -104,10 +104,7 @@ int ScanConsoleImpl::init(ScanOpts options) {
         loggerConfig["outputDir"]=scanOpts.outputDir;
     } else {
         // default log setting
-        loggerConfig["pattern"] = scanOpts.defaultLogPattern;
-        loggerConfig["log_config"][0]["name"] = "all";
-        loggerConfig["log_config"][0]["level"] = "info";
-        loggerConfig["outputDir"]="";
+        loggerConfig = logging::defaultConfig();
     }
     spdlog::info("Configuring logger ...");
     logging::setupLoggers(loggerConfig);
@@ -159,10 +156,7 @@ int ScanConsoleImpl::loadConfig() {
 
 // load scan config from a JSON string
 int ScanConsoleImpl::loadConfig(const char *config){
-    loggerConfig["pattern"] = scanOpts.defaultLogPattern;
-    loggerConfig["log_config"][0]["name"] = "all";
-    loggerConfig["log_config"][0]["level"] = "info";
-    loggerConfig["outputDir"]="";
+    loggerConfig = logging::defaultConfig();
     spdlog::info("Configuring logger ...");
     logging::setupLoggers(loggerConfig);
     json j = json::parse(config);
@@ -662,11 +656,7 @@ void ScanConsoleImpl::dump() {
 }
 
 void ScanConsoleImpl::setupLogger(const char *config) {
-    json loggerConfig;
-    loggerConfig["pattern"] = "[%T:%e]%^[%=8l][%=15n][%t]:%$ %v";
-    loggerConfig["log_config"][0]["name"] = "all";
-    loggerConfig["log_config"][0]["level"] = "info";
-    loggerConfig["outputDir"] = "";
+    json loggerConfig = logging::defaultConfig();
     if (config) {
         try {
             loggerConfig = json::parse(config);
