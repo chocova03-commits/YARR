@@ -1034,7 +1034,7 @@ void NPointGain::loadConfig(const json &j) {
 
 void NPointGain::processHistogram(HistogramBase *h) {
     std::string hname = h->getName();
-    std::string prefix = hname.substr(0, hname.find("-"));
+    std::string prefix = hname.substr(0, hname.find("_"));
 
     // pick storage container based on input histogram
     InjectionDataMap* container;
