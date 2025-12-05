@@ -139,13 +139,7 @@ void OccupancyAnalysis::processHistogram(HistogramBase *h) {
     // Get unique ID from LoopStatus
     LoopStatus loopStatus = h->getStat();
     loopStatus.setEnabledLoops(loops);
-    std::cout << "loopStatus = " << loopStatus.toString() << std::endl;
     LoopStatus::UID uid = loopStatus.uniqueID();
-    std::cout << "uid = ";
-    for (int i = 0; i < uid.size(); i++) {
-        std::cout << uid[i] << " ";
-    }
-    std::cout << std::endl;
 
     // Check if Histogram exists
     if (occMaps[uid] == nullptr) {
@@ -920,7 +914,6 @@ void ScurveFitter::end() {
         alog->info("[{}] Tuned to ==> {}", this->id, thrTarget);
     }
 
-    // TODO Loop over outerIdent
     for (auto &[uid, thrMapPtr] : thrMap) {
         if (thrMapPtr) {
 

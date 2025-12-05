@@ -270,10 +270,6 @@ bool Histo1d::fromJson(const json &j) {
 void Histo1d::plot(const std::string &prefix, const std::string &dir) const {
     hlog->info("Plotting {}", HistogramBase::name);
 
-    // std::string output = dir + prefix + "_" + HistogramBase::name;
-    // for (unsigned i=0; i<lStat.size(); i++)
-    //     output += "_" + std::to_string(lStat.get(i));
-    // output += ".png";
     std::string output = createFilename(prefix, dir, "png");
     std::string input;
     input+="\"set terminal png size 1280, 1024;";
