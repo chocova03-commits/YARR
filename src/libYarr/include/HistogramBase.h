@@ -103,17 +103,14 @@ protected:
     /// @param dir Output directory to put file in
     /// @param jsonType If true, use .json extension, otherwise .dat
     /// @return Full path to file
-    std::string createFilename(const std::string &prefix, const std::string &dir, bool jsonType) const {
+    std::string createFilename(const std::string &prefix, const std::string &dir, const std::string &ext) const {
         std::string filename = dir + prefix + "_" + name;
         if (!lStat.toString().empty()) {
             filename += "_" + lStat.toString();
         }
 
-        if (jsonType) {
-            filename += ".json";
-        } else {
-            filename += ".dat";
-        }
+        filename += "." + ext;
+
         return filename;
     }
 };

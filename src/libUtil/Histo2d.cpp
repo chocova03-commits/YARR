@@ -280,7 +280,12 @@ void Histo2d::toJson(json &j) const{
 }
 
 void Histo2d::toFile(const std::string &prefix, const std::string &dir, bool jsonType) const{
-    std::string filename = createFilename(prefix, dir, jsonType);
+    std::string ext = "";
+    if (jsonType) 
+        ext = "json";
+    else
+        ext = "dat";
+    std::string filename = createFilename(prefix, dir, ext);
     std::fstream file(filename, std::fstream::out | std::fstream::trunc);
 
     // jsonType
@@ -377,10 +382,11 @@ bool Histo2d::fromJson(const json &j) {
 void Histo2d::plot(const std::string &prefix, const std::string &dir) const{
     hlog->info("Plotting {}", HistogramBase::name);
 
-    std::string output = dir + prefix + "_" + HistogramBase::name;
-    for (unsigned i=0; i<lStat.size(); i++)
-        output += "_" + std::to_string(lStat.get(i));
-    output += ".png";
+    // std::string output = dir + prefix + "_" + HistogramBase::name;
+    // for (unsigned i=0; i<lStat.size(); i++)
+    //     output += "_" + std::to_string(lStat.get(i));
+    // output += ".png";
+    std::string output = createFilename(prefix, dir, "png");
 
     // Open gnuplot as file and pipe commands
     std::string input;

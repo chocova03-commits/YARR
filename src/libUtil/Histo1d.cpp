@@ -179,7 +179,12 @@ void Histo1d::toJson(json &j) const {
 }
 
 void Histo1d::toFile(const std::string &prefix, const std::string &dir, bool jsonType) const{
-    std::string filename = createFilename(prefix, dir, jsonType);
+    std::string ext = "";
+    if (jsonType) 
+        ext = "json";
+    else
+        ext = "dat";
+    std::string filename = createFilename(prefix, dir, ext);
     std::fstream file(filename, std::fstream::out | std::fstream::trunc);
 
     // jsonType
@@ -265,10 +270,11 @@ bool Histo1d::fromJson(const json &j) {
 void Histo1d::plot(const std::string &prefix, const std::string &dir) const {
     hlog->info("Plotting {}", HistogramBase::name);
 
-    std::string output = dir + prefix + "_" + HistogramBase::name;
-    for (unsigned i=0; i<lStat.size(); i++)
-        output += "_" + std::to_string(lStat.get(i));
-    output += ".png";
+    // std::string output = dir + prefix + "_" + HistogramBase::name;
+    // for (unsigned i=0; i<lStat.size(); i++)
+    //     output += "_" + std::to_string(lStat.get(i));
+    // output += ".png";
+    std::string output = createFilename(prefix, dir, "png");
     std::string input;
     input+="\"set terminal png size 1280, 1024;";
     input+="unset key;";
