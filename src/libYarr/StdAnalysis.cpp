@@ -763,9 +763,11 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
     LoopStatus loopStatus = hh->getStat();
 
     // Get unique ID from LoopStatus
-    loopStatus.setEnabledLoops(loops);
-    loopStatus.setDisabledLoops({vcalLoop});
+    std::vector<size_t> enabledLoops = loops;
+    enabledLoops.erase(std::remove(enabledLoops.begin(), enabledLoops.end(), vcalLoop), enabledLoops.end()); // remove POI
+    loopStatus.setEnabledLoops(enabledLoops);
     LoopStatus::UID uid = loopStatus.uniqueID();
+
     medCnt[uid]++;
 
     unsigned vcal = loopStatus.get(vcalLoop);
