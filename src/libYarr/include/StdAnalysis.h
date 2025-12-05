@@ -36,7 +36,7 @@ class OccupancyAnalysis : public AnalysisAlgorithm {
         void end() override {}
         void loadConfig(const json &config) override;
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         bool createMask;
 	    bool coreColMask;
@@ -82,7 +82,7 @@ class TotAnalysis : public AnalysisAlgorithm {
         void setParams(int tot, int _charge) override { target_tot = tot; }
 
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         double injections;
@@ -154,7 +154,7 @@ class ScurveFitter : public AnalysisAlgorithm {
         double maxBaselineDifference = 0.1;
 
         std::vector<double> x;
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
 
         std::map<std::pair<LoopStatus::UID, unsigned>, std::unique_ptr<Histo1d>> histos;
@@ -280,7 +280,7 @@ class OccGlobalThresholdTune : public AnalysisAlgorithm {
         void end() override {}
         void loadConfig(const json &config) override{}
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
@@ -306,7 +306,7 @@ class GlobalPreampTune : public AnalysisAlgorithm {
         void loadConfig(const json &config) override{}
 
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
@@ -332,7 +332,7 @@ class OccPixelThresholdTune : public AnalysisAlgorithm {
         void loadConfig(const json &config) override;
 
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         std::vector<float> m_occLowCut;
@@ -355,7 +355,7 @@ class L1Analysis : public AnalysisAlgorithm {
         void end() override;
         void loadConfig(const json &config) override{}
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         unsigned injections;
@@ -374,7 +374,7 @@ class TagAnalysis : public AnalysisAlgorithm {
         void end() override;
         void loadConfig(const json &config) override{}
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         unsigned injections;
@@ -397,7 +397,7 @@ class TotDistPlotter : public AnalysisAlgorithm {
         void end() override {}
         void loadConfig(const json &config) override{}
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         unsigned injections;
@@ -439,7 +439,7 @@ class NoiseTuning : public AnalysisAlgorithm {
         void end() override;
         void loadConfig(const json &config) override{}
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
@@ -459,7 +459,7 @@ class DelayAnalysis : public AnalysisAlgorithm {
         void loadConfig(const json &config) override{}
 
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         std::map<unsigned, std::unique_ptr<Histo3d>> occMaps;
@@ -487,7 +487,7 @@ class ParameterAnalysis : public AnalysisAlgorithm {
         void end() override;
         void loadConfig(const json &config) override;
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned injections;
         unsigned paramLoopNo{0xffffffff};
