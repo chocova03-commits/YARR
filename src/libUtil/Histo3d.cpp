@@ -20,40 +20,10 @@ namespace {
 }
 
 template<typename DataT>
-Histo3dT<DataT>::Histo3dT(const std::string &arg_name, unsigned arg_xbins, double arg_xlow, double arg_xhigh,
-                 unsigned arg_ybins, double arg_ylow, double arg_yhigh,
-                 unsigned arg_zbins, double arg_zlow, double arg_zhigh)
-  : HistogramBase(arg_name)
-{
-    xbins = arg_xbins;
-    xlow = arg_xlow;
-    xhigh = arg_xhigh;
-    xbinWidth = (xhigh - xlow)/xbins;
-    
-    ybins = arg_ybins;
-    ylow = arg_ylow;
-    yhigh = arg_yhigh;
-    ybinWidth = (yhigh - ylow)/ybins;
-    
-    zbins = arg_zbins;
-    zlow = arg_zlow;
-    zhigh = arg_zhigh;
-    zbinWidth = (zhigh - zlow)/zbins;
- 
-    min = 0;
-    max = 0;
-    underflow = 0;
-    overflow = 0;
-    data = std::vector<DataT>(xbins*ybins*zbins,0);
-    m_isFilled = std::vector<bool>(xbins*ybins*zbins, false);
 
-    entries = 0;
-}
-
-template<typename DataT>
-Histo3dT<DataT>::Histo3dT(const std::string& arg_name, unsigned arg_xbins, double arg_xlow, double arg_xhigh,
-        unsigned arg_ybins, double arg_ylow, double arg_yhigh,
-        unsigned arg_zbins, double arg_zlow, double arg_zhigh,
+Histo3dT<DataT>::Histo3dT(const std::string& arg_name, unsigned arg_xbins, double arg_xlow, double arg_xhigh, 
+        unsigned arg_ybins, double arg_ylow, double arg_yhigh, 
+        unsigned arg_zbins, double arg_zlow, double arg_zhigh, 
         const LoopStatus &stat)
   : HistogramBase(arg_name, stat)
 {

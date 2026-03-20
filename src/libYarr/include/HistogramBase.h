@@ -25,11 +25,9 @@ public:
      *
      * Using given name and particular loop position.
      */
-    HistogramBase(std::string arg_name, LoopStatus stat)
+    HistogramBase(std::string arg_name, LoopStatus stat = {})
             : name(std::move(arg_name)), lStat(std::move(stat)) {}
 
-    explicit HistogramBase(std::string arg_name)
-            : name(std::move(arg_name)) {}
 
    /// Destructor
    virtual  ~HistogramBase() = default;
