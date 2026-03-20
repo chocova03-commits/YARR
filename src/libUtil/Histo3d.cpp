@@ -25,32 +25,32 @@ Histo3dT<DataT>::Histo3dT(const std::string& arg_name, unsigned arg_xbins, doubl
         unsigned arg_ybins, double arg_ylow, double arg_yhigh, 
         unsigned arg_zbins, double arg_zlow, double arg_zhigh, 
         const LoopStatus &stat)
-  : HistogramBase(arg_name, stat)
-{
-    xbins = arg_xbins;
-    xlow = arg_xlow;
-    xhigh = arg_xhigh;
-    xbinWidth = (xhigh - xlow)/xbins;
+  : HistogramBase(arg_name, stat),
+    data(arg_xbins*arg_ybins*arg_zbins,0),
+    underflow(0),
+    overflow(0),
     
-    ybins = arg_ybins;
-    ylow = arg_ylow;
-    yhigh = arg_yhigh;
-    ybinWidth = (yhigh - ylow)/ybins;
+    xbins(arg_xbins),
+    xlow(arg_xlow),
+    xhigh(arg_xhigh),
+    xbinWidth((arg_xhigh - arg_xlow)/arg_xbins),
     
-    zbins = arg_zbins;
-    zlow = arg_zlow;
-    zhigh = arg_zhigh;
-    zbinWidth = (zhigh - zlow)/zbins;
- 
-    min = 0;
-    max = 0;
-    underflow = 0;
-    overflow = 0;
-    data = std::vector<DataT>(xbins*ybins*zbins,0);
-    m_isFilled = std::vector<bool>(xbins*ybins*zbins, false);
-
-    entries = 0;
-}
+    ybins(arg_ybins),
+    ylow(arg_ylow),
+    yhigh(arg_yhigh),
+    ybinWidth((arg_yhigh - arg_ylow)/arg_ybins),
+    
+    zbins(arg_zbins),
+    zlow(arg_zlow),
+    zhigh(arg_zhigh),
+    zbinWidth((arg_zhigh - arg_zlow)/arg_zbins),
+    
+    max(0),
+    min(0),
+    entries(0),
+    
+    m_isFilled(arg_xbins*arg_ybins*arg_zbins, false)
+{}
 
 template<typename DataT>
 Histo3dT<DataT>::Histo3dT(Histo3dT *h) : HistogramBase(h->getName()) {
