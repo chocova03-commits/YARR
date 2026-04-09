@@ -24,6 +24,7 @@
 #include <sys/file.h>
 #include <cerrno>
 #include <iostream>
+#include <mutex>
 
 using namespace specDriver;
 
@@ -47,8 +48,6 @@ SpecDevice::SpecDevice(int number)
 	if (stat(name.c_str(), &tmp_stat) < 0)
 		throw Exception( Exception::DEVICE_NOT_FOUND );
 
-    mmap_mutex = PTHREAD_MUTEX_INITIALIZER;
-	pthread_mutex_init(&mmap_mutex, nullptr);
 
 	handle = -1;
 
@@ -75,7 +74,6 @@ SpecDevice::~SpecDevice()
 	if (handle > 0)
 		this->close();
 
-	pthread_mutex_destroy(&mmap_mutex);
 }
 
 /**
@@ -285,17 +283,17 @@ void *SpecDevice::mapBAR(unsigned int bar)
 	/* This is not fully safe, as a separate process can still open the device independently.
 	 * That will use a separate mutex and the race condition can arise.
 	 * Posible fix: Do not allow the driver for mutliple openings of a device */
-	mmap_lock();
+	{
+		std::lock_guard<std::mutex> lock(mmap_mutex);
 
-	if (ioctl(handle, SPECDRIVER_IOC_MMAP_MODE, SPECDRIVER_MMAP_PCI) != 0)
-		throw Exception(Exception::INTERNAL_ERROR);
+		if (ioctl(handle, SPECDRIVER_IOC_MMAP_MODE, SPECDRIVER_MMAP_PCI) != 0)
+			throw Exception(Exception::INTERNAL_ERROR);
 
-	if (ioctl( handle, SPECDRIVER_IOC_MMAP_AREA, SPECDRIVER_BAR0+bar) != 0)
-		throw Exception(Exception::INTERNAL_ERROR);
+		if (ioctl( handle, SPECDRIVER_IOC_MMAP_AREA, SPECDRIVER_BAR0+bar) != 0)
+			throw Exception(Exception::INTERNAL_ERROR);
 
-	mem = mmap(nullptr, info.bar_length[bar], PROT_WRITE | PROT_READ, MAP_SHARED, handle, 0);
-	
-	mmap_unlock();
+		mem = mmap(nullptr, info.bar_length[bar], PROT_WRITE | PROT_READ, MAP_SHARED, handle, 0);
+	}
 
 	if ((mem == MAP_FAILED) || (mem == nullptr))
 		throw Exception(Exception::MMAP_FAILED);
