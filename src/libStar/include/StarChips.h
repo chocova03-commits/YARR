@@ -14,6 +14,7 @@
 class TxCore;
 class RxCore;
 
+#include "AsyncReg.h"
 #include "StarCmd.h"
 #include "StarCfg.h"
 
@@ -59,6 +60,9 @@ class StarChips : public StarCfg, public StarCmd, public FrontEnd {
   /// Give this object the broadcast address
   void makeGlobal() override {}
 
+  /// Check communication with chips
+  yarrStatus checkCom() override;
+
   /// Retrieve broadcast object
   std::unique_ptr<FrontEnd> getGlobal() override;
 
@@ -100,6 +104,16 @@ class StarChips : public StarCfg, public StarCmd, public FrontEnd {
       @param addr HCC register address.
   */
   void readHCCRegister(int addr);
+
+  /**
+   * Read data for HCC register.
+   *
+   * @param ctxt Async context to store in-flight.
+   * @param addr HCC register address.
+   *
+   * @return std::future containing register value.
+   */
+  AsyncAccess::AsyncReg32 readHCCRegisterAsync(AsyncAccess::AsyncContext &ctxt, HCCStarRegister reg);
 
   /***
       Send command to read ABC register.
