@@ -123,6 +123,16 @@ class StarChips : public StarCfg, public StarCmd, public FrontEnd {
   */
   void readABCRegister(int addr, int32_t chipID);
 
+  /**
+   * Read data for ABC register.
+   *
+   * @param addr ABC register address.
+   * @param chipID ABC communications ID.
+   *
+   * @return std::future containing register value.
+   */
+  AsyncAccess::AsyncReg32 readABCRegisterAsync(AsyncAccess::AsyncContext &ctxt, ABCStarRegister reg, int32_t chipID);
+
   /// Set HCC register field and write to front end
   void setAndWriteHCCSubRegister(HCCStarSubRegister subRegEnum, uint32_t value){
     m_hcc.setSubRegisterValue(subRegEnum, value);
