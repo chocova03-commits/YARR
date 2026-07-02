@@ -62,13 +62,13 @@ class Bookkeeper {
          *
          * Bookkeeper always takes the ownership of the FrontEnd object.
          */
-        void addFe(std::unique_ptr<FrontEnd> fe, const FrontEndConnectivity& cfg);
+        unsigned addFe(std::unique_ptr<FrontEnd> fe, const FrontEndConnectivity& cfg);
         /**
          * Attach FrontEnd to the same tx and rx channel.
          *
          * Bookkeeper always takes the ownership of the FrontEnd object.
          */
-        void addFe(std::unique_ptr<FrontEnd> fe, unsigned channel);
+        unsigned addFe(std::unique_ptr<FrontEnd> fe, unsigned channel);
 
         /**
          * Delete FrontEnd referenced by ID.
@@ -84,8 +84,6 @@ class Bookkeeper {
         /** Retrieve FrontEndCfg with ID. */
         FrontEndCfg* getFeCfg(unsigned id);
 
-        /** Retrieve most recently added FrontEnd. */
-        FrontEnd* getLastFe();
         /** Retrieve global FrontEnd */
         FrontEnd* getGlobalFe() const {
             return g_fe.get();
@@ -142,7 +140,7 @@ class Bookkeeper {
         /** Configure the clipboard monitor thread. */
         void setFeClipboardMonitorRefreshTime(unsigned arg_clipboardMonitorRefreshTime);
         /** Add FrontEnd to clipboard monitor thread. */
-        void addFeClipboardMonitor(unsigned arg_id, std::string arg_name);
+        void addFeClipboardMonitor(unsigned arg_id, const std::string& arg_name);
 
         ClipBoard<HistogramBase> &getLoopHistograms();
 
@@ -157,13 +155,13 @@ class Bookkeeper {
         std::map<unsigned, std::vector<unsigned>> rxToIdMap;
         std::shared_ptr<StdTriggerAction> m_trigLoop = nullptr;
 
-        int target_tot;
-        int target_threshold;
-        int target_charge;
+        int target_tot = 0;
+        int target_threshold = 0;
+        int target_charge = 0;
 
         // Clipboard monitoring thread/variables
-        unsigned clipboardMonitorRefreshTime;
-        bool runClipboardMonitor;
+        unsigned clipboardMonitorRefreshTime = 0;
+        bool runClipboardMonitor = false;
 
         std::unique_ptr<ClipBoard<HistogramBase>> loop_histograms;
         std::unique_ptr<std::thread> clipboardMonitorThread_ptr;

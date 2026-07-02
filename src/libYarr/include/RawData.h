@@ -48,7 +48,15 @@ class RawData {
             return adr;
         }
 
+        virtual inline uint32_t getAdr() const {
+            return adr;
+        }
+
         virtual inline uint32_t* getBuf() {
+            return buf.data();
+        }
+
+        virtual inline const uint32_t* getBuf() const {
             return buf.data();
         }
 
@@ -79,7 +87,7 @@ using RawDataPtr = std::shared_ptr<RawData>;
 class RawDataContainer {
     public:
         /** Create empty container */
-        RawDataContainer(LoopStatus &&s) : stat(s) {}
+        RawDataContainer(const LoopStatus &s) : stat(s) {}
         
         /** Destroy attached RawData. */
         ~RawDataContainer()=default;

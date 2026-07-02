@@ -226,7 +226,7 @@ void Itkpixv2::configurePixelMaskParallel() {
     for (unsigned dc=0; dc<4; dc++) {
         this->writeRegister(&Itkpixv2::PixRegionCol, dc);
         this->writeRegister(&Itkpixv2::PixRegionRow, 0);
-        std::array<uint16_t, n_Row> maskBits;
+        std::array<uint16_t, n_Row> maskBits = {};
         for (unsigned row=0; row<n_Row; row++) {
             maskBits[row] = toTenBitMask(pixRegs[dc][row]);
         }
@@ -452,7 +452,7 @@ Itkpixv2RegDefault Itkpixv2GlobalCfg::*  Itkpixv2::getNamedRegisterObject(std::s
     } else {
         logger->error("Trying to get named register object, register not found: {}", name);
     }
-    return NULL;
+    return nullptr;
 }
 
 yarrStatus Itkpixv2::checkCom() {
@@ -478,7 +478,7 @@ yarrStatus Itkpixv2::checkCom() {
         data = dataVec[0];
     }
 
-    if (data != NULL) {
+    if (data != nullptr) {
         unsigned size = data->getSize();       
         if (!(size == 2 || size == 4 || size == 8 || size == 12 || size == 6)) {
             logger->error("Received wrong number of words ({}) for {}", data->getSize(), this->name);
@@ -686,7 +686,7 @@ yarrStatus Itkpixv2::confAdc(uint16_t MONMUX, bool doCur) {
     success = success && (this->writeRegister(&Itkpixv2::MonitorEnable, 1) == yarrSuccess); // Enabling monitoring
     while(!core->isCmdEmpty()){;}
 
-    success = success && (this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x40) == yarrSuccess); // Reset ADC
+    success = success && (this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x100) == yarrSuccess); // Reset ADC
     success = success && (this->writeRegister(&Itkpixv2::GlobalPulseWidth, 4) == yarrSuccess);   // Duration = 4 inherited from RD53A
     while(!core->isCmdEmpty()){;}
     std::this_thread::sleep_for(std::chrono::microseconds(100));
@@ -696,7 +696,7 @@ yarrStatus Itkpixv2::confAdc(uint16_t MONMUX, bool doCur) {
 
     success = success && (this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x1000) == yarrSuccess); //Trigger ADC Conversion
     while (!core->isCmdEmpty()){;}
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    std::this_thread::sleep_for(std::chrono::microseconds(1000));
 
     this->sendGlobalPulse(m_chipId);
     std::this_thread::sleep_for(std::chrono::microseconds(1000)); //This is neccessary to clean. This might be controller dependent.
@@ -707,7 +707,7 @@ yarrStatus Itkpixv2::confAdc(uint16_t MONMUX, bool doCur) {
     success = success && (this->writeRegister(&Itkpixv2::MonitorV, OriginalMonitorV) == yarrSuccess);
     success = success && (this->writeRegister(&Itkpixv2::MonitorI, OriginalMonitorI) == yarrSuccess);
     while (!core->isCmdEmpty()){;}
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    std::this_thread::sleep_for(std::chrono::microseconds(1000));
 
     return (success ? yarrSuccess : yarrFailure);
 }

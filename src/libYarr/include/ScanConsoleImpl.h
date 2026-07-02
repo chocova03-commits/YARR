@@ -10,6 +10,8 @@
 #include <map>
 
 #include "AnalysisDataProcessor.h"
+#include "AllPlotters.h"
+#include "ThreadPool.h"
 #include "ScanOpts.h"
 #include "ScanBase.h"
 #include "HwController.h"
@@ -44,8 +46,6 @@ public:
     void run();
     void dump();
 
-    void runOutputHistogramCallback(const std::string &name,
-                                    const HistogramBase &histo);
     static void setupLogger(const char *config = nullptr);
     ~ScanConsoleImpl() = default;
 
@@ -57,6 +57,12 @@ private:
     json scanLog;
     std::unique_ptr<HwController> hwCtrl{};
     std::unique_ptr<Bookkeeper> bookie{};
+    /**
+     * Store info about where FE config came from.
+     *
+     * Map ID to (full_path, base_name). The first is used to update configuration file
+     * after the scan is complete. The second is used to write ".before" and ".after" files.
+     */
     std::map<unsigned, std::array<std::string, 2>> feCfgMap;
     std::unique_ptr<ScanBase> scanBase{};
     std::map<unsigned, std::unique_ptr<FeDataProcessor> > procs{};
@@ -79,6 +85,8 @@ private:
     std::chrono::steady_clock::time_point scan_done, scan_start;
     std::chrono::steady_clock::time_point processor_done, all_done;
     YarrDiagram diagram;
+    std::unique_ptr<ThreadPool> m_pool;
+    std::unique_ptr<Plotter> m_plotter;
 };
 
 

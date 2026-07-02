@@ -26,7 +26,7 @@ constexpr const char* COLOR_GREEN = "\033[32m";
 constexpr const char* COLOR_RESET = "\033[0m";
 
 void printHelp() {
-    std::cout << "./bin/dataMergingScan [-h] [-r <hw_controller_file>] [-c <connectivity_file>] [-t <test_size>] [-m <mode>] [-q]\n\n"
+    std::cout << "./bin/dataMergingCheck [-h] [-r <hw_controller_file>] [-c <connectivity_file>] [-t <test_size>] [-m <mode>] [-q]\n\n"
         << "Options:\n"
         << "  -h                        Display this help message.\n"
         << "  -r <hw_controller_file>   Specify hardware controller JSON path.\n"
@@ -158,16 +158,20 @@ int main(int argc, char **argv) {
     int wait = time*10000000;
     std::cout << std::fixed << std::setprecision(2);
 
+    int min=std::floor(count);
+    int max=std::ceil(count);
+
     std::vector<unsigned> lanes;
     if (mode=="4-to-1"){
         count = count * 4;
+        min = min * 4;
+        max = max * 4;
     } else if (mode=="2-to-1"){
         count = count * 3;
+        min = min * 3;
+        max = max * 3;
     }
     
-    int min=std::floor(count)-1;
-    int max=std::ceil(count)+1;
-
     logger->info("Setting up configuration for all chips...");
 
     // Set up all chips 
@@ -198,11 +202,11 @@ int main(int argc, char **argv) {
             int chip_id=jchip[chipType]["Parameter"]["ChipId"];
 
             fe->writeNamedRegister("EnChipId", 1);
+            fe->writeNamedRegister("SerEnLane", 15);
             // Check which data merging mode we want to test 
             if (mode=="4-to-1"){
                 fe->writeNamedRegister("ServiceBlockEn", 1);
                 if (chip_id == 12 || chip_id==13 || chip_id==14){ // Secondaries
-                    fe->writeNamedRegister("EnChipId", 1);
                     fe->writeNamedRegister("CdrClkSel", 2);
                     fe->writeNamedRegister("CmlBias0", 500);
                     fe->writeNamedRegister("CmlBias1", 0);
@@ -214,9 +218,15 @@ int main(int argc, char **argv) {
                         fe->writeNamedRegister("DataMergeOutMux1", 0);
                         fe->writeNamedRegister("DataMergeOutMux2", 1);
                         fe->writeNamedRegister("DataMergeOutMux3", 2);
+                        fe->writeNamedRegister("SerSelOut0", 3);
                         fe->writeNamedRegister("SerSelOut1", 1);
+                        fe->writeNamedRegister("SerSelOut2", 3);
+                        fe->writeNamedRegister("SerSelOut3", 3);
                     } else if (chip_id==13 || chip_id==14){ // Secondary 
+                        fe->writeNamedRegister("SerSelOut0", 3);
+                        fe->writeNamedRegister("SerSelOut1", 3);
                         fe->writeNamedRegister("SerSelOut2", 1);
+                        fe->writeNamedRegister("SerSelOut3", 3);
                         fe->writeNamedRegister("DataMergeOutMux0", 2);
                         fe->writeNamedRegister("DataMergeOutMux1", 3);
                         fe->writeNamedRegister("DataMergeOutMux2", 0);
@@ -233,24 +243,22 @@ int main(int argc, char **argv) {
             } else if (mode=="2-to-1"){
                 fe->writeNamedRegister("ServiceBlockEn", 1);
                 if (chip_id==12 || chip_id==14){ // Secondaries
+                    fe->writeNamedRegister("AuroraActiveLanes", 3);
                     fe->writeNamedRegister("CdrClkSel", 2);
                     fe->writeNamedRegister("CmlBias0", 500);
                     fe->writeNamedRegister("CmlBias1", 0);
-                    fe->writeNamedRegister("SerEnLane", 15);
+                    fe->writeNamedRegister("SerEnTap", 0);
+                    fe->writeNamedRegister("SerInvTap", 0);
                     fe->writeNamedRegister("SerSelOut0", 1);
                     fe->writeNamedRegister("SerSelOut1", 1);
+                    fe->writeNamedRegister("SerSelOut2", 3);
+                    fe->writeNamedRegister("SerSelOut3", 3);
                     fe->writeNamedRegister("DataMergeOutMux0", 1);
                     fe->writeNamedRegister("DataMergeOutMux1", 0);
                     fe->writeNamedRegister("DataMergeOutMux2", 2);
                     fe->writeNamedRegister("DataMergeOutMux3", 3);
                     logger->info("Setting up {} as secondary for 2-to-1 merging", name);
-                } else if (chip_id==13){ // Primary
-                    fe->writeNamedRegister("DataMergeEn", 0);
-                    fe->writeNamedRegister("DataMergeEnBond", 1);
-                    fe->writeNamedRegister("ServiceBlockEn", 1);
-                    logger->info("Setting up {} as primary for 2-to-1 merging", name);
-                    lanes.push_back(dynamic_cast<FrontEndCfg*>(&*fe)->getRxChannel());
-                } else if (chip_id==15){ // Primary
+                } else if (chip_id==13 || chip_id==15){ // Primaries
                     fe->writeNamedRegister("DataMergeEn", 0);
                     fe->writeNamedRegister("DataMergeEnBond", 1);
                     fe->writeNamedRegister("ServiceBlockEn", 1);

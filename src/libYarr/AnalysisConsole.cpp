@@ -2,10 +2,12 @@
 
 #include "AllAnalyses.h"
 #include "AllChips.h"
+#include "AllPlotters.h"
 #include "AllStdActions.h"
 #include "ClipBoard.h"
 #include "FrontEndCfg.h"
 #include "ScanHelper.h"
+#include "ThreadPool.h"
 
 #include "logging.h"
 #include "LoggingConfig.h"
@@ -54,7 +56,7 @@ class BasicScanInfo : public ScanLoopInfo {
                statVec.push_back(0);
            }
 
-           return {std::move(statVec), styleVec};
+           return {statVec, styleVec};
         }
 };
 
@@ -62,6 +64,7 @@ class AnalysisConsoleImpl {
     AnalysisOpts options;
 
     std::unique_ptr<FrontEnd> frontEnd;
+    ThreadPool m_pool{4}; // hardcoded to 4 threads as not easily configurable and only used for testing
 
     ClipBoard<HistogramBase> clipHistoInput;
     std::vector<std::unique_ptr<ClipBoard<HistogramBase>> > clipResultOutput;
@@ -77,7 +80,7 @@ class AnalysisConsoleImpl {
     clk::time_point all_done;
 
   public:
-    AnalysisConsoleImpl(const AnalysisOpts &opts);
+    AnalysisConsoleImpl(AnalysisOpts opts);
 
     int init();
 
@@ -143,8 +146,8 @@ int AnalysisConsole::parseOptions(int argc, char *argv[], AnalysisOpts &anOpts) 
     anOpts.progName=argv[0];
     const struct option long_options[] =
       {
-        {"help", no_argument, 0, 'h'},
-        {0, 0, 0, 0}};
+        {"help", no_argument, nullptr, 'h'},
+        {nullptr, 0, nullptr, 0}};
 
     int c;
     while (true) {
@@ -236,8 +239,8 @@ int AnalysisConsole::parseOptions(int argc, char *argv[], AnalysisOpts &anOpts) 
     return 1;
 }
 
-AnalysisConsoleImpl::AnalysisConsoleImpl(const AnalysisOpts &opts)
-  : options(opts)
+AnalysisConsoleImpl::AnalysisConsoleImpl(AnalysisOpts opts)
+  : options(std::move(opts))
 {
 }
 
@@ -515,7 +518,8 @@ void AnalysisConsoleImpl::saveAndPlot() {
         const std::string filename = options.outputDir + "config_post_analysis.json";
         logger->info("Saving config of FE {} to {}",
                      feCfg->getName(), filename);
-        ScanHelper::writeFeConfig(feCfg, filename);
+        auto plotter = StdDict::getPlotter("Default");
+        plotter->writeFeConfig(feCfg, filename, m_pool);
     }
 
     // Save the output of the final level of output

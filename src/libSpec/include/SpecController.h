@@ -19,6 +19,10 @@
 
 class SpecController : public HwController, public SpecTxCore, public SpecRxCore {
     public:
+        SpecController() {
+            m_waitTime = std::chrono::microseconds(1000);
+            m_timeoutTime = std::chrono::microseconds(50000);
+        }
 
         const json getStatus() override {
             return this->SpecCom::getStatus();
@@ -41,6 +45,14 @@ class SpecController : public HwController, public SpecTxCore, public SpecRxCore
 
             if (j.contains("txPolarity")) {
                 this->setTxPolarity(j["txPolarity"]);
+            }
+
+            if (j.contains("rxWaitTime")) {
+                m_waitTime = std::chrono::microseconds(j["rxWaitTime"]);
+            }
+            
+            if (j.contains("rxTimeoutTime")) {
+                m_timeoutTime = std::chrono::microseconds(j["rxTimeoutTime"]);
             }
             
             // Configure trigger logic (disable trigger encoder by default)
@@ -140,7 +152,7 @@ class SpecController : public HwController, public SpecTxCore, public SpecRxCore
                 this->setRxActiveLanes(j["rxActiveLanes"]);
                 SpecRxCore::m_rxActiveLanes = j["rxActiveLanes"];
             }
- 
+
             // Configure RX delay
             SpecCom::writeSingle(RX_ADDR | RX_MANUAL_DELAY, 0xFFFF);    
             if (j.contains("delay")) {

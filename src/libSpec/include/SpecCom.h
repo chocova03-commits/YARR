@@ -85,6 +85,7 @@ const static std::string specIdentChCfg[] = {"undefined", "4x4", "16x1", "8x4", 
 const static uint32_t specIdentLaneCfg[] = {0, 4, 1, 4, 1, 4, 4, 1, 1};
 
 static std::map<uint16_t, std::string> specIdentFw = {
+    {0xacb87f4, "v1.6.0"},
     {0x7b14549, "v1.5.0"},
     {0xe7985d6, "v1.4.0"},
     {0x4256c32, "v1.3.1"},
@@ -143,11 +144,11 @@ class SpecCom {
         uint32_t getSpecIdentLaneCfg(uint32_t fw_ident);
    
     private:
-        unsigned int specId;
-        bool is_initialized;
-        bool do_reset;
-        SpecDevice *spec;
-        void *bar0, *bar4;
+        unsigned int specId = 0;
+        bool is_initialized = false;
+        bool do_reset = true;
+        SpecDevice *spec = nullptr;
+        void *bar0 = nullptr, *bar4 = nullptr;
 
         void init();
         void configure();

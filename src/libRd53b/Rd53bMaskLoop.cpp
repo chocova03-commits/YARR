@@ -72,7 +72,7 @@ Rd53bMaskLoop::Rd53bMaskLoop() : LoopActionBase(LOOP_STYLE_MASK) {
     //Even
     AllNeighboursCoordinates["25x100_downup"][0] ={{std::make_pair(1,1),std::make_pair(3,1),std::make_pair(2,0),std::make_pair(3,0),std::make_pair(1,0),std::make_pair(-1,0),std::make_pair(-2,0),std::make_pair(-1,1)}};
     //Odd
-    AllNeighboursCoordinates["25x100_downup"][0] ={{std::make_pair(-1,0),std::make_pair(1,0),std::make_pair(2,0),std::make_pair(1,-1),std::make_pair(-1,-1),std::make_pair(-3,-1),std::make_pair(-2,0),std::make_pair(-3,0)}};
+    AllNeighboursCoordinates["25x100_downup"][1] ={{std::make_pair(-1,0),std::make_pair(1,0),std::make_pair(2,0),std::make_pair(1,-1),std::make_pair(-1,-1),std::make_pair(-3,-1),std::make_pair(-2,0),std::make_pair(-3,0)}};
 
     //How many and which pixels to consider for cross-talk (1: consider, 0: ignore)
     m_mask_size = {{
@@ -363,7 +363,7 @@ bool Rd53bMaskLoop::getNeighboursMap(int col, int row,int sensorType, int maskSi
 }
 
 
-bool Rd53bMaskLoop::ignorePixel(int col, int row){
+bool Rd53bMaskLoop::ignorePixel(int col, int row) const {
 
     //if checking bump bonding connections for rectangular sensors, only use (0,0) pixel
     if ( m_includedPixels == only00CornerForBumpBonding){

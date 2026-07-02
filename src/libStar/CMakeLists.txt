@@ -19,8 +19,11 @@ add_library(Star SHARED
         StarNPointGainAnalysis.cpp
         StarParamFeedback.cpp
         StarRegDump.cpp
+        StarRRHistogrammer.cpp
+        StarRRvParamAnalysis.cpp
         StarSeqGenerator.cpp
         StarStrobeDelayAnalysis.cpp
+        StarThrottleLoop.cpp
         StarTriggerLoop.cpp
         StarTriggerThrottleAnalysis.cpp
         StarTrimDacAnalysis.cpp
@@ -47,6 +50,7 @@ foreach (target IN LISTS apps)
     post_build_debug_executable(${target})
 endforeach ()
 
+add_test(NAME CrossCheck_test_star_list COMMAND test_star -T)
 
 if (BUILD_TESTS)
     add_subdirectory(tests)

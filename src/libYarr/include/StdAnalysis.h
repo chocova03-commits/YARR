@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "AnalysisAlgorithm.h"
+#include "StdTriggerAction.h"
 
 // Need size to make unique_ptr destructors
 #include "Histo1d.h"
@@ -227,9 +228,15 @@ class NPointGain : public AnalysisAlgorithm {
         };
 
         // maps of 2d vectors, one for each injection + channel
-        typedef std::map<double,std::vector<std::vector<double>>> InjectionDataMap;
-        InjectionDataMap m_thresholdMap;
-        InjectionDataMap m_outputNoiseMap;
+        // not totally ideal to store everything as it can use a lot of memory,
+        // but it makes organization significantly easier
+        typedef std::map<double,std::vector<std::vector<double>>> InjectionDataContainer;
+        InjectionDataContainer m_thresholdMap;
+        InjectionDataContainer m_outputNoiseMap;
+        InjectionDataContainer m_inputNoiseMap;
+        InjectionDataContainer m_gainMap;
+        typedef std::vector<std::vector<std::vector<double>>> ResponseParamContainer;
+        ResponseParamContainer m_responseParamMap;
 
         /// @brief Placeholder to convert injection units from DAC counts to the desired unit (e.g. fC)
         /// @param inj Injection value in DAC counts
@@ -268,6 +275,21 @@ class NPointGain : public AnalysisAlgorithm {
 
     private:
         bool m_skipDependencyCheck = false;
+
+        /// @brief Create, fill, and push output histograms
+        /// These contain data that is necessary for proper analysis downstream,
+        /// but are mostly 3D histograms and thus not easy to interpret directly.
+        /// No (usable) plots are produced from these histograms.
+        void writeOutputHistograms();
+
+        // indicates whether to produce basic validation plots
+        bool m_produceValidationHistos = false;
+
+        /// @brief Create, fill, and push validation histograms
+        /// For immediate (partial) validation of the analysis results,
+        /// these histograms contain more easily interpretable data.
+        /// They are 1D histograms per injection, filled with data from all channels.
+        void writeValidationHistograms();
 };
 
 class OccGlobalThresholdTune : public AnalysisAlgorithm {
@@ -501,6 +523,31 @@ class ParameterAnalysis : public AnalysisAlgorithm {
         std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> paramMaps;
 
         bool m_createMap = false;
+};
+
+class TriggerThrottleAnalysis : public AnalysisAlgorithm {
+     public:
+ TriggerThrottleAnalysis() : AnalysisAlgorithm() {};
+    ~TriggerThrottleAnalysis() {};
+    
+    void init(const ScanLoopInfo *s) override;
+    void processHistogram(HistogramBase *h) override;
+    void end() override;
+    void loadConfig(const json &config) override;
+ private:
+    std::vector<unsigned> loops;
+    std::vector<unsigned> loopMax;
+    std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
+    std::map<unsigned, std::unique_ptr<Histo2d>> outerOccMaps;
+    std::map<unsigned, unsigned> innerCnt;
+    unsigned target_occ, target_inj, current_inj;
+    unsigned n_count;
+    int injections, start_inj;
+    std::unique_ptr<GlobalFeedbackSender> fb;
+
+    /// Save pointer to trigger loop to be adjusted
+    // TODO make this possible
+    const StdTriggerAction* trigLoop;
 };
 
 #endif

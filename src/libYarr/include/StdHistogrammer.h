@@ -28,7 +28,7 @@ class DataArchiver : public HistogramAlgorithm {
         }
         ~DataArchiver() override { if(fileHandle.is_open()) fileHandle.close(); }
 
-        bool open(std::string filename);
+        bool open(const std::string& filename);
 
         void create(const LoopStatus &stat) override {}
 
@@ -202,6 +202,32 @@ class L1Dist : public HistogramAlgorithm {
         unsigned current_tag;
 };
 
+/**
+ * Build histogram of L1/L0 data from raw events.
+ */
+class L1Hist : public HistogramAlgorithm {
+    public:
+        L1Hist() : HistogramAlgorithm() {
+            r = nullptr;
+        }
+
+        ~L1Hist() override = default;
+
+        void create(const LoopStatus &stat) override;
+
+        void processEvent(FrontEndData *data) override;
+
+        void loadConfig(const json &config) override;
+
+        static std::string outputName() { return "L1Hist"; }
+
+    private:
+        Histo1d *h{};
+
+        /// Divisor to record modulo after
+        size_t divisor{1000};
+};
+
 class L13d : public HistogramAlgorithm {
     public:
         L13d() : HistogramAlgorithm() {
@@ -239,6 +265,32 @@ class HitsPerEvent : public HistogramAlgorithm {
         static std::string outputName() { return "HitDist"; }
     private:
         Histo1d *h;
+};
+
+/**
+ * Build histogram of BCID data from raw events.
+ */
+class BcHist : public HistogramAlgorithm {
+    public:
+        BcHist() : HistogramAlgorithm() {
+            r = nullptr;
+        }
+
+        ~BcHist() override = default;
+
+        void create(const LoopStatus &stat) override;
+
+        void processEvent(FrontEndData *data) override;
+
+        void loadConfig(const json &config) override;
+
+        static std::string outputName() { return "BcHist"; }
+
+    private:
+        Histo1d *h{};
+
+        /// Divisor to record modulo after
+        size_t divisor{3564};
 };
 
 /**
