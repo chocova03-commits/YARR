@@ -990,7 +990,7 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
         }
         prevUid = uid;
         alog->info("[{}] --> Sending feedback #{}", this->id, loopStatus.toString());
-        fb->feedback(this->id, std::move(std::make_unique<Histo2d>(*(step[uid].get()))));
+        fb->feedback(this->id, std::make_unique<Histo2d>(*(step[uid].get())));
     }
 }
 
