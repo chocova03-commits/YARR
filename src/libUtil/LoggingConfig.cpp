@@ -15,9 +15,13 @@
 
 namespace logging {
 void to_json(json& j, const LoggingLoggersConfig& c) {
-  j = json{{"name", c.name},
-           {"level", c.level},
-           {"sink", c.sink}};
+  j = json{{"name", c.name}};
+  if(!c.level.empty()) {
+    j["level"] = c.level;
+  }
+  if(!c.sink.empty()) {
+    j["sink"] = c.sink;
+  }
 }
 
 void from_json(const json& j, LoggingLoggersConfig& c) {
@@ -36,9 +40,13 @@ void from_json(const json& j, LoggingLoggersConfig& c) {
 
 void to_json(json& j, const LoggingSinkConfig& c) {
   j = json{{"name", c.name},
-           {"file_name", c.file_name},
-           {"level", c.level},
-           {"pattern", c.pattern}};
+           {"file_name", c.file_name}};
+  if(!c.level.empty()) {
+    j["level"] = c.level;
+  }
+  if(!c.pattern.empty()) {
+    j["pattern"] = c.pattern;
+  }
 }
 
 void from_json(const json& j, LoggingSinkConfig& c) {
@@ -61,11 +69,32 @@ void from_json(const json& j, LoggingSinkConfig& c) {
 }
 
 void to_json(json& j, const LoggingConfig& c) {
-  j = json{{"level", c.level},
-           {"log_config", c.log_config},
-           {"pattern", c.pattern},
-           {"report_loggers", c.report_loggers},
-           {"sinks", c.sinks}};
+  // All optional
+  j = json::object();
+  if(!c.level.empty()) {
+    j["level"] = c.level;
+  }
+  if(!c.log_config.empty()) {
+    j["log_config"] = c.log_config;
+  }
+  if(!c.pattern.empty()) {
+    j["pattern"] = c.pattern;
+  }
+  if(c.report_loggers) {
+    j["report_loggers"] = c.report_loggers;
+  }
+  if(!c.sinks.empty()) {
+    j["sinks"] = c.sinks;
+  }
+  if(!c.default_sink.empty()) {
+    j["default_sink"] = c.default_sink;
+  }
+  if(c.ringbuffer_size != 0) {
+    j["ringbuffer_size"] = c.ringbuffer_size;
+  }
+  if(c.simple) {
+    j["simple"] = c.simple;
+  }
 }
 
 void from_json(const json& j, LoggingConfig& c) {
@@ -85,13 +114,13 @@ void from_json(const json& j, LoggingConfig& c) {
     j.at("sinks").get_to(c.sinks);
   }
   if(j.contains("default_sink")) {
-    j.at("default_sink").get_to(c.sinks);
+    j.at("default_sink").get_to(c.default_sink);
   }
   if(j.contains("ringbuffer_size")) {
-    j.at("ringbuffer_size").get_to(c.sinks);
+    j.at("ringbuffer_size").get_to(c.ringbuffer_size);
   }
-  if(j.contains("ringbuffer_simple")) {
-    j.at("simple").get_to(c.sinks);
+  if(j.contains("simple")) {
+    j.at("simple").get_to(c.simple);
   }
 }
 

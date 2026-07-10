@@ -58,6 +58,16 @@ void listLoggers(bool print_details = false);
 
 // get messages from ringbuffer sink
 std::vector<std::string> getLog(size_t lim);
+
+// Serialisation
+
+void to_json(json& j, const LoggingLoggersConfig& c);
+void from_json(const json& j, LoggingLoggersConfig& c);
+void to_json(json& j, const LoggingSinkConfig& c);
+void from_json(const json& j, LoggingSinkConfig& c);
+void to_json(json& j, const LoggingConfig& c);
+void from_json(const json& j, LoggingConfig& c);
+
 }
 
 #endif
