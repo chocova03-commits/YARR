@@ -1,6 +1,7 @@
 #include "LoggingConfig.h"
 
 #include "LoadJson.h"
+#include "PirateSpeak.h"
 
 #include <filesystem>
 #include <optional>
@@ -10,6 +11,7 @@
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/ringbuffer_sink.h"
+#include "spdlog/pattern_formatter.h"
 
 #include "ProgressAwareSink.h"
 
@@ -25,6 +27,21 @@ static const std::map<std::string, int> level_map = {
   {"debug", SPDLOG_LEVEL_DEBUG},
   {"trace", SPDLOG_LEVEL_TRACE},
 };
+
+// Apply a pattern to a sink, routing the message payload ('%v') through
+// piratify() and prepending a random quip ('%j'), when pirate mode has been
+// enabled via the secret pass-phrase.
+static void applyPattern(spdlog::sink_ptr &sink, const std::string &pattern) {
+    if (logging::pirateModeEnabled()) {
+        auto formatter = std::make_unique<spdlog::pattern_formatter>();
+        formatter->add_flag<logging::PirateVFormatter>('v');
+        formatter->add_flag<logging::PirateQuipFormatter>('j');
+        formatter->set_pattern(logging::insertQuipFlag(pattern));
+        sink->set_formatter(std::move(formatter));
+    } else {
+        sink->set_pattern(pattern);
+    }
+}
 
 static std::string_view level_string(int lvl) {
   auto i = std::find_if(level_map.begin(), level_map.end(),
@@ -115,13 +132,14 @@ void setupLoggers(const json &j, const std::string &path) {
           pattern = jl["pattern"];
         }
 
-        new_sink->set_pattern(pattern);
+        spdlog::sink_ptr new_sink_ptr = new_sink;
+        applyPattern(new_sink_ptr, pattern);
         other_sinks[key] = new_sink;
       }
     }
 
     if(!default_pattern.empty()) {
-      default_sink->set_pattern(default_pattern);
+      applyPattern(default_sink, default_pattern);
     }
 
     if(j.contains("log_config")) {

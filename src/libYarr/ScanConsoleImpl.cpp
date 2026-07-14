@@ -10,6 +10,7 @@
 
 #include "logging.h"
 #include "LoggingConfig.h"
+#include "PirateSpeak.h"
 
 #include "ScanHelper.h"
 #include "ScanOpts.h"
@@ -126,6 +127,7 @@ int ScanConsoleImpl::init(ScanOpts options) {
         loggerConfig = logging::defaultConfig();
     }
     spdlog::info("Configuring logger ...");
+    logging::setPirateMode(scanOpts.pirateMode);
     logging::setupLoggers(loggerConfig);
     ScanHelper::banner(logger,"Welcome to YARR - ScanConsole");
     return 1;
