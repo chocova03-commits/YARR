@@ -19,7 +19,7 @@ namespace {
     auto blog = logging::make_log("Bookkeeper");
 }
 
-Bookkeeper::Bookkeeper(TxCore *arg_tx, RxCore *arg_rx) {
+Bookkeeper::Bookkeeper(TxCore *arg_tx, RxCore *arg_rx) : clipboardMonitorRefreshTime(0), runClipboardMonitor(false) {
     tx = arg_tx;
     rx = arg_rx;
     g_fe.reset();
@@ -43,7 +43,7 @@ void Bookkeeper::initGlobalFe(const std::string& chipType) {
     g_fe->connectBookkeeper(this);
 }
 
-void Bookkeeper::addFe(std::unique_ptr<FrontEnd> fe, const FrontEndConnectivity& cfg) {
+unsigned Bookkeeper::addFe(std::unique_ptr<FrontEnd> fe, const FrontEndConnectivity& cfg) {
     // Create new entry
     bookEntries.emplace_back();
     bookEntries.back().fe = std::move(fe);
@@ -61,10 +61,12 @@ void Bookkeeper::addFe(std::unique_ptr<FrontEnd> fe, const FrontEndConnectivity&
 
     // Using macro includes file/line info
     SPDLOG_LOGGER_INFO(blog, "Added FE: Tx({}), Rx({}), RegRx({}) under ID {}", cfg.getTxChannel(), cfg.getRxChannel(), cfg.getRegRxChannel(), uid);
+
+    return uid;
 }
 
-void Bookkeeper::addFe(std::unique_ptr<FrontEnd> fe, unsigned channel) {
-  this->addFe(std::move(fe), FrontEndConnectivity(channel,channel));
+unsigned Bookkeeper::addFe(std::unique_ptr<FrontEnd> fe, unsigned channel) {
+    return this->addFe(std::move(fe), FrontEndConnectivity(channel,channel));
 }
 
 void Bookkeeper::delFe(unsigned id) {
@@ -104,9 +106,6 @@ FrontEndCfg* Bookkeeper::getFeCfg(unsigned id) {
     }
 }
 
-FrontEnd* Bookkeeper::getLastFe() {
-    return bookEntries.back().fe.get();
-}
 
 std::vector<uint32_t> Bookkeeper::getTxMask() {
     std::vector<uint32_t> activeChannels;
@@ -182,7 +181,7 @@ void Bookkeeper::startFeClipboardMonitor() {
 
     // start clipboard monitoring thread
     runClipboardMonitor = true;
-    clipboardMonitorThread_ptr.reset(new std::thread(&Bookkeeper::feClipboardMonitor, this));
+    clipboardMonitorThread_ptr = std::make_unique<std::thread>(&Bookkeeper::feClipboardMonitor, this);
 }
 
 void Bookkeeper::setFeClipboardMonitorRefreshTime(unsigned arg_clipboardMonitorRefreshTime) {
@@ -194,7 +193,7 @@ void Bookkeeper::joinFeClipboardMonitor() {
     clipboardMonitorThread_ptr->join();
 }
 
-void Bookkeeper::addFeClipboardMonitor(unsigned arg_id, std::string arg_name) {
+void Bookkeeper::addFeClipboardMonitor(unsigned arg_id, const std::string& arg_name) {
     clipboardMonitorFeIDs.push_back(arg_id);
     clipboardMonitorFeNames.push_back(arg_name);
 }

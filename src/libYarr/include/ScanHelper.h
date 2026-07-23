@@ -39,6 +39,15 @@ namespace ScanHelper {
 
         using JsonHelper::openJsonFile;
         std::unique_ptr<HwController> loadController(const json &ctrlCfg);
+
+        /**
+         * Build all front ends from the chips data.
+         *
+         * @param j Input chip configuration as json.
+         * @param bookie Bookkeeper to store built FrontEnd.
+         * @param hwCtrl Controller to connect to FrontEnd.
+         * @param feCfgMap Record config path name for scan book-keeping.
+         */
         std::string buildChips(const json &j, Bookkeeper &bookie, HwController *hwCtrl,
                                std::map<unsigned, std::array<std::string, 2>> &feCfgMap);
         
@@ -101,7 +110,7 @@ namespace ScanHelper {
                                   int target_tot, int target_charge);
 
         void buildAnalyses( std::map<unsigned, std::vector<std::unique_ptr<AnalysisDataProcessor>> >& analyses,
-                            const json& scanType, Bookkeeper& bookie, const ScanLoopInfo* s, FeedbackClipboardMap *fbMap, int mask_opt, std::string outputDir,
+                            const json& scanType, Bookkeeper& bookie, const ScanLoopInfo* s, FeedbackClipboardMap *fbMap, int mask_opt, const std::string& outputDir,
                             int target_tot, int target_charge);
         void buildAnalysisHierarchy(AlgoTieredIndex& indexTiers,
                                     const json &anaCfg);

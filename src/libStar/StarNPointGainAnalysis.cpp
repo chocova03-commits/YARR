@@ -9,7 +9,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <unistd.h> // needed to fix linker errors
  
 #include "AllAnalyses.h"
 #include "ScanLoopInfo.h"
@@ -94,7 +93,7 @@ void StarNPointGainAnalysis::end() {
     auto respCurvesByChip = createAverageResponseCurves();
     for (unsigned chip = 0; chip < (nCol/Star::StripsPerABCRow); chip++) {
         // fit chip-avg response curve and fill output configuration
-        auto thresholds = respCurvesByChip[chip];
+        const auto& thresholds = respCurvesByChip[chip];
         std::vector<double> fitParams = guessInitialFitParams(thresholds);
         fitResponseCurve(thresholds, fitParams);
         m_conversionTool->setResponseParameters(fitParams, chip);

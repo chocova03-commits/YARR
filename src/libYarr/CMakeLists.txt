@@ -64,6 +64,7 @@ add_library(Scan SHARED
         AllStdActions.cpp
         AnalysisAlgorithm.cpp
         AnalysisConsole.cpp
+        AsyncReg.cpp
         Bookkeeper.cpp
         Clipboard.cpp
         ClusterData.cpp
@@ -74,6 +75,7 @@ add_library(Scan SHARED
         FrontEnd.cpp
         HistogramAlgorithm.cpp
         HistogramBase.cpp
+        Histograms.cpp
 	JsonData.cpp
         LoopActionBase.cpp
         LoopEngine.cpp

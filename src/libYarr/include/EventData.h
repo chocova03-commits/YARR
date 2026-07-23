@@ -12,8 +12,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
-#include <unistd.h> // this is needed for magical unknown reasons
-#include <stdint.h>
+#include <cstdint>
 
 // YARR
 #include "EventDataBase.h"
@@ -103,7 +102,7 @@ class FrontEndData : public EventDataBase {
             events.emplace_back(FrontEndEvent(arg_tag, arg_l1id, arg_bcid));
             curEvent = &events.back();
         }
-        void toFile(std::string filename);
+        void toFile(const std::string& filename);
         
         FrontEndEvent* curEvent;
         LoopStatus lStat;
