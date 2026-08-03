@@ -304,3 +304,88 @@ TEST_CASE("AsyncReadExceptionInProcess", "[Async]") {
   }
   logger->debug("++ Finish async test");
 }
+
+TEST_CASE("AsyncReadExceptionTest", "[Async]") {
+  // Throw exception from each slot (+ timeout)
+  auto l = spdlog::get("StarChips");
+
+  MyTestHw hw;
+
+  logger->debug("++ Make async");
+  AsyncAccess::AsyncContext anon{hw, hw};
+
+  logger->debug("++ Do async read");
+  std::vector<std::pair<uint32_t, AsyncAccess::AsyncReg>> regs;
+
+  // Test exceptions from different places
+  //  0: timeout
+  //  1: throw in send
+  //  2: throw in filter
+  //  3: throw in process
+  //  4: normal
+  for(uint32_t idx=0; idx<5; idx++) {
+    regs.push_back
+      (std::make_pair
+       (idx,
+        AsyncAccess::AsyncReg{
+          anon,
+          // Send
+          [&, idx](TxCore &) {
+            if(idx == 1) {
+              throw std::runtime_error("Throw from send");
+            }
+            // Non-timeout need some data to check
+            // Tag data with idx so each AsyncReg only consumes its own
+            if(idx != 0) {
+              hw.data.push_back({std::make_unique<RawData>(idx, std::vector<uint32_t>{})});
+            }
+          },
+          // Filter - only accept data tagged with our idx
+          [idx](const RawData &d) {
+            if(d.getAdr() != idx) {
+              return false;
+            }
+
+            if(idx == 2) {
+              throw std::runtime_error("Throw from filter");
+            }
+            return true;
+          },
+          // Process data (return void)
+          [idx](const RawData &d){
+            if(idx == 3) {
+              throw std::runtime_error("Throw from process");
+            }
+          },
+          // Make short timeout so that test completes quickly
+          std::chrono::milliseconds((idx == 0)?1:100)
+        }
+        ));
+  }
+
+  logger->debug("++ Async read in progress");
+
+  for(auto &r: regs) {
+    auto idx = r.first;
+    CAPTURE(idx);
+    try {
+      r.second.result.get();
+      // Anything else, will already throw
+      CHECK(idx > 3);
+    } catch(std::exception &e) {
+      std::string e_what = e.what();
+      if(idx == 0) {
+        CHECK(e_what == "Timeout exception");
+      } else if(idx == 1) {
+        CHECK(e_what == "Throw from send");
+      } else if(idx == 2) {
+        CHECK(e_what == "Throw from filter");
+      } else if(idx == 3) {
+        CHECK(e_what == "Throw from process");
+      } else {
+        CHECK(e_what == "Not expecting exception");
+      }
+    }
+  }
+  logger->debug("++ Finish async test");
+}
