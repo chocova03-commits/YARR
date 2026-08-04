@@ -29,6 +29,7 @@ class OccupancyAnalysis : public AnalysisAlgorithm {
             LowThr = 0.0;
             HighThr = 0.0;
             coreColMask = false;
+            coreColMaskThr = 0.1;
         }
         ~OccupancyAnalysis() override = default;
 
@@ -40,10 +41,11 @@ class OccupancyAnalysis : public AnalysisAlgorithm {
         std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         bool createMask;
-	    bool coreColMask;
+        bool coreColMask;
+        double coreColMaskThr;
         unsigned n_count;
         unsigned injections;
-	double LowThr, HighThr;
+        double LowThr, HighThr;
         std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
         std::map<LoopStatus::UID, unsigned> innerCnt;
 };

@@ -270,9 +270,15 @@ bool Histo1d::fromJson(const json &j) {
 void Histo1d::plot(const std::string &prefix, const std::string &dir) const {
     hlog->info("Plotting {}", HistogramBase::name);
 
-    std::string output = createFilename(prefix, dir, "png");
+    auto check_terminal = getenv("YARR_GNUPLOT_TERMINAL");
+    std::string term_name = "png";
+    if(check_terminal != nullptr) {
+      term_name = check_terminal;
+    }
+
+    std::string output = createFilename(prefix, dir, term_name);
     std::string input;
-    input+="\"set terminal png size 1280, 1024;";
+    input+="\"set terminal " + term_name + " size 1280, 1024;";
     input+="unset key;";
     input+="set xlabel '"  +HistogramBase::xAxisTitle+"';";
     input+="set ylabel '"  +HistogramBase::yAxisTitle+"';";

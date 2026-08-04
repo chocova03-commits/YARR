@@ -26,6 +26,11 @@ auto logger = logging::make_log("eyeDiagram");
 constexpr const char* COLOR_GREEN = "\033[32m";
 constexpr const char* COLOR_RESET = "\033[0m";
 
+// Bias the chosen delay towards the low edge of the eye rather than dead
+// center: the high edge has been observed to degrade faster than the low
+// edge, so centering leaves less margin than intended.
+constexpr double EYE_LOW_EDGE_FRACTION = 0.25;
+
 void printHelp() {
     std::cout << "Usage: ./bin/eyeDiagram [-h] [-r <hw_controller_file>] [-c <connectivity_file>] [-t <test_size>] [-s]\n\n"
         << "Options:\n"
@@ -312,8 +317,8 @@ int main(int argc, char **argv) {
             }
         }    
         int delay=0;
-        if (best_width!=0){ 
-            delay=(int) best_val+(best_width/2);
+        if (best_width!=0){
+            delay=(int) best_val+(best_width*EYE_LOW_EDGE_FRACTION);
             logger->info("Delay setting for lane {} with eye width {}: {}", i, best_width, delay);
         } else {
             logger->info("No good delay setting for lane {}", i);
@@ -325,6 +330,10 @@ int main(int argc, char **argv) {
         logger->info("Writing to controller config {}", hw_controller_filename);
         jcontroller["ctrlCfg"]["cfg"]["delay"]=delayVec;
         std::ofstream outputFile(hw_controller_filename);
+        if (!outputFile.is_open()) {
+            logger->error("Failed to open file for writing: {}", hw_controller_filename);
+            return 1;
+        }
         outputFile << std::setw(4) << jcontroller << std::endl;
         outputFile.close();
         logger->info("All done! \n");

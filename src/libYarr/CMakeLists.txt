@@ -64,6 +64,7 @@ add_library(Scan SHARED
         AllStdActions.cpp
         AnalysisAlgorithm.cpp
         AnalysisConsole.cpp
+        AsyncReg.cpp
         Bookkeeper.cpp
         Clipboard.cpp
         ClusterData.cpp
@@ -84,6 +85,7 @@ add_library(Scan SHARED
         ScanConsoleImpl.cpp
         ScanFactory.cpp
         ScanHelper.cpp
+        ScanProgress.cpp
         StdAnalysis.cpp
         StdDataGatherer.cpp
         StdDataLoop.cpp
