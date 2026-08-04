@@ -105,6 +105,7 @@ struct ReadRegStateCommon {
     }
   }
 
+  /// Check data, return true if data has been used
   bool checkData(RawData &rawData) {
     // logger->trace("Async read reg check data");
     if(*state != ReadRegSM::READY_FOR_DATA) {
@@ -112,7 +113,15 @@ struct ReadRegStateCommon {
       // logger->trace("Async read received data in wrong state {}", stateName());
       return false;
     }
-    if(filter_cb(rawData)) {
+    bool run_process_data = false;
+    try {
+      run_process_data = filter_cb(rawData);
+    } catch(...) {
+      notifyException(std::current_exception());
+      newState(ReadRegSM::EXCEPTION);
+      return false;
+    }
+    if(run_process_data) {
       newState(ReadRegSM::FOUND_DATA);
       processData(rawData);
       newState(ReadRegSM::READ_COMPLETE);

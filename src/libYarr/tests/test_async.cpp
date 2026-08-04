@@ -229,3 +229,40 @@ TEST_CASE("AsyncReadExceptionInSend", "[Async]") {
   }
   logger->debug("++ Finish async test");
 }
+
+TEST_CASE("AsyncReadExceptionInFilter", "[Async]") {
+  auto l = spdlog::get("StarChips");
+
+  MyTestHw hw;
+
+  logger->debug("++ Make async");
+  AsyncAccess::AsyncContext anon{hw, hw};
+
+  logger->debug("++ Do async read");
+  AsyncAccess::AsyncReg reg{
+    anon,
+    // Send
+    [&](TxCore &) {
+      hw.data.push_back({std::make_unique<RawData>(0, std::vector<uint32_t>{})});
+    },
+    // Filter
+    [](const RawData &d) -> bool {
+      throw std::runtime_error("Throw from filter");
+    },
+    // Process data (return void)
+    [](const RawData &d) {
+    }
+  };
+
+  logger->debug("++ Async read in progress");
+
+  try {
+    reg.result.get();
+    // Should have thrown
+    CHECK(false);
+  } catch(std::exception &e) {
+    std::string e_what = e.what();
+    CHECK(e_what == "Throw from filter");
+  }
+  logger->debug("++ Finish async test");
+}
