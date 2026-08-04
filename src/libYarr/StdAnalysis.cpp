@@ -2254,13 +2254,11 @@ void ParameterAnalysis::processHistogram(HistogramBase *h) {
 
 void ParameterAnalysis::end() {
     alog->trace("ParameterAnalysis end");
-    for (auto &[uid, histPtr] : paramCurves) {
-        if (histPtr) {
-            if (m_createMap) {
-                output->pushData(std::move(histPtr));
-            }
-            output->pushData(std::move(histPtr));
-        }        
+    for (auto &[uid, mapPtr] : paramMaps) {
+        if (m_createMap) {
+            output->pushData(std::move(paramCurves[uid]));
+        }
+        output->pushData(std::move(mapPtr));
     }
 }
 
