@@ -228,11 +228,11 @@ void OccupancyAnalysis::processHistogram(HistogramBase *h) {
                     } else {
                         const unsigned regIdx = s.coreCol / 16;
                         const unsigned bitVal = 1u << (s.coreCol % 16);
-                        alog->info("[{}][{}]   CoreCol {:2d}: {:4d}/{} bad ({:5.1f}%){}",
+                        alog->info("[{}][{}]   CoreCol {:2d}: {:4d}/{} bad ({:5.1f}%){}{}",
                                    id, feCfg->getName(), s.coreCol+1, s.nBad, totalPixelsPerCCol,
                                    pct, (pct >= 50.0 * coreColMaskThr) ? " -- near threshold" : "",
-                                   (pct >= 50.0 * coreColMaskThr) ? "[config hint: subtract " + std::to_string(bitVal) 
-                                   + " from EnCoreCol" + std::to_string(regIdx) + "{}]" : "");
+                                   (pct >= 50.0 * coreColMaskThr) ? " [config hint: subtract " + std::to_string(bitVal) 
+                                   + " from EnCoreCol" + std::to_string(regIdx) + "]" : "");
                     }
                 }
             }
