@@ -123,8 +123,13 @@ struct ReadRegStateCommon {
     }
     if(run_process_data) {
       newState(ReadRegSM::FOUND_DATA);
-      processData(rawData);
-      newState(ReadRegSM::READ_COMPLETE);
+      try {
+        processData(rawData);
+        newState(ReadRegSM::READ_COMPLETE);
+      } catch(...) {
+        notifyException(std::current_exception());
+        newState(ReadRegSM::EXCEPTION);
+      }
       return true;
     }
     return false;
@@ -165,6 +170,11 @@ struct ReadRegState : ReadRegStateCommon {
   }
 
   void processData(RawData &rawData) override {
+    if(*state == ReadRegSM::EXCEPTION) {
+      logger->error("Async read already set exception in processData!");
+      // Don't call set_value if already have exception
+      return;
+    }
     if constexpr (std::is_void_v<RegType>) {
       process_cb(rawData);
       promise.set_value();
