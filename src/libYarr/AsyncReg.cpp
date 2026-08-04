@@ -17,6 +17,7 @@ enum class ReadRegSM {
   FOUND_DATA,
   READ_COMPLETE,
 
+  EXCEPTION,
   TIMEOUT,
 };
 
@@ -53,7 +54,7 @@ struct ReadRegStateCommon {
   virtual ~ReadRegStateCommon() = default;
 
   /// Set exception on promise
-  virtual void notifyTimeout() = 0;
+  virtual void notifyException(std::exception_ptr ep) = 0;
 
   /// Use call back and set promise
   virtual void processData(RawData &) = 0;
@@ -72,6 +73,7 @@ struct ReadRegStateCommon {
     case ReadRegSM::FOUND_DATA: return "FOUND_DATA";
     case ReadRegSM::READ_COMPLETE: return "READ_COMPLETE";
     case ReadRegSM::TIMEOUT: return "TIMEOUT";
+    case ReadRegSM::EXCEPTION: return "EXCEPTION";
     default: return "UNEXPECTED";
     }
   }
@@ -83,12 +85,18 @@ struct ReadRegStateCommon {
        && (clk::now() - last_state_change) > ms_timeout) {
       logger->trace("Async read reg timeout from {}", stateName());
       newState(ReadRegSM::TIMEOUT);
-      return notifyTimeout();
+      return notifyException(std::make_exception_ptr(std::runtime_error("Timeout exception")));
     }
 
     switch(*state) {
     case ReadRegSM::INIT:
-      send_cb(tx);
+      try {
+        send_cb(tx);
+      } catch(...) {
+        notifyException(std::current_exception());
+        newState(ReadRegSM::EXCEPTION);
+        break;
+      }
       newState(ReadRegSM::READY_FOR_DATA);
       break;
     default:
@@ -138,9 +146,9 @@ struct ReadRegState : ReadRegStateCommon {
   ReadRegState &operator=(const ReadRegState &) = delete;
   ReadRegState &operator=(ReadRegState &&rhs) = default;
 
-  void notifyTimeout() override {
+  void notifyException(std::exception_ptr e) override {
     try {
-      throw std::runtime_error("Timeout exception");
+      std::rethrow_exception(e);
     } catch(...) {
       promise.set_exception(std::current_exception());
       return;
@@ -243,7 +251,7 @@ void AsyncAccess::detail::AsyncContextImpl::run(std::atomic<bool> &running_flag)
       for(size_t i=0; i<allSMs.size(); i++) {
         auto &sm = *allSMs[i];
         if((*sm.state == ReadRegSM::READ_COMPLETE)
-           || (*sm.state == ReadRegSM::READ_COMPLETE)) {
+           || (*sm.state == ReadRegSM::EXCEPTION)) {
           allSMs.erase(allSMs.begin() + i);
           // // Only do one at a time
           // break;
