@@ -150,3 +150,43 @@ TEST_CASE("AsyncReadRegisterMultipleChannels", "[Async]") {
   }
   logger->debug("++ Finish async test");
 }
+
+TEST_CASE("AsyncReadTimeoutException", "[Async]") {
+  // Throw exception from timeout
+  auto l = spdlog::get("StarChips");
+
+  MyTestHw hw;
+
+  logger->debug("++ Make async");
+  AsyncAccess::AsyncContext anon{hw, hw};
+
+  logger->debug("++ Do async read");
+
+  AsyncAccess::AsyncReg reg{
+    anon,
+    // Send
+    [&](TxCore &) {
+    },
+    // Filter
+    [](const RawData &d) {
+      return true;
+    },
+    // Process data (return void)
+    [](const RawData &d){
+    },
+    // Make short timeout so that test completes quickly
+    std::chrono::milliseconds(1)
+  };
+
+  logger->debug("++ Async read in progress");
+
+  try {
+    reg.result.get();
+    // Check exception happened
+    CHECK(false);
+  } catch(std::exception &e) {
+    std::string e_what = e.what();
+    CHECK(e_what == "Timeout exception");
+  }
+  logger->debug("++ Finish async test");
+}
