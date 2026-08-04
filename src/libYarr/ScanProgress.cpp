@@ -7,6 +7,14 @@
 #include "ProgressBar.h"
 
 namespace {
+    std::string padToWidth(unsigned value, unsigned width) {
+        std::string str = std::to_string(value);
+        if (str.size() < width) {
+            str.insert(0, width - str.size(), ' ');
+        }
+        return str;
+    }
+
     std::string formatDuration(std::chrono::seconds secs) {
         long long total = secs.count();
         if (total < 0) total = 0;
@@ -63,8 +71,9 @@ void ScanProgress::update(const LoopStatus &status) {
         elapsed = elapsed * level.count + step;
         total *= level.count;
 
+        std::string countStr = std::to_string(level.count);
         if (!label.empty()) label += " ";
-        label += level.tag + ": " + std::to_string(step + 1) + "/" + std::to_string(level.count);
+        label += level.tag + ": " + padToWidth(step + 1, countStr.size()) + "/" + countStr;
     }
 
     double fraction = total > 0 ? (double)elapsed / (double)total : 0.0;
