@@ -1,14 +1,41 @@
 #include "catch.hpp"
 
 #include "ScanHelper.h"
+#include "AllAnalyses.h"
 #include "AllChips.h"
 #include "AnalysisDataProcessor.h"
 #include "Bookkeeper.h"
 #include "ScanFactory.h"
 #include "FrontEndClipBoards.h"
+#include "LoopStatus.h"
+
+#include <set>
+#include <utility>
 
 #include "EmptyHw.h"
 #include "EmptyFrontEnd.h"
+
+namespace {
+  // Minimal ScanLoopInfo, so a fixed loop geometry can be handed to an
+  // analysis without a full ScanFactory/LoopEngine.
+  class TestScanInfo : public ScanLoopInfo {
+      struct TestLoopInfo : public LoopActionBaseInfo {
+        TestLoopInfo(LoopStyle s, int mn, int mx, unsigned st)
+          : LoopActionBaseInfo(s) {
+          min = mn;
+          max = mx;
+          step = st;
+        }
+      };
+
+      std::vector<TestLoopInfo> loops;
+
+    public:
+      explicit TestScanInfo(const std::vector<TestLoopInfo> &in) : loops(in) {}
+      unsigned size() const override { return loops.size(); }
+      const LoopActionBaseInfo *getLoop(unsigned n) const override { return &loops[n]; }
+  };
+}
 
 TEST_CASE("AnalysisHierarchy", "[Analysis]") {
 
@@ -140,8 +167,115 @@ TEST_CASE("AnalysisChainIO", "[Analysis]") {
       CHECK (h2d->getUnderflow() < 1e-9);
 
       // Check its content
-      REQUIRE (h2d->getBin(1) == 43);   
+      REQUIRE (h2d->getBin(1) == 43);
     }
   }
 
+}
+
+// Drive OccupancyAnalysis through multiple loop iterations with distinct
+// LoopStatus, to check that it buckets by uniqueID() rather than
+// conflating different parameter/mask-step positions into one histogram.
+// This exercises the LoopStatus/uniqueID machinery the way a real
+// multi-loop scan config does, which the single-histogram AnalysisChainIO
+// test above does not.
+TEST_CASE("AnalysisChainUID", "[Analysis]") {
+
+  EmptyHw hwCtrl;
+  Bookkeeper bookie(&hwCtrl, &hwCtrl);
+
+  unsigned nCol = 4, nRow = 4;
+  auto fe = std::make_unique<EmptyFrontEnd>(FrontEndGeometry{nCol, nRow});
+  fe->setActive(true);
+  unsigned last_id = bookie.addFe(std::move(fe), 42);
+
+  // Two "outer" loops that OccupancyAnalysis treats as parameter-of-interest
+  // loops (bucketed separately, one output histogram per combination), plus
+  // a mask loop and a trigger loop that get summed over into n_count.
+  //   loop 0: parameter loop,   3 steps (0, 1, 2)
+  //   loop 1: global feedback,  2 steps (0, 1) -- also kept as a distinct bucket
+  //   loop 2: mask loop,        2 steps (0, 1) -- summed into n_count, not a UID axis
+  //   loop 3: trigger loop,     100 count
+  // Mask/trigger loop counts follow the (max-min)/step convention used by
+  // real mask loops (e.g. a 64-step pixel mask loop has min=0, max=64), so
+  // 2 mask iterations means max=2, not max=1.
+  TestScanInfo scanInfo({
+      {LOOP_STYLE_PARAMETER,       0, 2, 1},
+      {LOOP_STYLE_GLOBAL_FEEDBACK, 0, 1, 1},
+      {LOOP_STYLE_MASK,            0, 2, 1},
+      {LOOP_STYLE_TRIGGER,         0, 0, 1},
+  });
+
+  auto analysis = StdDict::getAnalysis("OccupancyAnalysis");
+  REQUIRE (analysis);
+  analysis->setConfig(bookie.getFeCfg(last_id));
+  analysis->setMapSize(nCol, nRow);
+  analysis->loadConfig(json::object());
+
+  AnalysisProcessor proc(last_id);
+  auto &cp = bookie.getFe(last_id)->clipboards();
+  cp.clipResult.emplace_back(new ClipBoard<HistogramBase>());
+  proc.connect(&scanInfo, &(cp.clipHisto), cp.clipResult.back().get(), nullptr);
+  proc.addAlgorithm(std::move(analysis));
+
+  proc.init();
+  proc.run();
+
+  // For each of the 2*2=4 (loop0, loop1) combinations, push both mask-loop
+  // iterations so OccupancyAnalysis considers that bucket complete, filling
+  // bin 0 with a value that identifies the (loop0, loop1) combination.
+  for (unsigned p=0; p<3; p++) {
+    for (unsigned g=0; g<2; g++) {
+      for (unsigned m=0; m<2; m++) {
+        LoopStatus stat({p, g, m, 0},
+                         {LOOP_STYLE_PARAMETER, LOOP_STYLE_GLOBAL_FEEDBACK,
+                          LOOP_STYLE_MASK, LOOP_STYLE_TRIGGER});
+        auto h = std::make_unique<Histo2d>("OccupancyMap",
+                                            nCol, 0.5, nCol+0.5,
+                                            nRow, 0.5, nRow+0.5, stat);
+        h->setBin(0, 10*p + g);
+        cp.clipHisto.pushData(std::move(h));
+      }
+    }
+  }
+
+  cp.clipHisto.finish();
+  proc.join();
+  cp.clipResult.back()->finish();
+
+  auto &output = *(cp.clipResult.back());
+  REQUIRE (!output.empty());
+
+  // One OccupancyMap + one EnMask per (loop0, loop1) combination: 3*2*2 = 12
+  std::set<std::pair<unsigned,unsigned>> seenCombinations;
+  unsigned occMapCount = 0;
+
+  while (!output.empty()) {
+    auto result = output.popData();
+    CAPTURE (result->getName());
+
+    if (result->getName() != "OccupancyMap")
+      continue;
+
+    occMapCount++;
+
+    auto h2d = dynamic_cast<Histo2d*>(result.get());
+    REQUIRE (h2d);
+
+    unsigned p = h2d->getStat().get(0);
+    unsigned g = h2d->getStat().get(1);
+
+    // Both mask-loop iterations contributed, so bin 0 should be 2x the
+    // per-iteration value -- if UID bucketing were wrong (e.g. conflating
+    // distinct (p, g) combinations), this sum would be corrupted.
+    CHECK (h2d->getBin(0) == 2 * (10*p + g));
+
+    auto inserted = seenCombinations.insert({p, g});
+    // Each (p, g) combination should produce exactly one OccupancyMap
+    CHECK (inserted.second);
+  }
+
+  // All 3*2 = 6 (loop0, loop1) combinations produced a distinct histogram
+  CHECK (occMapCount == 6);
+  CHECK (seenCombinations.size() == 6);
 }
