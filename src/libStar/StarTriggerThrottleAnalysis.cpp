@@ -30,8 +30,7 @@ void StarTriggerThrottleAnalysis::init(const ScanLoopInfo *s) {
     auto l = s->getLoop(n);
     if (isPOILoop(l)) {
       // Data for parameter of interest goes in different analysis bins
-      ident_loops.push_back(n);
-      loopMax.push_back((unsigned)l->getMax());
+      loops.push_back(n);
     }
 
     if (l->isTriggerLoop()) {
@@ -51,27 +50,14 @@ void StarTriggerThrottleAnalysis::init(const ScanLoopInfo *s) {
   }
 }
 
-unsigned StarTriggerThrottleAnalysis::buildIdent(const LoopStatus &ls) {
-    // Select correct output container
-    unsigned ident = 0;
-    unsigned offset = 1;
-
-    // Determine identifier as a function of the scan parameters
-    for (unsigned n=0; n<ident_loops.size(); n++) {
-        auto loop_val = ls.get(ident_loops[n]);
-        ident += loop_val*offset;
-        offset *= loopMax[n];
-    }
-
-    return ident;
-}
-
 void StarTriggerThrottleAnalysis::endBin(const LoopStatus &ls) {
-    auto ident = buildIdent(ls);
+    LoopStatus loopStatus = ls;
+    loopStatus.setEnabledLoops(loops);
+    LoopStatus::UID ident = loopStatus.uniqueID();
 
     alog->debug("Done!");
     if(!m_occMapAllBunches[ident]) {
-      alog->warn("No data at end bin for {}", ident);
+      alog->warn("No data at end bin for {}", loopStatus.toString());
       return;
     }
 
@@ -100,13 +86,15 @@ void StarTriggerThrottleAnalysis::processHistogram(HistogramBase *h) {
     unsigned nbTriggersInBunch = m_trigLoop->getTrigCnt();
 
     // Select correct output container
-    unsigned ident = buildIdent(h->getStat());
+    LoopStatus loopStatus = h->getStat();
+    loopStatus.setEnabledLoops(loops);
+    LoopStatus::UID ident = loopStatus.uniqueID();
 
     // Determine identifier as a function of the scan parameters
     std::string name2 = "OccupancyMapAllBunches";
 
     alog->debug("Histogram from {} triggers for ident {}.",
-                nbTriggersInBunch, ident);
+                nbTriggersInBunch, loopStatus.toString());
 
     // Create "total" histogram (concatenating all bunches of triggers)
     if (m_occMapAllBunches[ident] == nullptr) {
