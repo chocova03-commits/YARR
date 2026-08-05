@@ -715,6 +715,7 @@ void ScurveFitter::init(const ScanLoopInfo *s) {
 
         // find potential pixel feedback
         if (l->isPixelFeedbackLoop()) {
+            pixelFeedbackLoop = n;
             fb = std::make_unique<PixelFeedbackSender>(feedback);
             if(fb == nullptr) {
                 alog->error("ScurveFitter: loop declared as pixel feedback, does not implement feedback");
@@ -957,7 +958,7 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
     // Finished full vcal loop, if feedback loop provide TDAC feedback
     // Requires odd number of TDAC steps, optimised for 3 iterations
     if (medCnt[uid] == n_count && fb != nullptr) {
-        if (uid[0] == 0) { // Might be dangerous if the outer loop is different than what we expect
+        if (uid[pixelFeedbackLoop] == 0) { // First pixel feedback iteration
             thrTarget = thrMap[uid]->getMean();
         }
 
@@ -992,7 +993,7 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                 step[uid]->setBin(bin, 0);
                 if (thrMap[uid]->getBin(bin) != 0) {
                     double curDeltaThr = thrTarget - thrMap[uid]->getBin(bin);
-                    if (uid[0] == 0) { // First time
+                    if (uid[pixelFeedbackLoop] == 0) { // First pixel feedback iteration
                         if (curDeltaThr > 5) { // Increase Threshold
                             step[uid]->setBin(bin, -1);
                         } else if (curDeltaThr < -5) { //Decrease Threshold

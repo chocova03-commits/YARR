@@ -144,6 +144,7 @@ class ScurveFitter : public AnalysisAlgorithm {
         void createFitResultHistograms(LoopStatus::UID uid, const LoopStatus& loopStatus);
 
         unsigned vcalLoop;
+        unsigned pixelFeedbackLoop{};
         unsigned vcalMin;
         unsigned vcalMax;
         unsigned vcalStep;
