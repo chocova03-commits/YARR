@@ -694,4 +694,20 @@ TEST_CASE("StarDataProcessorBadLength", "[star][data_processor]") {
   CAPTURE (proc.parse_error_string);
 
   CHECK (proc.parse_error_string == tc.expected_error);
+
+  if(bytes.size() < 4) {
+    // These now OK because 32-bit is already 4 bytes
+    return;
+  }
+
+  // Now rerun with 32-bit words
+  std::vector<uint32_t> words((bytes.size() + 3)/4);
+  std::copy(bytes.data(), bytes.data() + bytes.size(), (uint8_t*)words.data());
+  StarProcessPacket((uint8_t*)words.data(), (uint8_t*)(words.data() + words.size()), proc);
+
+  auto error_with_words = proc.parse_error_string;
+
+  CAPTURE (error_with_words);
+
+  CHECK (proc.parse_error_string == tc.expected_error);
 }
