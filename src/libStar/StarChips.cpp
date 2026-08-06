@@ -461,6 +461,11 @@ AsyncAccess::AsyncReg32 StarChips::readABCRegisterAsync(AsyncAccess::AsyncContex
 }
 
 yarrStatus StarChips::checkCom() {
+    if(!m_run_check_com) {
+      logger->info("Skipping checkCom, set RunCheckCom in config");
+      return yarrSuccess;
+    }
+
     logger->debug("Start check communication with Hybrid");
 
     // Run commands in separate thread

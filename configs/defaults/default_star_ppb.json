@@ -1,5 +1,6 @@
 {
     "name": "Barrel_Hybrid_PPB",
+    "RunCheckCom": true,
     "HCC": {
         "ID": 2,
         "fuse_id": "123abc",
