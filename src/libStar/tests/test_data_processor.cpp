@@ -211,6 +211,19 @@ TEST_CASE("StarDataProcessorPrintTemplate", "[star][data_processor]") {
     };
   }
 
+  SECTION("Data Cluster 2") {
+    expected = "Packet's abc clusters are:\n  0) InputChannel: 5, Address: 0xe5, Next Strip Pattern: 000.\n  1) InputChannel: 9, Address: 0xe5, Next Strip Pattern: 000.\n";
+
+    expected = "Packet type is TYP_LP\nPacket info: BCID 3 (0), L0ID 0\n" + expected;
+
+    bytes = {
+      0x20, 0x06, // Header
+      0x2f, 0x28, // Hit input channel 7, 0xe5 only
+      0x4f, 0x28, // Hit input channel 9, 0xe5 only
+      0x6f, 0xed  // Trailer
+    };
+  }
+
   SECTION("ABC Read") {
     expected = " ABC 0 ABC status 9141 Address: 51 value: 0000000c\n";
 
@@ -296,6 +309,18 @@ TEST_CASE("StarDataProcessorPrintTemplate", "[star][data_processor]") {
     }
     CHECK(output[i] == expected[i]);
   }
+
+  // Reset
+  oss = std::stringstream{};
+
+  // Run again with word input
+  std::vector<uint32_t> words((bytes.size() + 3)/4);
+  std::copy(bytes.data(), bytes.data() + bytes.size(), (uint8_t*)words.data());
+  StarProcessPacket((uint8_t*)words.data(), (uint8_t*)(words.data() + words.size()), proc);
+
+  output = oss.str();
+  CHECK (output == expected);
+  CHECK (output.size() == expected.size());
 }
 
 namespace {
