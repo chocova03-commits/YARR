@@ -321,7 +321,12 @@ void Histo3dT<DataT>::toJson(json &j) const {
 
 template<typename DataT>
 void Histo3dT<DataT>::toFile(const std::string &prefix, const std::string &dir, bool jsonType) const {
-    std::string filename = createFilename(prefix, dir, jsonType);
+    std::string ext = "";
+    if (jsonType) 
+        ext = "json";
+    else
+        ext = "dat";
+    std::string filename = createFilename(prefix, dir, ext);
     std::fstream file(filename, std::fstream::out | std::fstream::trunc);
 
     json j;
@@ -418,14 +423,13 @@ void Histo3dT<DataT>::plot(const std::string &prefix, const std::string &dir) co
     hlog->info("Plotting {}", HistogramBase::name);
     // Put raw histo data in tmp file
     std::string tmp_name = std::string(getenv("USER")) + "/tmp_yarr_histo2d_" + prefix;
-
     auto check_terminal = getenv("YARR_GNUPLOT_TERMINAL");
     std::string term_name = "png";
     if(check_terminal != nullptr) {
       term_name = check_terminal;
     }
 
-    std::string output = dir + prefix + "_" + HistogramBase::name + "_" + lStat.toString() + "." + term_name;
+    std::string output = createFilename(prefix, dir, term_name);
 
     // Open gnuplot as file and pipe commands
 
