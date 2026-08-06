@@ -51,8 +51,12 @@ bool StarProcessPacket(const uint8_t *b, const uint8_t *e, StarProcessor &t)
 
   if(type == SPT_HCC_RR || type == SPT_HCC_HPR) {
     if(count != 6) {
-      t.parse_error("Expect size 6 for HCC read packet");
-      return false;
+      if(count == 8) {
+        // Allow for 32-bit reasons
+      } else {
+        t.parse_error("Expect size 6 for HCC read packet");
+        return false;
+      }
     }
     uint8_t address = ((b[0] & 0xf) << 4) | ((b[1] >> 4) & 0xf);
     uint32_t value = ((b[1] & 0xf) << 28) | ((b[2] & 0xff) << 20) |
@@ -60,8 +64,12 @@ bool StarProcessPacket(const uint8_t *b, const uint8_t *e, StarProcessor &t)
     t.hcc_read(type == SPT_HCC_HPR, address, value);
   } else if (type == SPT_ABC_RR || type == SPT_ABC_HPR) {
     if(count != 9) {
-      t.parse_error("Expect size 9 for ABC read packet");
-      return false;
+      if(count == 12) {
+        // Allow for 32-bit reasons
+      } else {
+        t.parse_error("Expect size 9 for ABC read packet");
+        return false;
+      }
     }
 
     int channel_abc = b[0] & 0xf;
