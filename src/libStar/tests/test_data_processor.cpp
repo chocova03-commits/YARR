@@ -604,3 +604,94 @@ TEST_CASE("StarDataProcessorReadAbc", "[star][data_processor]") {
 
   CHECK (output == expected);
 }
+
+struct ErrorProcessor : public EmptyProc {
+  std::string parse_error_string;
+
+  void parse_error(const char *msg) {
+    parse_error_string = msg;
+  }
+};
+
+namespace {
+
+struct BadLengthTestData {
+  std::string expected_error;
+  std::vector<uint8_t> input_bytes;
+};
+
+}
+
+TEST_CASE("StarDataProcessorBadLength", "[star][data_processor]") {
+
+  auto tc = GENERATE
+    (
+     BadLengthTestData{"Not enough words",
+                       {0x20}
+     },
+
+     BadLengthTestData{"Not enough words", {
+         0x20, 0x20,
+     }},
+
+     BadLengthTestData{"Not enough words", {
+         0x20, 0x20, 0x20,
+     }},
+
+     BadLengthTestData{"Bad packet type",
+            {
+              0x00, 0x33, 0x00, 0x33,
+            }
+     },
+
+     BadLengthTestData{"Expect size 6 for HCC read packet",
+            {
+              0x80, 0xf5,
+              0x78, 0x50,
+              0x07, 0x90, 0x00
+            }
+     },
+
+     BadLengthTestData{"Expect size 9 for ABC read packet",
+            {
+                0x40, 0x3f,
+                0x07, 0x85,
+                0x51, 0xff,
+                0xf9, 0x14,
+                0x90, 0x00
+            }
+     },
+
+     BadLengthTestData{"Reached end of words without the end pattern!",
+         {
+           0x20, 0x06, // Header
+           0x4f, 0x28,
+           0x5f, 0x28
+         }
+     },
+
+     BadLengthTestData{"Bad cluster, bit 15 set",
+                       {0x20, 0x06, // Header
+                        0x83, 0x8f,
+                        0x6f, 0xed  // Trailer
+                       }
+     },
+
+     // Put empty test last
+     BadLengthTestData{"Not enough words", {}}
+     );
+
+  CAPTURE (tc.expected_error);
+
+  auto &bytes = tc.input_bytes;
+
+  CAPTURE (bytes);
+
+  ErrorProcessor proc;
+
+  StarProcessPacket(bytes.data(), bytes.data() + bytes.size(), proc);
+
+  CAPTURE (proc.parse_error_string);
+
+  CHECK (proc.parse_error_string == tc.expected_error);
+}
