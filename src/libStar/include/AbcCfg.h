@@ -7,6 +7,7 @@
 // # Comment: ABC Star configuration class
 // ################################
 
+#include <array>
 #include <map>
 #include <memory>
 #include <vector>
@@ -72,6 +73,8 @@ class AbcStarRegInfo {
     return abcSubRegisterMap_all;
   }
 
+  std::array<uint8_t, 256> m_registerMap;
+
  private:
   /// This is a map from each subregister to the ABC subregister name
   /// For example abcSubRegisterMap_all[NAME]
@@ -81,9 +84,6 @@ class AbcStarRegInfo {
 /// Configuration for an individual ABCStar
 class AbcCfg {
         unsigned m_abcID;
-
-        //This is a map from address to register index (into register set)
-        std::map<unsigned, unsigned> m_registerMap;
 
         // Store of registers in arbitrary order
         std::vector< Register > m_registerSet;
@@ -193,22 +193,22 @@ class AbcCfg {
         }
 
         const Register &getRegister(ABCStarRegister addr) const {
-            auto index = m_registerMap.at((unsigned int)addr);
+            auto index = m_info->m_registerMap[(unsigned int)addr];
             return m_registerSet[index];
         }
 
         Register &getRegister(ABCStarRegister addr) {
-            auto index = m_registerMap.at((unsigned int)addr);
+            auto index = m_info->m_registerMap[(unsigned int)addr];
             return m_registerSet[index];
         }
 
         const Register &getRegister(unsigned int addr) const {
-            auto index = m_registerMap.at(addr);
+            auto index = m_info->m_registerMap[addr];
             return m_registerSet[index];
         }
 
         Register &getRegister(unsigned int addr) {
-            auto index = m_registerMap.at(addr);
+            auto index = m_info->m_registerMap[addr];
             return m_registerSet[index];
         }
 

@@ -195,6 +195,22 @@ AbcStarRegInfo::AbcStarRegInfo(int version) {
         abcWriteMap[addr] = regMap[addr];
     }
 
+    // Map from address to storage
+    unsigned lastReg=0;
+    for (const ABCStarRegister &reg : AbcNames::listRegs()) {
+        if(version == 1 &&
+           ((reg > ABCStarRegister::ADCS3 && reg <= ABCStarRegister::ADCS7)
+            || (reg > ABCStarRegister::CREG1 && reg <= ABCStarRegister::CREG6))) {
+          continue;
+        }
+
+        int addr = (int)reg;
+        // Save position of register in memory to the registerMap
+        m_registerMap[addr] = lastReg;
+
+        lastReg++;
+    }
+
     auto &subregdefs = (version == 0)?
       s_abcsubregdefs_v0 : s_abcsubregdefs_v1;
 
@@ -216,7 +232,6 @@ AbcStarRegInfo::AbcStarRegInfo(int version) {
 
 AbcCfg::AbcCfg(int version)
   : m_abcID(0),
-    m_registerMap{},
     m_registerSet{},
     m_info(AbcStarRegInfo::instance(version))
 {
@@ -240,8 +255,14 @@ void AbcCfg::setupMaps(int version) {
 
         Register tmp_Reg(m_info->abcregisterMap.at(addr), 0);
         m_registerSet.push_back( std::move(tmp_Reg) ); //Save it to the list
-        int lastReg = m_registerSet.size()-1;
-        m_registerMap[addr] = lastReg; //Save it's position in memory to the registerMap
+        unsigned lastReg = m_registerSet.size()-1;
+
+        unsigned offset_check = m_info->m_registerMap[addr];
+
+        if(offset_check != lastReg) {
+          logger->warn("Mismatched mapping! {} {}", addr, lastReg);
+          abort();
+        }
     }
 }
 
