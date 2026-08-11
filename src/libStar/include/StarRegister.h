@@ -16,6 +16,12 @@ struct SubRegisterInfo {
             m_subRegName(subRegName)
         {}
 
+        // Don't allow copying (to avoid shared_ptr churn)
+        SubRegisterInfo(SubRegisterInfo const&) = delete;
+        SubRegisterInfo(SubRegisterInfo&&) = delete;
+        SubRegisterInfo& operator=(SubRegisterInfo const&) = delete;
+        SubRegisterInfo& operator=(SubRegisterInfo &&) = delete;
+
         int m_regAddress;
         unsigned m_bOffset;
         unsigned m_width;
@@ -31,13 +37,13 @@ struct SubRegisterInfo {
 /// A sub register of register, const implies the value can't be changed
 class ConstSubRegister {
     public:
-        ConstSubRegister(const uint32_t *reg, std::shared_ptr<const SubRegisterInfo> info)
+        ConstSubRegister(const uint32_t *reg, const SubRegisterInfo &info)
           : m_info(info), m_parentReg(reg) {}
 
         // Get value of field
         unsigned getValue() const {
-            unsigned maskBits = (1<<m_info->m_width)-1;
-            unsigned tmp = ((*m_parentReg&(maskBits<<m_info->m_bOffset))>>m_info->m_bOffset);
+            unsigned maskBits = (1<<m_info.m_width)-1;
+            unsigned tmp = ((*m_parentReg&(maskBits<<m_info.m_bOffset))>>m_info.m_bOffset);
 
             return tmp;
         }
@@ -45,14 +51,14 @@ class ConstSubRegister {
         uint32_t getParentRegValue() const{ return *m_parentReg; }
 
    private:
-        std::shared_ptr<const SubRegisterInfo> m_info;
+        const SubRegisterInfo &m_info;
         const uint32_t *m_parentReg;
 };
 
 /// A sub register of register, this one can update the value
 class SubRegister {
     public:
-        SubRegister(uint32_t *reg, std::shared_ptr<const SubRegisterInfo> info)
+        SubRegister(uint32_t *reg, const SubRegisterInfo &info)
           : m_info(info),
             m_parentReg(reg)
         {
@@ -60,26 +66,26 @@ class SubRegister {
 
         // Get value of field
         unsigned getValue() const {
-            unsigned maskBits = (1<<m_info->m_width)-1;
-            unsigned tmp = ((*m_parentReg&(maskBits<<m_info->m_bOffset))>>m_info->m_bOffset);
+            unsigned maskBits = (1<<m_info.m_width)-1;
+            unsigned tmp = ((*m_parentReg&(maskBits<<m_info.m_bOffset))>>m_info.m_bOffset);
 
             return tmp;
         }
 
         // Write value to field and config
-        void updateValue(const uint32_t cfgBits) {
-            unsigned maskBits = (1<<m_info->m_width)-1;
+        void updateValue(uint32_t cfgBits) {
+            unsigned maskBits = (1<<m_info.m_width)-1;
             if(cfgBits & ~maskBits) {
                 throw std::runtime_error("Attempt to write invalid bits in sub register");
             }
-            *m_parentReg=(*m_parentReg&(~(maskBits<<m_info->m_bOffset))) |
-              ((cfgBits&maskBits)<<m_info->m_bOffset);
+            *m_parentReg=(*m_parentReg&(~(maskBits<<m_info.m_bOffset))) |
+              ((cfgBits&maskBits)<<m_info.m_bOffset);
         }
 
         uint32_t getParentRegValue() const{ return *m_parentReg; }
 
    private:
-        std::shared_ptr<const SubRegisterInfo> m_info;
+        const SubRegisterInfo &m_info;
         uint32_t *m_parentReg;
 };
 
@@ -87,6 +93,12 @@ struct RegisterInfo {
         RegisterInfo(int address)
             : m_regAddress(address)
         {}
+
+        // Don't allow copying as uses shared_ptr too much
+        RegisterInfo(RegisterInfo const&) = delete;
+        RegisterInfo(RegisterInfo&&) = delete;
+        RegisterInfo& operator=(RegisterInfo const&) = delete;
+        RegisterInfo& operator=(RegisterInfo &&) = delete;
 
         int m_regAddress;
 
@@ -97,9 +109,9 @@ struct RegisterInfo {
             return subRegisterMap[subRegName];
         }
 
-        std::shared_ptr<const SubRegisterInfo> getSubRegister(std::string subRegName) const {
+        const SubRegisterInfo &getSubRegister(std::string subRegName) const {
             try {
-                return subRegisterMap.at(subRegName);
+                return *subRegisterMap.at(subRegName);
             } catch(std::out_of_range &e) {
                 throw std::runtime_error("RegisterInfo: Bad sub-register lookup"); 
             }
@@ -121,10 +133,11 @@ class Register {
             m_regValue(value)
         {}
 
-        // need to explicitly default due to unique_ptr
-        Register(const Register& other) = default;
+        // explicitly delete to avoid copying shared_ptr too much
+        Register(const Register& other) = delete;
+        Register &operator=(const Register& other) = delete;
+        // Moving is useful at creation time
         Register(Register && other) = default;
-        Register &operator=(const Register& other) = default;
         Register &operator=(Register&& other) = default;
 
         ~Register() = default;
@@ -140,23 +153,23 @@ class Register {
 
         /// Set value of named sub-field
         void setMySubRegisterValue(std::string subRegName, uint32_t value){
-            auto info = m_info->getSubRegister(subRegName);
+            auto &info = m_info->getSubRegister(subRegName);
             SubRegister(&m_regValue, info).updateValue(value);
         }
 
         /// Set value of named sub-field
         unsigned getMySubRegisterValue(std::string subRegName){
-            auto info = m_info->getSubRegister(subRegName);
+            auto &info = m_info->getSubRegister(subRegName);
             return SubRegister(&m_regValue, info).getValue();
         }
 
         /// Get sub-field by info (caller is responsible for this being valid)
-        ConstSubRegister getSubRegister(std::shared_ptr<const SubRegisterInfo> info) const {
-            return ConstSubRegister(&m_regValue, info);
+        ConstSubRegister getSubRegister(const SubRegisterInfo &info) const {
+            return ConstSubRegister(&m_regValue, std::move(info));
         }
 
         /// Get updateable sub-field by info (caller is responsible for this being valid)
-        SubRegister getSubRegister(std::shared_ptr<const SubRegisterInfo> info) {
+        SubRegister getSubRegister(const SubRegisterInfo &info) {
           return SubRegister(&m_regValue, info);
         }
 

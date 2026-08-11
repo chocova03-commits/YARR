@@ -61,14 +61,14 @@ class AbcStarRegInfo {
   static std::shared_ptr<const AbcStarRegInfo> instance(int version);
 
   /// Return sub register info from enum, throws std::runtime_error
-  SubInfoPtr subRegFromEnum(ABCStarSubRegister subReg) const;
+  const SubRegisterInfo &subRegFromEnum(ABCStarSubRegister subReg) const;
 
   int getSubRegisterParentAddr(ABCStarSubRegister subReg) const {
-    return subRegFromEnum(subReg)->getRegAddress();
+    return subRegFromEnum(subReg).getRegAddress();
   }
 
   /// The sub-reg map is accessible, but is const so can't be updated
-  const std::map<ABCStarSubRegister, SubInfoPtr> subRegMap() const {
+  const std::map<ABCStarSubRegister, SubInfoPtr> &subRegMap() const {
     return abcSubRegisterMap_all;
   }
 
@@ -115,15 +115,15 @@ class AbcCfg {
 
         /// Set the value of a register field for this ABC
         void setSubRegisterValue(ABCStarSubRegister subReg, uint32_t value) {
-            auto info = m_info->subRegFromEnum(subReg);
-            auto &reg = getRegister(info->m_regAddress);
+            auto &info = m_info->subRegFromEnum(subReg);
+            auto &reg = getRegister(info.m_regAddress);
             reg.getSubRegister(info).updateValue(value);
         }
 
         /// Get the value of a register field for this ABC
         uint32_t getSubRegisterValue(ABCStarSubRegister subReg) const {
-            auto info = m_info->subRegFromEnum(subReg);
-            auto &reg = getRegister(info->m_regAddress);
+            auto &info = m_info->subRegFromEnum(subReg);
+            auto &reg = getRegister(info.m_regAddress);
             return reg.getSubRegister(info).getValue();
         }
 
@@ -134,8 +134,8 @@ class AbcCfg {
 
         /// Find the full register contents for a register field
         uint32_t getSubRegisterParentValue(ABCStarSubRegister subReg) const {
-            auto info = m_info->subRegFromEnum(subReg);
-            return getRegister(info->m_regAddress).getValue();
+            auto &info = m_info->subRegFromEnum(subReg);
+            return getRegister(info.m_regAddress).getValue();
         }
 
         /// Find the full register contents for a register address
@@ -183,13 +183,13 @@ class AbcCfg {
 
     private:
         SubRegister getSubRegister(ABCStarSubRegister r) {
-            auto info = m_info->subRegFromEnum(r);
-            return getRegister(info->m_regAddress).getSubRegister(info);
+            auto &info = m_info->subRegFromEnum(r);
+            return getRegister(info.m_regAddress).getSubRegister(info);
         }
 
         ConstSubRegister getSubRegister(ABCStarSubRegister r) const {
-            auto info = m_info->subRegFromEnum(r);
-            return getRegister(info->m_regAddress).getSubRegister(info);
+            auto &info = m_info->subRegFromEnum(r);
+            return getRegister(info.m_regAddress).getSubRegister(info);
         }
 
         const Register &getRegister(ABCStarRegister addr) const {

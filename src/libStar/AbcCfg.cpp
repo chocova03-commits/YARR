@@ -359,10 +359,10 @@ void AbcCfg::setRegisterValue(ABCStarRegister addr, uint32_t val) {
     getRegister(addr).setValue(val);
 }
 
-AbcStarRegInfo::SubInfoPtr AbcStarRegInfo::subRegFromEnum(ABCStarSubRegister subReg) const
+const SubRegisterInfo &AbcStarRegInfo::subRegFromEnum(ABCStarSubRegister subReg) const
 {
     try {
-        return abcSubRegisterMap_all.at(subReg);
+        return *abcSubRegisterMap_all.at(subReg);
     } catch(std::out_of_range &e) {
         logger->info("Failed request for subReg: {}", AbcNames::subRegToString(subReg));
         for(auto &sr: abcSubRegisterMap_all) {
