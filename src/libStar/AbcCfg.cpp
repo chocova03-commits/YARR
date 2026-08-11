@@ -221,7 +221,7 @@ AbcStarRegInfo::AbcStarRegInfo(int version) {
         auto offset = std::get<2>(def);
         auto width = std::get<3>(def);
         const auto& reg_info = regMap.at(addr);
-        abcSubRegisterMap_all[reg_id] = reg_info->addSubRegister(subregname, offset, width);
+        abcSubRegisterMap_all[(unsigned)reg_id] = reg_info->addSubRegister(subregname, offset, width);
     }
 
     // Copy to const for remainder of life
@@ -382,12 +382,14 @@ void AbcCfg::setRegisterValue(ABCStarRegister addr, uint32_t val) {
 
 const SubRegisterInfo &AbcStarRegInfo::subRegFromEnum(ABCStarSubRegister subReg) const
 {
-    try {
-        return *abcSubRegisterMap_all.at(subReg);
-    } catch(std::out_of_range &e) {
+    auto &info = abcSubRegisterMap_all[(unsigned)subReg];
+    if(info) {
+        return *info;
+    } else {
         logger->info("Failed request for subReg: {}", AbcNames::subRegToString(subReg));
-        for(auto &sr: abcSubRegisterMap_all) {
-            logger->debug(" Have: {}", AbcNames::subRegToString(sr.first));
+        for(unsigned i=0; i<abcSubRegisterMap_all.size(); i++) {
+            if(!abcSubRegisterMap_all[i]) continue;
+            logger->debug(" Have: {}", AbcNames::subRegToString(ABCStarSubRegister(i)));
         }
         throw std::out_of_range("Attempt to get info for bad ABC sub register");
     }

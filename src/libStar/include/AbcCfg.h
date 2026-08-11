@@ -48,6 +48,7 @@ namespace ABCStarRegisters {
 class AbcStarRegInfo {
   typedef std::shared_ptr<const RegisterInfo> InfoPtr;
   typedef std::shared_ptr<const SubRegisterInfo> SubInfoPtr;
+  typedef std::array<SubInfoPtr, (unsigned)ABCStarSubRegister::READOUT_TIMEOUT_ENABLE + 1> AbcSubRegArray;
 
   public:
   /// Fills the maps appropriately
@@ -69,16 +70,16 @@ class AbcStarRegInfo {
   }
 
   /// The sub-reg map is accessible, but is const so can't be updated
-  const std::map<ABCStarSubRegister, SubInfoPtr> &subRegMap() const {
-    return abcSubRegisterMap_all;
-  }
+  const AbcSubRegArray &subRegMap() const {
+      return abcSubRegisterMap_all;
+   }
 
   std::array<uint8_t, 256> m_registerMap;
 
  private:
   /// This is a map from each subregister to the ABC subregister name
   /// For example abcSubRegisterMap_all[NAME]
-  std::map<ABCStarSubRegister, SubInfoPtr> abcSubRegisterMap_all;
+  AbcSubRegArray abcSubRegisterMap_all;
 };
 
 /// Configuration for an individual ABCStar
