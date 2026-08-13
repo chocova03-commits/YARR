@@ -52,6 +52,7 @@ json defaultConfig() {
 }
 
 spdlog::sink_ptr default_sink;
+std::string default_pattern_used = defaultLogPattern;
 void setupLoggers(const json &j, const std::string &path) {
     static bool initialized = false;
 
@@ -122,6 +123,7 @@ void setupLoggers(const json &j, const std::string &path) {
 
     if(!default_pattern.empty()) {
       default_sink->set_pattern(default_pattern);
+      default_pattern_used = default_pattern;
     }
 
     if(j.contains("log_config")) {
@@ -193,6 +195,16 @@ void setupLoggers(const json &j, const std::string &path) {
       listLoggers(true);
     }
     initialized =  true;
+}
+
+void addOutputFileSink(const std::string &outputDir) {
+    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(outputDir + "stdout.log");
+    file_sink->set_level(default_sink->level());
+    file_sink->set_pattern(default_pattern_used);
+
+    spdlog::apply_all([&](const std::shared_ptr<spdlog::logger>& l) {
+        l->sinks().push_back(file_sink);
+    });
 }
 
 void listLoggers(bool print_details) {

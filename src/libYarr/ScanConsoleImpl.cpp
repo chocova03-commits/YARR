@@ -155,6 +155,7 @@ int ScanConsoleImpl::loadConfig() {
     if(scanOpts.doOutput) {
         strippedScan = ScanHelper::createOutputDir(scanOpts.scanType, runCounter, scanOpts.outputDir);
         ScanHelper::createSymlink(dataDir,strippedScan,runCounter);
+        logging::addOutputFileSink(scanOpts.outputDir);
     }
 
     if(scanOpts.scan_config_provided) {
