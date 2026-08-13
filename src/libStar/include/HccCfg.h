@@ -38,16 +38,16 @@ class HccStarRegInfo {
         std::map<unsigned, InfoPtr> hccWriteMap;
 
         /// Return sub register info from enum, throws std::runtime_error
-        SubInfoPtr subRegFromEnum(HCCStarSubRegister subReg) const {
+        const SubRegisterInfo &subRegFromEnum(HCCStarSubRegister subReg) const {
           try {
-            return hccSubRegisterMap_all.at(subReg);
+            return *hccSubRegisterMap_all.at(subReg);
           } catch(std::out_of_range &e) {
             throw std::runtime_error("Attempt to get info for bad (HCC) sub-register");
           }
         }
 
         /// The sub-reg map is accessible, but is const so can't be updated
-        const std::map<HCCStarSubRegister, SubInfoPtr> subRegMap() const {
+        const std::map<HCCStarSubRegister, SubInfoPtr> &subRegMap() const {
             return hccSubRegisterMap_all;
         }
 
@@ -94,26 +94,26 @@ class HccCfg {
 
         /// Set value of register field
         void setSubRegisterValue(HCCStarSubRegister subReg, uint32_t value) {
-            auto info = m_info->subRegFromEnum(subReg);
-            m_registerMap.at(info->m_regAddress)->getSubRegister(info).updateValue(value);
+            auto &info = m_info->subRegFromEnum(subReg);
+            m_registerMap.at(info.m_regAddress)->getSubRegister(info).updateValue(value);
         }
 
         /// Get value of register field
         uint32_t getSubRegisterValue(HCCStarSubRegister subReg) const {
-            auto info = m_info->subRegFromEnum(subReg);
-            return m_registerMap.at(info->m_regAddress)->getSubRegister(info).getValue();
+            auto &info = m_info->subRegFromEnum(subReg);
+            return m_registerMap.at(info.m_regAddress)->getSubRegister(info).getValue();
         }
 
         /// Retrieve address of register corresponding to register field
         int getSubRegisterParentAddr(HCCStarSubRegister subReg) const {
-            auto info = m_info->subRegFromEnum(subReg);
-            return info->getRegAddress();
+            auto &info = m_info->subRegFromEnum(subReg);
+            return info.getRegAddress();
         }
 
         /// Retrieve full value of register containing register field
         uint32_t getSubRegisterParentValue(HCCStarSubRegister subReg) const {
-            auto info = m_info->subRegFromEnum(subReg);
-            return m_registerMap.at(info->m_regAddress)->getValue();
+            auto &info = m_info->subRegFromEnum(subReg);
+            return m_registerMap.at(info.m_regAddress)->getValue();
         }
 
         /// Get configured value of register address
@@ -135,8 +135,8 @@ class HccCfg {
 
     private:
         SubRegister getSubRegister(HCCStarSubRegister r) const {
-            auto info = m_info->subRegFromEnum(r);
-            return m_registerMap.at(info->m_regAddress)->getSubRegister(info);
+            auto &info = m_info->subRegFromEnum(r);
+            return m_registerMap.at(info.m_regAddress)->getSubRegister(info);
         }
 
         const Register &getRegister(HCCStarRegister addr) const {

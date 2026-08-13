@@ -7,6 +7,7 @@
 // # Comment: ABC Star configuration class
 // ################################
 
+#include <array>
 #include <map>
 #include <memory>
 #include <vector>
@@ -47,6 +48,7 @@ namespace ABCStarRegisters {
 class AbcStarRegInfo {
   typedef std::shared_ptr<const RegisterInfo> InfoPtr;
   typedef std::shared_ptr<const SubRegisterInfo> SubInfoPtr;
+  typedef std::array<SubInfoPtr, (unsigned)ABCStarSubRegister::READOUT_TIMEOUT_ENABLE + 1> AbcSubRegArray;
 
   public:
   /// Fills the maps appropriately
@@ -61,29 +63,28 @@ class AbcStarRegInfo {
   static std::shared_ptr<const AbcStarRegInfo> instance(int version);
 
   /// Return sub register info from enum, throws std::runtime_error
-  SubInfoPtr subRegFromEnum(ABCStarSubRegister subReg) const;
+  const SubRegisterInfo &subRegFromEnum(ABCStarSubRegister subReg) const;
 
   int getSubRegisterParentAddr(ABCStarSubRegister subReg) const {
-    return subRegFromEnum(subReg)->getRegAddress();
+    return subRegFromEnum(subReg).getRegAddress();
   }
 
   /// The sub-reg map is accessible, but is const so can't be updated
-  const std::map<ABCStarSubRegister, SubInfoPtr> subRegMap() const {
-    return abcSubRegisterMap_all;
-  }
+  const AbcSubRegArray &subRegMap() const {
+      return abcSubRegisterMap_all;
+   }
+
+  std::array<uint8_t, 256> m_registerMap;
 
  private:
   /// This is a map from each subregister to the ABC subregister name
   /// For example abcSubRegisterMap_all[NAME]
-  std::map<ABCStarSubRegister, SubInfoPtr> abcSubRegisterMap_all;
+  AbcSubRegArray abcSubRegisterMap_all;
 };
 
 /// Configuration for an individual ABCStar
 class AbcCfg {
         unsigned m_abcID;
-
-        //This is a map from address to register index (into register set)
-        std::map<unsigned, unsigned> m_registerMap;
 
         // Store of registers in arbitrary order
         std::vector< Register > m_registerSet;
@@ -115,15 +116,15 @@ class AbcCfg {
 
         /// Set the value of a register field for this ABC
         void setSubRegisterValue(ABCStarSubRegister subReg, uint32_t value) {
-            auto info = m_info->subRegFromEnum(subReg);
-            auto &reg = getRegister(info->m_regAddress);
+            auto &info = m_info->subRegFromEnum(subReg);
+            auto &reg = getRegister(info.m_regAddress);
             reg.getSubRegister(info).updateValue(value);
         }
 
         /// Get the value of a register field for this ABC
         uint32_t getSubRegisterValue(ABCStarSubRegister subReg) const {
-            auto info = m_info->subRegFromEnum(subReg);
-            auto &reg = getRegister(info->m_regAddress);
+            auto &info = m_info->subRegFromEnum(subReg);
+            auto &reg = getRegister(info.m_regAddress);
             return reg.getSubRegister(info).getValue();
         }
 
@@ -134,8 +135,8 @@ class AbcCfg {
 
         /// Find the full register contents for a register field
         uint32_t getSubRegisterParentValue(ABCStarSubRegister subReg) const {
-            auto info = m_info->subRegFromEnum(subReg);
-            return getRegister(info->m_regAddress).getValue();
+            auto &info = m_info->subRegFromEnum(subReg);
+            return getRegister(info.m_regAddress).getValue();
         }
 
         /// Find the full register contents for a register address
@@ -183,32 +184,32 @@ class AbcCfg {
 
     private:
         SubRegister getSubRegister(ABCStarSubRegister r) {
-            auto info = m_info->subRegFromEnum(r);
-            return getRegister(info->m_regAddress).getSubRegister(info);
+            auto &info = m_info->subRegFromEnum(r);
+            return getRegister(info.m_regAddress).getSubRegister(info);
         }
 
         ConstSubRegister getSubRegister(ABCStarSubRegister r) const {
-            auto info = m_info->subRegFromEnum(r);
-            return getRegister(info->m_regAddress).getSubRegister(info);
+            auto &info = m_info->subRegFromEnum(r);
+            return getRegister(info.m_regAddress).getSubRegister(info);
         }
 
         const Register &getRegister(ABCStarRegister addr) const {
-            auto index = m_registerMap.at((unsigned int)addr);
+            auto index = m_info->m_registerMap[(unsigned int)addr];
             return m_registerSet[index];
         }
 
         Register &getRegister(ABCStarRegister addr) {
-            auto index = m_registerMap.at((unsigned int)addr);
+            auto index = m_info->m_registerMap[(unsigned int)addr];
             return m_registerSet[index];
         }
 
         const Register &getRegister(unsigned int addr) const {
-            auto index = m_registerMap.at(addr);
+            auto index = m_info->m_registerMap[addr];
             return m_registerSet[index];
         }
 
         Register &getRegister(unsigned int addr) {
-            auto index = m_registerMap.at(addr);
+            auto index = m_info->m_registerMap[addr];
             return m_registerSet[index];
         }
 

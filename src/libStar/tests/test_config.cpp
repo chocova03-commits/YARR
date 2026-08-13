@@ -262,9 +262,23 @@ TEST_CASE("Star_AbcRegInfo", "[star][config]") {
     CHECK (info->abcregisterMap.find(rm.first) != info->abcregisterMap.end());
   }
 
-  for(auto &rm: info->subRegMap()) {
-    CAPTURE (rm.first);
-    CHECK (rm.second != nullptr);
+  unsigned unused_count = 0;
+  auto &srm = info->subRegMap();
+  for(unsigned si=0; si<srm.size(); si++) {
+    CAPTURE (si);
+    if(si == 0) {
+      // For some reason 0 not used in either case
+      CHECK (srm[si] == nullptr);
+    } else if(srm[si] == nullptr) {
+      unused_count ++;
+    }
+  }
+
+  // Count of how many unused sub register names in each version
+  if(version == 0) {
+    CHECK(unused_count == 19);
+  } else {
+    CHECK(unused_count == 22);
   }
 
   CHECK (info->abcWriteMap.size() == write_size);
