@@ -27,7 +27,7 @@ For details please refer to the [documentation](http://cern.ch/yarr) covering in
 
 This README only includes a quick install guide.
 
-(If you are working with the devel branch refer to the [devel docs](http://cern.ch/yarr/devel/) and see the current [coverage report](https://yarr.web.cern.ch/yarr/devel/coverage/).)
+(If you are working with the devel branch refer to the [devel docs](http://cern.ch/yarr/devel/), the [developer (doxygen) docs](https://yarr.web.cern.ch/doxygen/devel/), and see the current [coverage report](https://yarr.web.cern.ch/yarr/devel/coverage/).)
 
 ## Mailing list
 
