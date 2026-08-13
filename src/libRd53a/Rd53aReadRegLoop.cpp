@@ -42,7 +42,7 @@ uint16_t Rd53aReadRegLoop::ReadRegister(Rd53Reg Rd53aGlobalCfg::*ref, Rd53a *tmp
         data = dataVec[0];
     }
     
-    if(data != nullptr)
+    if(data == nullptr)
     {
         logger->warn("Warning!!!, No Word Recieved in ReadRegister");
         return 65535;
