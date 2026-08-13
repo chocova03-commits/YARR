@@ -22,9 +22,15 @@ int main(int argc, char **argv) {
     // Setup logger with some defaults
     logging::setupLoggers(logging::defaultConfig());
     
+    if (argc < 2) {
+	logger->critical("No arguments given, please specify 'on' or 'off'!");
+	printHelp();
+	return -1;
+    }
+
     // Init spec
     logger->info("Init spec");
-    int c;	
+    int c;
     int specNum = 0;
     int enableTX = 15;
     int enable = 0;
