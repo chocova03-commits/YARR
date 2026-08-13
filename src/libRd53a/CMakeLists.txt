@@ -27,6 +27,10 @@ target_link_libraries(Rd53a PUBLIC Scan Yarr_interface Util_interface)
 # rd53aReadRegister
 # rd53aReadRingosc
 
+if (BUILD_TESTS)
+    add_subdirectory(tests)
+endif ()
+
 install(TARGETS Rd53a
     EXPORT Yarr_Rd53aTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
