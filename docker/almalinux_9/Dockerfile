@@ -1,5 +1,6 @@
 FROM almalinux:9
 RUN dnf -y groupinstall "Development Tools"
+RUN dnf -y install dnf-plugins-core
 RUN dnf config-manager --set-enabled crb
 RUN dnf -y install epel-release
 RUN dnf -y install make cmake gnuplot git zeromq-devel root python3-devel boost-devel
