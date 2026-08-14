@@ -257,6 +257,9 @@ class StarCfg : public FrontEndCfg {
   int inputChannelForHistoChip(unsigned histo_chip) const;
 
   StarConversionTools m_ct;
+
+  /// By default don't run checkCom
+  bool m_run_check_com{};
 };
 
 #endif

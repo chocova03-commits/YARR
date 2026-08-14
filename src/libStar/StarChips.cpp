@@ -10,11 +10,13 @@
 
 #include "AbcNames.h"
 #include "HccNames.h"
+#include "StarProcessor.h"
 
 #include "HwController.h"
 #include "TxCore.h"
 
 #include <chrono>
+#include <optional>
 
 #include "logging.h"
 
@@ -354,6 +356,147 @@ void StarChips::readRegisters(){
                 }//for each register address
           }); //for each chipID
 
+}
+
+struct HccReadProc : public EmptyProc {
+  std::optional<std::pair<int, int>> result;
+
+  void hcc_read(bool hpr_not_rr, int address, int value) {
+    if(hpr_not_rr) {
+      return;
+    }
+    result = std::make_pair(address, value);
+  }
+};
+
+struct AbcReadProc : public EmptyProc {
+  std::optional<std::tuple<int, int, int>> result;
+
+  void abc_read(bool hpr_not_rr, int ic, int address, int value, int status) {
+    if(hpr_not_rr) {
+      return;
+    }
+    result = std::make_tuple(ic, address, value);
+  }
+};
+
+AsyncAccess::AsyncReg32 StarChips::readHCCRegisterAsync(AsyncAccess::AsyncContext &ctxt, HCCStarRegister reg)
+{
+  int reg_addr = (int)reg;
+  return AsyncAccess::AsyncReg32
+    (ctxt,
+     [&, reg_addr](TxCore &) {
+       sendCmd(read_hcc_register(reg_addr, getHCCchipID()));
+     },
+     [this](const RawData &d) {
+       if(d.getAdr() != getRxChannel()) {
+         // Ignore data for other FEs
+         return false;
+       }
+
+       HccReadProc proc;
+       uint8_t *start = (uint8_t*)d.getBuf();
+       uint8_t *end = start + (d.getSize() * 4);
+       StarProcessPacket(start, end, proc);
+
+       // Ignore if hcc reg read not found
+       return proc.result.has_value();
+     },
+     [reg_addr](const RawData &d) -> uint32_t {
+       HccReadProc proc;
+       uint8_t *start = (uint8_t*)d.getBuf();
+       uint8_t *end = start + (d.getSize() * 4);
+       StarProcessPacket(start, end, proc);
+
+       if(proc.result) {
+         auto [addr, value] = proc.result.value();
+         if(addr != reg_addr) {
+           throw std::runtime_error("Bad register address in HCC readback");
+         }
+         return value;
+       } else {
+         throw std::runtime_error("Bad packet for HCC readback");
+       }
+     });
+}
+
+AsyncAccess::AsyncReg32 StarChips::readABCRegisterAsync(AsyncAccess::AsyncContext &ctxt, ABCStarRegister reg, int chipID)
+{
+  int reg_addr = (int)reg;
+
+  return AsyncAccess::AsyncReg32
+    (ctxt,
+     [&, reg_addr, chipID](TxCore &) {
+       sendCmd(read_abc_register(reg_addr, getHCCchipID(), chipID));
+     },
+     [this](const RawData &d) {
+       if(d.getAdr() != getRxChannel()) {
+         // Ignore data for other FEs
+         return false;
+       }
+
+       AbcReadProc proc;
+       uint8_t *start = (uint8_t*)d.getBuf();
+       uint8_t *end = start + (d.getSize() * 4);
+       StarProcessPacket(start, end, proc);
+
+       // Ignore if hcc reg read not found
+       return proc.result.has_value();
+     },
+     [reg_addr](const RawData &d) {
+       AbcReadProc proc;
+       uint8_t *start = (uint8_t*)d.getBuf();
+       uint8_t *end = start + (d.getSize() * 4);
+       StarProcessPacket(start, end, proc);
+       if(proc.result) {
+         auto [chip, addr, value] = proc.result.value();
+         if(addr != reg_addr) {
+           throw std::runtime_error("Bad register address in ABC readback");
+         }
+         return value;
+       } else {
+         throw std::runtime_error("Bad packet for ABC readback");
+       }
+     });
+}
+
+yarrStatus StarChips::checkCom() {
+    if(!m_run_check_com) {
+      logger->info("Skipping checkCom, set RunCheckCom in config");
+      return yarrSuccess;
+    }
+
+    logger->debug("Start check communication with Hybrid");
+
+    // Run commands in separate thread
+    AsyncAccess::AsyncContext ctxt(*m_txcore, *m_rxcore);
+
+    // First read back HCC HPR reg
+    auto hcc_hpr = readHCCRegisterAsync(ctxt, HCCStarRegister::HPR);
+
+    uint32_t hpr_value = hcc_hpr.result.get();
+
+    logger->debug("Read back HCC HPR register: {:08x}", hpr_value);
+
+    if(hpr_value == 0) {
+      logger->error("Bad HCC HPR value {:08x}", hpr_value);
+      return yarrFailure;
+    }
+
+    std::vector<AsyncAccess::AsyncReg32> abc_vars;
+
+    eachAbc([&](auto &abc) { abc_vars.push_back(readABCRegisterAsync(ctxt, ABCStarRegister::HPR, abc.getABCchipID())); });
+
+    for(auto &aa: abc_vars) {
+      auto abc_value = aa.result.get();
+
+      if(abc_value == 0) {
+        logger->error("Bad ABC HPR value {:08x}", abc_value);
+        return yarrFailure;
+      }
+    }
+
+    return yarrSuccess;
 }
 
 void StarChips::writeHCCRegister(int addr) {
