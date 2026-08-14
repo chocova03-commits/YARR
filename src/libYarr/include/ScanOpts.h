@@ -35,6 +35,8 @@ struct ScanOpts {
     bool doResetBeforeScan = true;
     bool doConfigureBeforeScan = true;
     bool makeGraph = false;
+    /// Enabled only by an exact secret pass-phrase match; see ScanHelper::parseOptions.
+    bool pirateMode = false;
     unsigned nThreadsOutput = [] {
         unsigned n = std::thread::hardware_concurrency();
         return n ? n : 4;
