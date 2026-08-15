@@ -10,8 +10,58 @@
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/ringbuffer_sink.h"
+#include "spdlog/pattern_formatter.h"
 
 #include "ProgressAwareSink.h"
+
+namespace {
+  // Drop ANSI CSI escape sequences (e.g. "\033[1;33m" ... "\033[0m" SGR color
+  // codes) from formatted output. Lets messages carry hand-placed terminal
+  // highlighting (which real color sinks pass straight through) without that
+  // highlighting leaking as raw escape bytes into plain sinks such as files.
+  void stripAnsiCodes(const spdlog::memory_buf_t &in, spdlog::memory_buf_t &out) {
+    for(size_t i = 0; i < in.size(); i++) {
+      if(in[i] == '\033' && i+1 < in.size() && in[i+1] == '[') {
+        size_t j = i + 2;
+        while(j < in.size() && (in[j] == ';' || (in[j] >= '0' && in[j] <= '9'))) {
+          j++;
+        }
+        // Final byte of a CSI sequence is in the range 0x40-0x7E
+        if(j < in.size() && in[j] >= 0x40 && in[j] <= 0x7E) {
+          i = j; // Skip the whole escape sequence
+          continue;
+        }
+      }
+      out.push_back(in[i]);
+    }
+  }
+
+  class AnsiStrippingFormatter : public spdlog::formatter {
+  public:
+    explicit AnsiStrippingFormatter(std::unique_ptr<spdlog::formatter> inner)
+      : m_inner(std::move(inner)) {}
+
+    void format(const spdlog::details::log_msg &msg, spdlog::memory_buf_t &dest) override {
+      spdlog::memory_buf_t formatted;
+      m_inner->format(msg, formatted);
+      stripAnsiCodes(formatted, dest);
+    }
+
+    std::unique_ptr<spdlog::formatter> clone() const override {
+      return std::make_unique<AnsiStrippingFormatter>(m_inner->clone());
+    }
+
+  private:
+    std::unique_ptr<spdlog::formatter> m_inner;
+  };
+
+  // Wrap a plain pattern formatter with ANSI stripping, for sinks (e.g. files)
+  // that should never receive raw terminal color escapes.
+  std::unique_ptr<spdlog::formatter> makeAnsiStrippingFormatter(const std::string &pattern) {
+    return std::make_unique<AnsiStrippingFormatter>(
+        std::make_unique<spdlog::pattern_formatter>(pattern));
+  }
+}
 
 // spdlog::level::level_enum, but then construction doesn't work?
 static const std::map<std::string, int> level_map = {
@@ -115,7 +165,9 @@ void setupLoggers(const json &j, const std::string &path) {
           pattern = jl["pattern"];
         }
 
-        new_sink->set_pattern(pattern);
+        // This is a file sink, so never let raw terminal color escapes
+        // (hand-placed at call sites) leak into it.
+        new_sink->set_formatter(makeAnsiStrippingFormatter(pattern));
         other_sinks[key] = new_sink;
       }
     }

@@ -11,6 +11,7 @@
 #include "storage.hpp"
 #include "logging.h"
 #include "LoggingConfig.h"
+#include "spdlog/fmt/bundled/color.h"
 
 #include "ScanHelper.h"
 #include "Bookkeeper.h"
@@ -200,9 +201,12 @@ int main(int argc, char *argv[])
     // Setup logger with some defaults
     logging::setupLoggers(logging::defaultConfig());
 
-    logger->info("\033[1;31m#################################\033[0m");
-    logger->info("\033[1;31m# RD53B Test Tool: SEE register #\033[0m");
-    logger->info("\033[1;31m#################################\033[0m");
+    {
+        auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
+        logger->info(fmt::format(style, "#################################"));
+        logger->info(fmt::format(style, "# RD53B Test Tool: SEE register #"));
+        logger->info(fmt::format(style, "#################################"));
+    }
 
     logger->info("Parsing command line parameters ...");
     int c;
@@ -249,9 +253,12 @@ int main(int argc, char *argv[])
     logger->info("Chip config file path  : {}", cfgFilePath);
     logger->info("Ctrl config file path  : {}", ctrlFilePath);
 
-    logger->info("\033[1;31m#################\033[0m");
-    logger->info("\033[1;31m# Init Hardware #\033[0m");
-    logger->info("\033[1;31m#################\033[0m");
+    {
+        auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
+        logger->info(fmt::format(style, "#################"));
+        logger->info(fmt::format(style, "# Init Hardware #"));
+        logger->info(fmt::format(style, "#################"));
+    }
 
     logger->info("-> Opening controller config: {}", ctrlFilePath);
 
@@ -274,9 +281,12 @@ int main(int argc, char *argv[])
 
     Bookkeeper bookie(&*hwCtrl, &*hwCtrl);
 
-    logger->info("\033[1;31m###################\033[0m");
-    logger->info("\033[1;31m##  Chip Config  ##\033[0m");
-    logger->info("\033[1;31m###################\033[0m");
+    {
+        auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
+        logger->info(fmt::format(style, "###################"));
+        logger->info(fmt::format(style, "##  Chip Config  ##"));
+        logger->info(fmt::format(style, "###################"));
+    }
 
     Rd53b rd53b;
     rd53b.init(&*hwCtrl, FrontEndConnectivity(0,0));

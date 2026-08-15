@@ -21,6 +21,7 @@
 #include "lmcurve.h"
 #include "scurvegauss.h"
 #include "logging.h"
+#include "spdlog/fmt/bundled/color.h"
 
 namespace {
     auto alog = logging::make_log("StdAnalysis");
@@ -246,7 +247,8 @@ void OccupancyAnalysis::processHistogram(HistogramBase *h) {
             }
         }
 
-        alog->info("\033[1m\033[31m[{}][{}] Total number of failing pixels: {}\033[0m", id, feCfg->getName(), failed_cnt);
+        alog->info(fmt::format(fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold,
+            "[{}][{}] Total number of failing pixels: {}", id, feCfg->getName(), failed_cnt));
         output->pushData(std::move(mask)); // TODO push this mask to the specific configuration
         output->pushData(std::move(occMaps[uid]));
 
@@ -506,7 +508,8 @@ void TotAnalysis::processHistogram(HistogramBase *h) {
             }
         }
 
-        alog->info("\033[1;33m[{}][{}][{}] ToT Mean = {} +- {}\033[0m", id, feCfg->getName(), loopStatus.toString(),  meanTotDist->getMean(), meanTotDist->getStdDev()); 
+        alog->info(fmt::format(fmt::fg(fmt::terminal_color::yellow) | fmt::emphasis::bold,
+            "[{}][{}][{}] ToT Mean = {} +- {}", id, feCfg->getName(), loopStatus.toString(),  meanTotDist->getMean(), meanTotDist->getStdDev()));
 
         if (globalFb != nullptr) {
             double mean = 0;
@@ -1094,9 +1097,12 @@ void ScurveFitter::end() {
             }
 
             // Before moving data to clipboard
-            alog->info("\033[1;33m[{}][{}][{}] Threshold Mean = {} +- {}\033[0m", id, feCfg->getName(), loopStatus.toString(), thrMap[uid]->getMean(), thrMap[uid]->getStdDev());
-            alog->info("\033[1;33m[{}][{}][{}] Noise Mean = {} +- {}\033[0m", id, feCfg->getName(), loopStatus.toString(), sigMap[uid]->getMean(), sigMap[uid]->getStdDev());
-            alog->info("\033[1;33m[{}][{}][{}] Number of failed fits = {}\033[0m", id, feCfg->getName(), loopStatus.toString(), n_failedfit);
+            {
+              auto style = fmt::fg(fmt::terminal_color::yellow) | fmt::emphasis::bold;
+              alog->info(fmt::format(style, "[{}][{}][{}] Threshold Mean = {} +- {}", id, feCfg->getName(), loopStatus.toString(), thrMap[uid]->getMean(), thrMap[uid]->getStdDev()));
+              alog->info(fmt::format(style, "[{}][{}][{}] Noise Mean = {} +- {}", id, feCfg->getName(), loopStatus.toString(), sigMap[uid]->getMean(), sigMap[uid]->getStdDev()));
+              alog->info(fmt::format(style, "[{}][{}][{}] Number of failed fits = {}", id, feCfg->getName(), loopStatus.toString(), n_failedfit));
+            }
             output->pushData(std::move(thrDist[uid]));
             output->pushData(std::move(thrMap[uid]));
             output->pushData(std::move(sigDist[uid]));

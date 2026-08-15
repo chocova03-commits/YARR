@@ -12,6 +12,7 @@
 #include "StdHistogrammer.h" // knowledge of other analyses/etc
 #include "StdTriggerAction.h"
 #include "logging.h"
+#include "spdlog/fmt/bundled/color.h"
 
 namespace {
     auto logger = logging::make_log("Rd53bAnalysis");
@@ -513,7 +514,8 @@ void ToaAnalysis::processHistogram(HistogramBase *h) {
             fineMeanPToADist->fill(meanPToAMap->getBin(ii));
         } // ii
 
-        logger->info("\033[1;33mId:{} ScanID:{} ToA Mean = {} +- {}\033[0m", id, ident, meanPToADist->getMean(), meanPToADist->getStdDev());
+        logger->info(fmt::format(fmt::fg(fmt::terminal_color::yellow) | fmt::emphasis::bold,
+            "Id:{} ScanID:{} ToA Mean = {} +- {}", id, ident, meanPToADist->getMean(), meanPToADist->getStdDev()));
 
         // ToA vs charge
         if (m_hasVcalLoop) {
