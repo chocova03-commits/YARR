@@ -317,8 +317,7 @@ int main(int argc, char *argv[])
     }
 
     hwCtrl->setCmdEnable(0);
-    while (!hwCtrl->isCmdEmpty())
-        ;
+    hwCtrl->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(10));
 
     if (initialize)
@@ -326,7 +325,7 @@ int main(int argc, char *argv[])
         rd53b.configureInit();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        while (!hwCtrl->isCmdEmpty());
+        hwCtrl->waitCmdEmpty();
 
         rd53b.configureGlobal();
         /* Put global threshold to high value to avoid large current */
@@ -336,7 +335,7 @@ int main(int argc, char *argv[])
         rd53b.writeRegister(&Rd53b::DiffVff, 200);
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        while (!hwCtrl->isCmdEmpty());
+        hwCtrl->waitCmdEmpty();
 
         if (randomize)
         {
@@ -365,23 +364,20 @@ int main(int argc, char *argv[])
                 std::uniform_int_distribution<> regVal(0, 0xFFFF);
                 j_glob_seu[regName] = regVal(generator);
                 rd53b.sendWrReg(rd53b.getChipId(), addr, j_glob_seu[regName]);
-                while (!hwCtrl->isCmdEmpty())
-                    ;
+                hwCtrl->waitCmdEmpty();
             }
 
             /* Save the config file */
             saveCfgFile(rd53b, outputPrefix + "_rndm" + std::to_string(seed) + ".json", j_glob_seu);
         }
         rd53b.configurePixels();
-        while (!hwCtrl->isCmdEmpty())
-            ;
+        hwCtrl->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     hwCtrl->setRxEnable(0);
-    while (!hwCtrl->isCmdEmpty())
-        ;
+    hwCtrl->waitCmdEmpty();
     hwCtrl->flushBuffer();
 
     /* Read back pixel registers */
@@ -409,14 +405,11 @@ int main(int argc, char *argv[])
                     rd53b.writeRegister(&Rd53b::PixRegionCol, dc);
                     rd53b.writeRegister(&Rd53b::PixRegionRow, row);
                     rd53b.sendRdReg(rd53b.getChipId(), rd53b.PixPortal.addr());
-                    while (!hwCtrl->isCmdEmpty())
-                        ;
+                    hwCtrl->waitCmdEmpty();
                     rd53b.sendRdReg(rd53b.getChipId(), rd53b.PixRegionCol.addr());
-                    while (!hwCtrl->isCmdEmpty())
-                        ;
+                    hwCtrl->waitCmdEmpty();
                     rd53b.sendRdReg(rd53b.getChipId(), rd53b.PixRegionRow.addr());
-                    while (!hwCtrl->isCmdEmpty())
-                        ;
+                    hwCtrl->waitCmdEmpty();
 
                     address.push_back(std::make_pair(dc, row));
                     counter++;
@@ -443,8 +436,7 @@ int main(int argc, char *argv[])
             for (unsigned addr = 0; addr < 138; addr++)
             {
                 rd53b.sendRdReg(rd53b.getChipId(), addr);
-                while (!hwCtrl->isCmdEmpty())
-                    ;
+                hwCtrl->waitCmdEmpty();
                 std::vector<RawData> dataList = processDataPackets(hwCtrl.get());
                 rd53b_readback[stage][idx][addr] = decodeGlob(dataList, addr);
             }
@@ -454,8 +446,7 @@ int main(int argc, char *argv[])
             {
                 std::string regName = addr < 202 ? ("SEU" + std::to_string(addr - 138) + "_notmr") : ("SEU" + std::to_string(addr - 202));
                 rd53b.sendRdReg(rd53b.getChipId(), addr);
-                while (!hwCtrl->isCmdEmpty())
-                    ;
+                hwCtrl->waitCmdEmpty();
                 std::vector<RawData> dataList = processDataPackets(hwCtrl.get());
                 j_glob_seu[regName] = decodeGlob(dataList, addr);
             }
@@ -479,8 +470,7 @@ int main(int argc, char *argv[])
     rd53b.writeRegister(&Rd53b::PixRegionRow, 0xffff); /* 16 bit */
     rd53b.writeRegister(&Rd53b::PixAutoRow, 0x0); /* 1 bit */
     rd53b.writeRegister(&Rd53b::AiRegionRow, 0x1ff); /* 9 bit */
-    while (!hwCtrl->isCmdEmpty())
-        ;
+    hwCtrl->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     std::ofstream ftime(outputPrefix + "_time.txt");

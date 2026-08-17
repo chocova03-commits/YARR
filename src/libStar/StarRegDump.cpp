@@ -30,7 +30,7 @@ void StarRegDump::init() {
 	SPDLOG_LOGGER_DEBUG(logger, "init");
 	g_tx->setCmdEnable(keeper->getTxMask());
 
-	while(!g_tx->isCmdEmpty());
+	g_tx->waitCmdEmpty();
 }
 
 
@@ -102,7 +102,7 @@ void StarRegDump::end() {
 	SPDLOG_LOGGER_DEBUG(logger, "");
 
 	// Go back to general state of FE, do something here (if needed)
-	while(!g_tx->isCmdEmpty());
+	g_tx->waitCmdEmpty();
 }
 
 void StarRegDump::writeConfig(json &config) {

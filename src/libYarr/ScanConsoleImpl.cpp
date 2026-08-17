@@ -345,7 +345,7 @@ int ScanConsoleImpl::configure() {
             bookie->getFe(id)->configure();
             // Wait for fifo to be empty
             std::this_thread::sleep_for(std::chrono::microseconds(100));
-            while(!hwCtrl->isCmdEmpty());
+            hwCtrl->waitCmdEmpty();
         }
         cfg_end = std::chrono::steady_clock::now();
         logger->info("Sent configuration to all FEs in {} ms!",

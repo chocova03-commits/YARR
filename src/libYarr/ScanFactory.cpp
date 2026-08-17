@@ -47,7 +47,7 @@ void ScanFactory::preScan() {
         FrontEnd &fe = *g_bk->getGlobalFe();
         fe.writeNamedRegister(it.key(), it.value());
     }
-    while(!g_tx->isCmdEmpty()){}
+    g_tx->waitCmdEmpty();
 
     if (g_bk->getTargetCharge() > 0) {
         for (unsigned id=0; id<g_bk->getNumOfEntries(); id ++) {
@@ -58,7 +58,7 @@ void ScanFactory::preScan() {
                 // Write parameter
                 sflog->info("Target charge specified as: {}", g_bk->getTargetCharge());
                 fe->setInjCharge(g_bk->getTargetCharge(), true, true); // TODO need sCap/lCap for FEI4
-                while(!g_tx->isCmdEmpty()){}
+                g_tx->waitCmdEmpty();
             }
         }
         // Reset CMD mask

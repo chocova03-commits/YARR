@@ -119,7 +119,7 @@ void Rd53aGlobalFeedback::writePar() {
             g_tx->setCmdEnable(feCfg->getTxChannel());
             // Write parameter
             dynamic_cast<Rd53a*>(fe)->writeRegister(parPtr, m_values[id]);
-            while(!g_tx->isCmdEmpty()){}
+            g_tx->waitCmdEmpty();
         }
     }
     // Reset CMD mask
@@ -204,7 +204,7 @@ void Rd53aGlobalFeedback::init() {
             }
             rd53a->configurePixels();
         }
-        while(!g_tx->isCmdEmpty()){}
+        g_tx->waitCmdEmpty();
     }
     g_tx->setCmdEnable(keeper->getTxMask());
 }

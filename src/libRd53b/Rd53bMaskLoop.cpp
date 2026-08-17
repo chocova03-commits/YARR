@@ -114,7 +114,7 @@ void Rd53bMaskLoop::init() {
             }
         }
         rd53b->configurePixels();
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
     g_tx->setCmdEnable(keeper->getTxMask());
 }
@@ -211,7 +211,7 @@ void Rd53bMaskLoop::execPart1() {
         //for (auto n: modPixels)
         //  logger->info("{} {}",n.first,n.second);
         rd53b->configurePixels(modPixels);
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
 
     g_tx->setCmdEnable(keeper->getTxMask());
@@ -253,7 +253,7 @@ void Rd53bMaskLoop::execPart2() {
                 }
             }	
             rd53b->configurePixels(modPixels);
-            while(!g_tx->isCmdEmpty()) {}	
+            g_tx->waitCmdEmpty();
         }
     }
 

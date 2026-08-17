@@ -131,7 +131,7 @@ void Rd53bTriggerLoop::init() {
     g_tx->setTrigWordLength(m_trigWordLength);
     g_tx->setTrigTime(m_trigTime);
     g_tx->setCmdEnable(keeper->getTxMask());
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     //std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
@@ -141,7 +141,7 @@ void Rd53bTriggerLoop::execPart1() {
     auto rd53b = dynamic_cast<Rd53b*>(g_fe);
     dynamic_cast<HwController*>(g_tx)->runMode();
     //rd53b->sendClear(16);
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(200));
     //std::this_thread::sleep_for(std::chrono::microseconds(10));
     g_rx->flushBuffer();
@@ -167,7 +167,7 @@ void Rd53bTriggerLoop::execPart2() {
         rd53b->writeRegister(&Rd53b::Latency, 500);
         rd53b->writeRegister(&Rd53b::InjDigEn, 1);
 
-        while(!g_tx->isCmdEmpty()){;}
+        g_tx->waitCmdEmpty();
 
         this->setEdgeMode(2);
         g_tx->setTrigFreq(800000);
@@ -184,7 +184,7 @@ void Rd53bTriggerLoop::execPart2() {
         rd53b->writeRegister(&Rd53b::Latency, latency);
         rd53b->writeRegister(&Rd53b::InjDigEn, injDigEn);
         
-        while(!g_tx->isCmdEmpty()){;}
+        g_tx->waitCmdEmpty();
     }
     
     m_done = true;

@@ -63,8 +63,7 @@ void StarCounterLoop::init() {
             }
         }
 
-	while(!g_tx->isCmdEmpty());
-
+	g_tx->waitCmdEmpty();
 }
 
 
@@ -119,7 +118,7 @@ void StarCounterLoop::end() {
 	SPDLOG_LOGGER_DEBUG(logger, "");
 
 	// Go back to general state of FE, do something here (if needed)
-	while(!g_tx->isCmdEmpty());
+	g_tx->waitCmdEmpty();
 }
 
 void StarCounterLoop::setTrigWord() {

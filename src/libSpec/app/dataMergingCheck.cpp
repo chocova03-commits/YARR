@@ -194,7 +194,7 @@ int main(int argc, char **argv) {
 
             // Wait for fifo to be empty
             std::this_thread::sleep_for(std::chrono::microseconds(10));
-            while(!hw->isCmdEmpty());
+            hw->waitCmdEmpty();
 
             // By default, disable service blocks and set VDDA/VDDD low
             fe->writeNamedRegister("ServiceBlockEn", 0);
@@ -275,7 +275,7 @@ int main(int argc, char **argv) {
 
         }
     }
-    while(!hw->isCmdEmpty()){;}
+    hw->waitCmdEmpty();
     logger->info("Configuration done.");
 
     // Global soft reset
@@ -287,7 +287,7 @@ int main(int argc, char **argv) {
     gFe->resetAllSoft();
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    while(!hw->isCmdEmpty()){;}
+    hw->waitCmdEmpty();
 
     bool success = true;
 	

@@ -67,7 +67,7 @@ class Fei4ParameterLoop : public LoopActionBase{
 
         void writePar() {
             keeper->globalFe<Fei4>()->writeRegister(parPtr, cur);
-            while(!g_tx->isCmdEmpty());
+            g_tx->waitCmdEmpty();
         }
 
         unsigned cur;

@@ -226,7 +226,7 @@ int main(int argc, char **argv) {
 
             // Wait for fifo to be empty
             std::this_thread::sleep_for(std::chrono::microseconds(10));
-            while(!hw->isCmdEmpty());
+            hw->waitCmdEmpty();
 
             if (!skip_config){
                 // Wait for sync
@@ -324,7 +324,7 @@ int main(int argc, char **argv) {
                 return 1; 
             }
 
-            while(!hw->isCmdEmpty()){;}
+            hw->waitCmdEmpty();
 
             std::this_thread::sleep_for(std::chrono::microseconds(200));
 
@@ -358,7 +358,7 @@ int main(int argc, char **argv) {
 
             // Wait for fifo to be empty
             std::this_thread::sleep_for(std::chrono::microseconds(10));
-            while(!hw->isCmdEmpty());
+            hw->waitCmdEmpty();
 
             int chip_id=jchip["RD53B"]["Parameter"]["ChipId"];
 
@@ -374,7 +374,7 @@ int main(int argc, char **argv) {
                 fe->writeNamedRegister("SerSelOut3", 1);
             }
 
-            while(!hw->isCmdEmpty()){;}
+            hw->waitCmdEmpty();
 
             std::this_thread::sleep_for(std::chrono::microseconds(200));
 

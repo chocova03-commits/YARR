@@ -43,7 +43,7 @@ void Rd53bParMaskLoop::init() {
     }
     
     rd53b->configurePixelMaskParallel();
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
 }
 
 void Rd53bParMaskLoop::execPart1() {
@@ -72,7 +72,7 @@ void Rd53bParMaskLoop::execPart1() {
         
     }
     rd53b->configurePixelMaskParallel();
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
     
     g_tx->setCmdEnable(keeper->getTxMask());
     g_stat->set(this, m_cur);

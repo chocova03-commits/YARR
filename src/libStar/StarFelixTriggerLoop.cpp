@@ -84,7 +84,7 @@ void StarFelixTriggerLoop::init() {
   // Enable the LCB configuration elinks for setting TRICKLE_TRIGGER_PULSE
   g_tx->setCmdEnable(config_elinks);
 
-  while(!g_tx->isCmdEmpty());
+  g_tx->waitCmdEmpty();
 }
 
 void StarFelixTriggerLoop::execPart1() {
@@ -108,7 +108,7 @@ void StarFelixTriggerLoop::end() {
   // Go back to general state of FE, do something here (if needed)
   g_tx->setCmdEnable(keeper->getTxMask());
 
-  while(!g_tx->isCmdEmpty());
+  g_tx->waitCmdEmpty();
 }
 
 void StarFelixTriggerLoop::setTrigWord() {

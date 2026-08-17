@@ -193,7 +193,7 @@ int main(int argc, char **argv) {
 
             // Wait for fifo to be empty
             std::this_thread::sleep_for(std::chrono::microseconds(10));
-            while(!hw->isCmdEmpty());
+            hw->waitCmdEmpty();
         }
     }
 
