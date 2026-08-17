@@ -7,10 +7,12 @@ int main(int argc, char *argv[]) {
     ScanConsole con;
     int res=con.init(argc, argv);
     if(res<=0) return res;
-    res=con.loadConfig(); if(res!=0) exit(res);
-    res=con.initHardware(); if(res!=0) exit(res);
-    res=con.configure(); if(res!=0) exit(res);
-    res=con.setupScan(); if(res!=0) exit(res);
+    res=con.loadConfig(); if(res!=0) return (res);
+    res=con.initHardware(); if(res!=0) return (res);
+    res=con.configure();
+    if(res<0) return res;
+    if(res>0) return 0; // configured front-ends without a scan, nothing left to do
+    res=con.setupScan(); if(res!=0) return (res);
     con.run();
     con.cleanup();
     con.plot();

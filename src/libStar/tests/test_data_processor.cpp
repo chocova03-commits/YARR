@@ -4,12 +4,17 @@
 
 #include "AllProcessors.h"
 #include "StarCfg.h"
+#include "StarProcessor.h"
+#include "StarProcessorPrint.h"
+#include "StarProcessorSimple.h"
 
 #include "EventData.h"
 #include <memory>
 
 TEST_CASE("StarDataProcessor", "[star][data_processor]") {
   std::shared_ptr<FeDataProcessor> proc;
+
+  bool use_base_zero = false;
 
   SECTION("Star") {
     proc = StdDict::getDataProcessor("Star");
@@ -23,20 +28,35 @@ TEST_CASE("StarDataProcessor", "[star][data_processor]") {
     proc = StdDict::getDataProcessor("Star_vH1A1");
   }
 
-  REQUIRE (proc);
+  SECTION("Star_PPB_template") {
+    proc = StdDict::getDataProcessor("Star_vH1A1");
+    json j;
+    j["use_template"] = true;
+    proc->loadConfig(j);
+  }
 
-  ClipBoard<RawDataContainer> rd_cp;
-  ClipBoard<EventDataBase> em_cp;
+  SECTION("Star_PPB_template_base0") {
+    use_base_zero = true;
+
+    proc = StdDict::getDataProcessor("Star_vH1A1");
+    json j;
+    j["use_template"] = true;
+    j["zero_base"] = true;
+    proc->loadConfig(j);
+  }
+
+  CAPTURE (use_base_zero);
+
+  REQUIRE (proc);
 
   // Use v1 mapping for simplicity
   int hcc_version = 1;
   StarCfg starCfg(0, hcc_version);
-  starCfg.hcc().setSubRegisterValue("ICENABLE", 0x3ff);
+  starCfg.hcc().setSubRegisterValue(HCCStarSubRegister::ICENABLE, 0x3ff);
 
-  proc->connect(&starCfg, &rd_cp, &em_cp );
+  proc->connect(&starCfg, nullptr, nullptr);
 
   proc->init();
-  proc->run();
 
   alignas(32) uint8_t packet_bytes[] = {
     0x20, 0x06, // Header
@@ -72,16 +92,13 @@ TEST_CASE("StarDataProcessor", "[star][data_processor]") {
 
   std::unique_ptr<RawDataContainer> rdc(new RawDataContainer(LoopStatus()));
   rdc->add(std::move(rd));
-  rd_cp.pushData(std::move(rdc));
 
-  rd_cp.finish();
-
-  proc->join();
+  auto output = proc->process_event_core(*rdc, [](auto f) {});
 
   // No other channels added
-  REQUIRE (!em_cp.empty());
+  REQUIRE (output);
 
-  auto data = em_cp.popData();
+  auto &data = output;
   FrontEndData &rawData = *(FrontEndData*)data.get();
 
   REQUIRE (rawData.events.size() == 1);
@@ -95,9 +112,14 @@ TEST_CASE("StarDataProcessor", "[star][data_processor]") {
 
   for(auto &hit: first.hits) {
     // Remove offset to base 1
-    uint16_t packed = hit.col - 1;
-    if((hit.row-1) == 1) {
+    uint16_t packed = hit.col - (use_base_zero?0:1);
+    size_t check_row = hit.row - (use_base_zero?0:1);
+    CAPTURE(hit.row, hit.col);
+    CAPTURE(check_row);
+    if(check_row == 1) {
       packed |= 0x8000;
+    } else {
+      CHECK (check_row == 0);
     }
     out_hits.push_back(packed);
 
@@ -107,6 +129,7 @@ TEST_CASE("StarDataProcessor", "[star][data_processor]") {
   REQUIRE (out_hits.size() == expected.size());
   std::sort(out_hits.begin(), out_hits.end());
 
+  CAPTURE (out_hits, expected);
   for(size_t index=0; index<out_hits.size(); index++) {
     CAPTURE (index);
     bool found_row = out_hits[index] & 0x8000;
@@ -118,11 +141,598 @@ TEST_CASE("StarDataProcessor", "[star][data_processor]") {
 
     CAPTURE (found_row, found_channel_offset, found_strip, expect_row, expect_channel_offset, expect_strip);
 
-    REQUIRE (found_row == expect_row);
-    REQUIRE (found_channel_offset == expect_channel_offset);
-    REQUIRE (found_strip == expect_strip);
+    CHECK (found_row == expect_row);
+    CHECK (found_channel_offset == expect_channel_offset);
+    CHECK (found_strip == expect_strip);
+  }
+}
+
+TEST_CASE("StarDataProcessorPrintTemplate", "[star][data_processor]") {
+  std::vector<uint8_t> bytes;
+  std::string expected;
+
+  // In each section test particular template function
+  SECTION("Nothing") {
+    expected = "Parse error: Not enough words\n";
   }
 
-  // Only one thing
-  REQUIRE (em_cp.empty());
+  SECTION("Error Info") {
+    std::string header = "Packet type is TYP_LP\nPacket info: BCID 3 (0), L0ID 0\n";
+
+    std::string error_marker = "We received an error block 0x77F4!\nReceived packet errors for the following channels:\n";
+
+    std::string abc_map = "  ABC Error: 4\n  BCID Error: 2 9\n  L0tag Error: 0 7\n  Timeout Error: 5\n";
+
+    expected = header + error_marker + abc_map;
+
+    bytes = {
+      0x20, 0x06, // Header
+      0x77, 0xf4, // Error marker
+      0x01, 0x02, // 12 bits for each of 4 types
+      0x04, 0x08,
+      0x10, 0x20,
+      0x6f, 0xed, // Trailer
+    };
+  }
+
+  SECTION("Data Header") {
+    expected = "Packet info: BCID 3 (0), L0ID 0\n";
+
+    expected = "Packet type is TYP_LP\n" + expected;
+
+    bytes = {
+      0x20, 0x06, // Header
+      0x6f, 0xed,  // Trailer
+    };
+  }
+
+  SECTION("Data No cluster") {
+    expected = "Packet's abc clusters are:\n  -) Empty chip (2)\n";
+
+    // Surrounding
+    expected = "Packet type is TYP_LP\nPacket info: BCID 3 (0), L0ID 0\n" + expected;
+
+    bytes = {
+      0x20, 0x06, // Header
+      0x13, 0xfe,
+      0x6f, 0xed  // Trailer
+    };
+  }
+
+  SECTION("Data Cluster") {
+    expected = "Packet's abc clusters are:\n  0) InputChannel: 9, Address: 0xe5, Next Strip Pattern: 000.\n";
+
+    expected = "Packet type is TYP_LP\nPacket info: BCID 3 (0), L0ID 0\n" + expected;
+
+    bytes = {
+      0x20, 0x06, // Header
+      0x4f, 0x28, // Hit input channel 9, 0xe5 only
+      0x6f, 0xed  // Trailer
+    };
+  }
+
+  SECTION("Data Cluster 2") {
+    expected = "Packet's abc clusters are:\n  0) InputChannel: 5, Address: 0xe5, Next Strip Pattern: 000.\n  1) InputChannel: 9, Address: 0xe5, Next Strip Pattern: 000.\n";
+
+    expected = "Packet type is TYP_LP\nPacket info: BCID 3 (0), L0ID 0\n" + expected;
+
+    bytes = {
+      0x20, 0x06, // Header
+      0x2f, 0x28, // Hit input channel 7, 0xe5 only
+      0x4f, 0x28, // Hit input channel 9, 0xe5 only
+      0x6f, 0xed  // Trailer
+    };
+  }
+
+  SECTION("ABC Read") {
+    expected = " ABC 0 ABC status 9141 Address: 51 value: 0000000c\n";
+
+    expected = "Packet type is TYP_ABC_RR\n" + expected;
+
+    bytes = {
+      0x40, 0x33,
+      0x00, 0x00,
+      0x00, 0x00,
+      0xc9, 0x14,
+      0x10
+    };
+  }
+
+  SECTION("ABC HPR Read") {
+    expected = " ABC 0 ABC status 9149 Address: 63 value: 78551fff\n";
+
+    expected = "Packet type is TYP_ABC_HPR\n" + expected;
+
+    bytes = {
+      0xd0, 0x3f,
+      0x07, 0x85,
+      0x51, 0xff,
+      0xf9, 0x14,
+      0x90,
+    };
+  }
+
+  SECTION("HCC Read") {
+    expected = " Address: 3 value: 74b78557\n";
+
+    expected = "Packet type is TYP_HCC_RR\n" + expected;
+
+    bytes = {
+      0x80, 0x37,
+      0x4b, 0x78,
+      0x55, 0x70,
+    };
+  }
+
+  SECTION("HCC HPR Read") {
+    expected = " Address: 15 value: 57850079\n";
+
+    expected = "Packet type is TYP_HCC_HPR\n" + expected;
+
+    bytes = {
+      0xe0, 0xf5,
+      0x78, 0x50,
+      0x07, 0x90,
+    };
+  }
+
+  SECTION("Transparent") {
+    expected = "ABC transparent 0: 0010001000000101101111111110011111111111011111111111011111111111\n";
+
+    expected = "Packet type is TYP_ABC_TRANSP\n" + expected;
+
+    bytes = {
+      0x70, 0x22,
+      0x05, 0xbf,
+      0xe7, 0xff,
+      0x7f, 0xf7,
+      0xff,
+    };
+  }
+
+  CAPTURE (bytes);
+
+  std::stringstream oss;
+  PrintProc proc(oss);
+
+  StarProcessPacket(bytes.data(), bytes.data() + bytes.size(), proc);
+  std::string output = oss.str();
+  CHECK (output == expected);
+  CHECK (output.size() == expected.size());
+  for (int i=0; i<output.size(); i++) {
+    CAPTURE(i);
+    if(i) {
+      CAPTURE(output[i-1]);
+    }
+    if(i<output.size()-1) {
+      CAPTURE(output[i+1]);
+    }
+    CHECK(output[i] == expected[i]);
+  }
+
+  // Reset
+  oss = std::stringstream{};
+
+  // Run again with word input
+  std::vector<uint32_t> words((bytes.size() + 3)/4);
+  std::copy(bytes.data(), bytes.data() + bytes.size(), (uint8_t*)words.data());
+  StarProcessPacket((uint8_t*)words.data(), (uint8_t*)(words.data() + words.size()), proc);
+
+  output = oss.str();
+  CHECK (output == expected);
+  CHECK (output.size() == expected.size());
+}
+
+namespace {
+
+struct TC {
+  std::vector<uint32_t> input;
+  std::vector<std::pair<uint16_t, uint16_t>> output;
+};
+
+}
+
+TEST_CASE("StarDataProcessorRaw", "[star][data_processor]") {
+  // Use default, no difference for ASIC versions
+  std::shared_ptr<FeDataProcessor> proc
+    = StdDict::getDataProcessor("Star");
+
+  REQUIRE (proc);
+
+  json j;
+  j["raw_bits"] = true;
+  proc->loadConfig(j);
+
+  proc->init();
+
+  auto tc = GENERATE
+    (
+     TC{{0x87654321}, {{0x8765, 0x4321}}},
+     TC{{0x1, 2, 3, 4}, {{0, 0x1}, {0, 0x2}, {0, 0x3}, {0, 0x4}}}
+    );
+
+  size_t len = tc.input.size();
+
+  RawDataPtr rd = std::make_shared<RawData>(0, len);
+  uint32_t *buffer = rd->getBuf();
+  std::copy(tc.input.data(), tc.input.data()+len, buffer);
+
+  std::unique_ptr<RawDataContainer> rdc(new RawDataContainer(LoopStatus()));
+  rdc->add(std::move(rd));
+
+  auto output = proc->process_event_core(*rdc, [](auto f) {});
+
+  // No other channels added
+  REQUIRE (output);
+
+  auto data = dynamic_cast<FrontEndData*>(output.get());
+  REQUIRE (data);
+
+  FrontEndData &rawData = *data;
+
+  REQUIRE (rawData.events.size() == 1);
+
+  auto &event = rawData.events.front();
+  CHECK (event.l1id == 0xffff);
+  CHECK (event.bcid == 0xffff);
+
+  std::vector<uint16_t> out_hits;
+
+  CHECK ( event.hits.size() == tc.output.size() );
+
+  for(size_t o=0; o<event.hits.size(); o++) {
+    auto &hit = event.hits[o];
+    CAPTURE(hit.row, hit.col);
+
+    auto &exp = tc.output[o];
+
+    CHECK (hit.row == exp.first);
+    CHECK (hit.col == exp.second);
+
+    // Marker
+    CHECK (hit.tot == 0xffff);
+  }
+}
+
+namespace {
+
+struct PktTC {
+  std::string name;
+  std::optional<int> expected_type;
+  std::vector<uint8_t> input_bytes;
+};
+
+}
+
+TEST_CASE("StarDataProcessorPacketType", "[star][data_processor]") {
+  auto tc = GENERATE
+    (
+     PktTC{"Data Header", {SPT_LP}, {
+         0x20, 0x06, // Header
+         0x6f, 0xed,  // Trailer
+     }},
+
+     PktTC{"ABC Read", {SPT_ABC_RR},
+         {
+           0x40, 0x33,
+           0x00, 0x00,
+           0x00, 0x00,
+           0xc9, 0x14,
+           0x10
+         }},
+
+     PktTC{"ABC HPR Read", {SPT_ABC_HPR},
+         {
+           0xd0, 0x3f,
+           0x07, 0x85,
+           0x51, 0xff,
+           0xf9, 0x14,
+           0x90,
+         }},
+
+     PktTC{"HCC Read", {SPT_HCC_RR},
+         {
+      0x80, 0x37,
+      0x4b, 0x78,
+      0x55, 0x70,
+         }},
+
+     PktTC{"HCC HPR Read", {SPT_HCC_HPR},
+         {
+           0xe0, 0xf5,
+           0x78, 0x50,
+           0x07, 0x90,
+         }},
+
+     PktTC{"Transparent", {SPT_ABC_TRANSP},
+         {
+           0x70, 0x22,
+           0x05, 0xbf,
+           0xe7, 0xff,
+           0x7f, 0xf7,
+           0xff,
+         }},
+
+     PktTC{"Nothing", {}, {}}
+    );
+
+  CAPTURE (tc.name);
+  CAPTURE (tc.input_bytes);
+
+  StarProcessors::PacketType proc;
+
+  StarProcessPacket(tc.input_bytes.data(),
+                    tc.input_bytes.data() + tc.input_bytes.size(),
+                    proc);
+
+  CAPTURE (tc.expected_type.value_or(-1));
+
+  auto output = proc.type;
+  CAPTURE (output.value_or(-1));
+  CHECK (output == tc.expected_type);
+}
+
+namespace {
+
+struct RHccTC {
+  std::string name;
+  std::optional<std::tuple<uint8_t, uint32_t>> expected{};
+  std::vector<uint8_t> input_bytes;
+};
+
+}
+
+TEST_CASE("StarDataProcessorReadHcc", "[star][data_processor]") {
+
+  auto tc = GENERATE
+    (
+     RHccTC{"Data Header", {}, {
+         0x20, 0x06, // Header
+         0x6f, 0xed,  // Trailer
+     }},
+
+     RHccTC{"HCC Read",
+            {
+              std::make_tuple(3, 0x74b78557)
+            },
+            {
+              0x80, 0x37,
+              0x4b, 0x78,
+              0x55, 0x70,
+            }},
+
+     RHccTC{"ABC Read",
+            // Not HCC
+            {},
+            {
+              0x40, 0x33,
+              0x00, 0x00,
+              0x00, 0x00,
+              0xc9, 0x14,
+              0x10
+            }},
+     RHccTC{"HCC HPR Read as register",
+            {
+              std::make_tuple(15, 0x57850079),
+            },
+            {
+              0x80, 0xf5,
+              0x78, 0x50,
+              0x07, 0x90,
+            }
+     },
+     RHccTC{"HCC HPR Read",
+      // Not a register read
+      {},
+      {
+        0xe0, 0xf5,
+        0x78, 0x50,
+        0x07, 0x90,
+      }},
+
+     RHccTC{"Nothing", {}, {}}
+    );
+
+  CAPTURE (tc.name);
+
+  auto &bytes = tc.input_bytes;
+  auto &expected = tc.expected;
+
+  CAPTURE (bytes);
+
+  StarProcessors::ReadHccRegister proc;
+
+  StarProcessPacket(bytes.data(), bytes.data() + bytes.size(), proc);
+
+  auto &output = proc.result;
+
+  auto [ea, ev] = (expected.value_or(std::make_tuple(-1, -1)));
+  CAPTURE(ea, ev);
+  auto [oa, ov] = (output.value_or(std::make_tuple(-1, -1)));
+  CAPTURE(oa, ov);
+
+  CHECK (output == expected);
+}
+
+namespace {
+
+struct RAbcTc {
+  std::string name;
+  std::optional<std::tuple<uint8_t, uint8_t, uint32_t, uint16_t>> expected;
+  std::vector<uint8_t> input_bytes;
+};
+
+}
+
+TEST_CASE("StarDataProcessorReadAbc", "[star][data_processor]") {
+
+  auto tc = GENERATE
+    (
+     RAbcTc{"Data Header", {}, {
+         0x20, 0x06, // Header
+         0x6f, 0xed,  // Trailer
+     }},
+
+     RAbcTc{"ABC Read",
+            {std::make_tuple(0, 51, 0xc, 0x9141)},
+            {
+              0x40, 0x33,
+              0x00, 0x00,
+              0x00, 0x00,
+              0xc9, 0x14,
+              0x10
+            }
+     },
+
+     RAbcTc{"ABC HPR Read as Register",
+            {std::make_tuple(0, 63, 0x78551fff, 0x9149)},
+            {
+                0x40, 0x3f,
+                0x07, 0x85,
+                0x51, 0xff,
+                0xf9, 0x14,
+                0x90,
+            }
+     },
+
+     RAbcTc{"ABC HPR Read",
+            {},
+            {
+                0xd0, 0x3f,
+                0x07, 0x85,
+                0x51, 0xff,
+                0xf9, 0x14,
+                0x90,
+            }
+     },
+
+     RAbcTc{"Nothing", {}, {}}
+    );
+
+  CAPTURE (tc.name);
+
+  auto &bytes = tc.input_bytes;
+  auto &expected = tc.expected;
+
+  CAPTURE (bytes);
+
+  StarProcessors::ReadAbcRegister proc;
+
+  StarProcessPacket(bytes.data(), bytes.data() + bytes.size(), proc);
+
+  auto &output = proc.result;
+
+  auto [ei, ea, ev, es] = (expected.value_or(std::make_tuple(-1, -1, -1, -1)));
+  CAPTURE(ei, ea, ev, es);
+  auto [oi, oa, ov, os] = (output.value_or(std::make_tuple(-1, -1, -1, -1)));
+  CAPTURE(oi, oa, ov, os);
+
+  CHECK (output == expected);
+}
+
+struct ErrorProcessor : public EmptyProc {
+  std::string parse_error_string;
+
+  void parse_error(const char *msg) {
+    parse_error_string = msg;
+  }
+};
+
+namespace {
+
+struct BadLengthTestData {
+  std::string expected_error;
+  std::vector<uint8_t> input_bytes;
+};
+
+}
+
+TEST_CASE("StarDataProcessorBadLength", "[star][data_processor]") {
+
+  auto tc = GENERATE
+    (
+     BadLengthTestData{"Not enough words",
+                       {0x20}
+     },
+
+     BadLengthTestData{"Not enough words", {
+         0x20, 0x20,
+     }},
+
+     BadLengthTestData{"Not enough words", {
+         0x20, 0x20, 0x20,
+     }},
+
+     BadLengthTestData{"Bad packet type",
+            {
+              0x00, 0x33, 0x00, 0x33,
+            }
+     },
+
+     BadLengthTestData{"Expect size 6 for HCC read packet",
+            {
+              0x80, 0xf5,
+              0x78, 0x50,
+              0x07, 0x90, 0x00
+            }
+     },
+
+     BadLengthTestData{"Expect size 9 for ABC read packet",
+            {
+                0x40, 0x3f,
+                0x07, 0x85,
+                0x51, 0xff,
+                0xf9, 0x14,
+                0x90, 0x00
+            }
+     },
+
+     BadLengthTestData{"Reached end of words without the end pattern!",
+         {
+           0x20, 0x06, // Header
+           0x4f, 0x28,
+           0x5f, 0x28
+         }
+     },
+
+     BadLengthTestData{"Bad cluster, bit 15 set",
+                       {0x20, 0x06, // Header
+                        0x83, 0x8f,
+                        0x6f, 0xed  // Trailer
+                       }
+     },
+
+     // Put empty test last
+     BadLengthTestData{"Not enough words", {}}
+     );
+
+  CAPTURE (tc.expected_error);
+
+  auto &bytes = tc.input_bytes;
+
+  CAPTURE (bytes);
+
+  ErrorProcessor proc;
+
+  StarProcessPacket(bytes.data(), bytes.data() + bytes.size(), proc);
+
+  CAPTURE (proc.parse_error_string);
+
+  CHECK (proc.parse_error_string == tc.expected_error);
+
+  if(bytes.size() < 4) {
+    // These now OK because 32-bit is already 4 bytes
+    return;
+  }
+
+  // Now rerun with 32-bit words
+  std::vector<uint32_t> words((bytes.size() + 3)/4);
+  std::copy(bytes.data(), bytes.data() + bytes.size(), (uint8_t*)words.data());
+  StarProcessPacket((uint8_t*)words.data(), (uint8_t*)(words.data() + words.size()), proc);
+
+  auto error_with_words = proc.parse_error_string;
+
+  CAPTURE (error_with_words);
+
+  CHECK (proc.parse_error_string == tc.expected_error);
 }

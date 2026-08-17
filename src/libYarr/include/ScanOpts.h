@@ -3,12 +3,16 @@
 //
 #ifndef YARR_SCANOPTS_H
 #define YARR_SCANOPTS_H
+#include <thread>
 #include <vector>
 #include <string>
 
 struct ScanOpts {
-    std::string defaultLogPattern = "[%T:%e]%^[%=8l][%=15n][%t]:%$ %v";
     bool scan_config_provided = false;
+    /// Backend configuration service to use
+    std::string configurationType="File";
+    /// Plotting output to use
+    std::string plottingType="Default";
     std::string scanType;
     std::vector<std::string> cConfigPaths;
     std::string outputDir = "./data/";
@@ -29,6 +33,13 @@ struct ScanOpts {
     std::string commandLineStr;
     std::string progName;
     bool doResetBeforeScan = true;
+    bool doConfigureBeforeScan = true;
     bool makeGraph = false;
+    /// Enabled only by an exact secret pass-phrase match; see ScanHelper::parseOptions.
+    bool pirateMode = false;
+    unsigned nThreadsOutput = [] {
+        unsigned n = std::thread::hardware_concurrency();
+        return n ? n : 4;
+    }(); // if hardware_concurrency() returns 0, then default to 4 threads
 };
 #endif //YARR_SCANOPTS_H

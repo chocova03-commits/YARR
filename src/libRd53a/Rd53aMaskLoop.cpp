@@ -8,6 +8,8 @@
 
 #include "Rd53aMaskLoop.h"
 
+#include "Bookkeeper.h"
+
 #include "logging.h"
 
 namespace {
@@ -71,7 +73,7 @@ Rd53aMaskLoop::Rd53aMaskLoop() : LoopActionBase(LOOP_STYLE_MASK) {
     //Even
     AllNeighboursCoordinates["25x100_downup"][0] ={{std::make_pair(1,1),std::make_pair(3,1),std::make_pair(2,0),std::make_pair(3,0),std::make_pair(1,0),std::make_pair(-1,0),std::make_pair(-2,0),std::make_pair(-1,1)}};
     //Odd
-    AllNeighboursCoordinates["25x100_downup"][0] ={{std::make_pair(-1,0),std::make_pair(1,0),std::make_pair(2,0),std::make_pair(1,-1),std::make_pair(-1,-1),std::make_pair(-3,-1),std::make_pair(-2,0),std::make_pair(-3,0)}};
+    AllNeighboursCoordinates["25x100_downup"][1] ={{std::make_pair(-1,0),std::make_pair(1,0),std::make_pair(2,0),std::make_pair(1,-1),std::make_pair(-1,-1),std::make_pair(-3,-1),std::make_pair(-2,0),std::make_pair(-3,0)}};
 
     //How many and which pixels to consider for cross-talk (1: consider, 0: ignore)
     m_mask_size = {{
@@ -109,7 +111,7 @@ void Rd53aMaskLoop::init() {
         }
         // TODO make configrue for subset
         rd53a->configurePixels();
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
     // Reset CMD mask
     g_tx->setCmdEnable(keeper->getTxMask());
@@ -188,7 +190,7 @@ void Rd53aMaskLoop::execPart1() {
             }//end row
         }//end column
         rd53a->configurePixels(modPixels);
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
     // Reset CMD mask
     g_tx->setCmdEnable(keeper->getTxMask());
@@ -227,7 +229,7 @@ void Rd53aMaskLoop::execPart2() {
                 }
             }	
             rd53a->configurePixels(modPixels);
-            while(!g_tx->isCmdEmpty()) {}	
+            g_tx->waitCmdEmpty();
         }
     }
 

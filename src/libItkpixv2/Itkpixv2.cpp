@@ -10,6 +10,9 @@
 #include "Itkpixv2.h"
 
 #include "logging.h"
+#include "HwController.h"
+
+#include <thread>
 
 // Create logger
 namespace {
@@ -48,7 +51,7 @@ void Itkpixv2::resetAllHard() {
         core->writeFifo(0x00000000);
     }
     core->releaseFifo();
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     
     // Wait for at least 1000us before chip is release from reset
     logger->debug(" ... waiting for CMD reset to be released");
@@ -59,7 +62,7 @@ void Itkpixv2::resetAllHard() {
     for(unsigned int i=0; i<32; i++)
         core->writeFifo(0x817E817E);
     core->releaseFifo();
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
 }
 
@@ -68,10 +71,10 @@ void Itkpixv2::resetAllSoft() {
 
     this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x018);
     this->writeRegister(&Itkpixv2::GlobalPulseWidth, 10);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
     this->sendGlobalPulse(m_chipId);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
 }
@@ -99,15 +102,15 @@ void Itkpixv2::configureInit() {
     logger->debug(" ... set global register in writeable mode");
     this->writeRegister(&Itkpixv2::GcrDefaultConfig, 0xAC75);
     this->writeRegister(&Itkpixv2::GcrDefaultConfigB, 0x538A);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
     // Send a global pulse to reset multiple things
     logger->debug(" ... send resets via global pulse");
     this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x0FFF);
     this->writeRegister(&Itkpixv2::GlobalPulseWidth, 10);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     this->sendGlobalPulse(m_chipId);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
     // Reset register
     this->writeRegister(&Itkpixv2::GlobalPulseConf, 0);
@@ -134,10 +137,10 @@ void Itkpixv2::configureInit() {
         this->writeRegister(&Itkpixv2::EnCoreCol1, 1<<i);
         this->writeRegister(&Itkpixv2::EnCoreCol2, 1<<i);
         this->writeRegister(&Itkpixv2::EnCoreCol3, 1<<i);
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         this->sendClear(m_chipId);
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
         
@@ -153,7 +156,7 @@ void Itkpixv2::configureInit() {
     // Send a clear cmd
     logger->debug(" ... sending clear command");
     this->sendClear(m_chipId);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     logger->debug("Chip initialisation done!");
@@ -170,7 +173,7 @@ void Itkpixv2::configureGlobal() {
     this->writeRegister(&Itkpixv2::DiffTh1R, 500);
     this->writeRegister(&Itkpixv2::DiffTh1M, 500);
     this->writeRegister(&Itkpixv2::DiffTh2, 0);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
     logger->debug("Configuring all registers ...");
     for (unsigned addr=0; addr<numRegs; addr++) {
@@ -178,21 +181,21 @@ void Itkpixv2::configureGlobal() {
         
         // Special handling of preamp register
         if (addr == 13) { // specifically wait after setting preamp bias
-            while(!core->isCmdEmpty()){;}
+            core->waitCmdEmpty();
             std::this_thread::sleep_for(std::chrono::microseconds(5000));
         }
 
         if (addr % 20 == 0) // Wait every 20 regs to not overflow a buffer
-            while(!core->isCmdEmpty()){;}
+            core->waitCmdEmpty();
     }
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     
     this->writeRegister(&Itkpixv2::DiffTh1L, tmpTh1L);
     this->writeRegister(&Itkpixv2::DiffTh1R, tmpTh1R);
     this->writeRegister(&Itkpixv2::DiffTh1M, tmpTh1M);
     this->writeRegister(&Itkpixv2::DiffTh2, tmpTh2);
     
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 }
 
 void Itkpixv2::configurePixels() {
@@ -207,9 +210,9 @@ void Itkpixv2::configurePixels() {
         for (unsigned row=0; row<n_Row; row++) {
             this->writeRegister(&Itkpixv2::PixPortal, pixRegs[dc][row]);
             if (row%32==0)
-                while(!core->isCmdEmpty()){;}
+                core->waitCmdEmpty();
         }
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
     }
 }
 
@@ -223,12 +226,12 @@ void Itkpixv2::configurePixelMaskParallel() {
     for (unsigned dc=0; dc<4; dc++) {
         this->writeRegister(&Itkpixv2::PixRegionCol, dc);
         this->writeRegister(&Itkpixv2::PixRegionRow, 0);
-        std::array<uint16_t, n_Row> maskBits;
+        std::array<uint16_t, n_Row> maskBits = {};
         for (unsigned row=0; row<n_Row; row++) {
             maskBits[row] = toTenBitMask(pixRegs[dc][row]);
         }
         this->sendPixRegBlock(m_chipId, maskBits);
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
     }
 
 }
@@ -249,11 +252,11 @@ void Itkpixv2::configurePixels(std::vector<std::pair<unsigned, unsigned>> &pixel
         this->writeRegister(&Itkpixv2::PixPortal, pixRegs[pixel.first>>1][pixel.second]);
         write_counter++;
         if (write_counter >= 20) {
-            while(!core->isCmdEmpty()){;}
+            core->waitCmdEmpty();
             write_counter = 0;
         }
     }
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 }
 
 yarrStatus Itkpixv2::writeRegister(Itkpixv2RegDefault Itkpixv2GlobalCfg::*ref, uint16_t value) {
@@ -270,45 +273,71 @@ yarrStatus Itkpixv2::readRegister(Itkpixv2RegDefault Itkpixv2GlobalCfg::*ref, ui
     // send a read register command to the chip so that it
     // sends back the current value of the register
     this->sendRdReg(m_chipId, (this->*ref).addr());
-    while(!core->isCmdEmpty()) {}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     // go through the incoming data stream and get the register read data
-    std::vector<RawDataPtr> dataVec = m_rxcore->readData();
+    std::vector<RawDataPtr> dataVec;
     RawDataPtr data;
-    if (dataVec.size() > 0) {
-        for(auto const &v : dataVec) {
-            // Find raw data for this address
-            if (rxChannel != v->getAdr())
-                continue;
+    bool found = false;
+    double check_seconds = 0.;
 
-            if (v->get(0) != 0xffffdead) {
-                data = v;
-                if(!(data->getSize() >= 2)) {
-                    logger->error("readRegister failed, received wrong number of words ({}) for FE with chipId {}", data->getSize(), m_chipId);
+    logger->debug("Reading register data for chip ID {} on channel {}", m_chipId, regRxChannel);
+    std::chrono::steady_clock::time_point comm_t0 = std::chrono::steady_clock::now();
+
+    do {
+        dataVec = m_rxcore->readData();
+        if (dataVec.size() > 0) {
+            for(auto const &v : dataVec) {
+                // Find raw data for this address
+                if (regRxChannel != v->getAdr()){
+                    logger->debug("Data doesn't belong to the regRx channel {}, instead comes from channel {}", regRxChannel, v->getAdr());
                     continue;
                 }
 
-                auto [id, received_address, register_value] = Itkpixv2::decodeSingleRegReadID(data->get(0), data->get(1));
-                chipId = id; // chipId is read from the chip wirebonded ID, m_chipId is set in the chip config file
-                if(id == (m_chipId&0x3)) {
-                    if(received_address != (this->*ref).addr()) {
-                        logger->error("readRegister failed, returned data is for unexpected register address (received address: {}, expected address {})", received_address, (this->*ref).addr());
-                        return yarrFailure;
+                if (v->get(0) != 0xffffdead) {
+                    data = v;
+                    if(!(data->getSize() >= 2)) {
+                        logger->error("readRegister failed, received wrong number of words ({}) for FE with chipId {}", data->getSize(), m_chipId);
+                        continue;
                     }
-                    // Update memory
-                    m_cfg[(this->*ref).addr()] = register_value;
-                    // Return value
-                    value = (this->*ref).read();
-                    return yarrSuccess;
-                } else {
-                    logger->info("readRegister 0x{:x} 0x{:x} -> ID {} {}, addr 0x{:x} val 0x{:x}", data->get(0), data->get(1), id, m_chipId&0x3, received_address, register_value);
+
+                    auto [id, received_address, register_value] = Itkpixv2::decodeSingleRegReadID(data->get(0), data->get(1));
+                    chipId = id; // chipId is read from the chip wirebonded ID, m_chipId is set in the chip config file
+                    if(m_chipId > 15 || id == (m_chipId&0x3)) { // only compare if not broadcasting
+                        if(received_address != (this->*ref).addr()) {
+                            logger->error("readRegister failed, returned data is for unexpected register address (received address: {}, expected address {})", received_address, (this->*ref).addr());
+                            continue;
+                        }
+                        logger->debug("readRegister successful for register address {} with value {} from chip with chipId {}", (this->*ref).addr(), register_value, m_chipId);
+                        found = true;
+                        // Update memory
+                        m_cfg[(this->*ref).addr()] = register_value;
+                        // Return value
+                        value = (this->*ref).read();
+                        return yarrSuccess;
+                    } else {
+                        logger->info("readRegister 0x{:x} 0x{:x} -> ID {} {}, addr 0x{:x} val 0x{:x}", data->get(0), data->get(1), id, m_chipId&0x3, received_address, register_value);
+                        logger->info("Sending another readRegister command.");
+                        m_rxcore->flushBuffer();
+                        this->sendRdReg(m_chipId, (this->*ref).addr());
+                        core->waitCmdEmpty();
+                        break;
+                    }
                 }
             }
+        } else {
+            logger->debug("No raw data received.");
         }
-    }
 
-    logger->error("readRegister failed, did not received register readback data from chip with chipId {}", m_chipId);
+        std::chrono::steady_clock::time_point comm_t1 = std::chrono::steady_clock::now();
+        check_seconds = std::chrono::duration_cast<std::chrono::seconds>(comm_t1 - comm_t0).count();
+        if(!found)
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    } while(!found && check_seconds<3.);
+
+    logger->error("readRegister failed, did not receive register readback data for address {} from chip with chipId {}", (this->*ref).addr(), m_chipId);
+    value = 65535;
     return yarrFailure;
 }
 
@@ -423,7 +452,7 @@ Itkpixv2RegDefault Itkpixv2GlobalCfg::*  Itkpixv2::getNamedRegisterObject(std::s
     } else {
         logger->error("Trying to get named register object, register not found: {}", name);
     }
-    return NULL;
+    return nullptr;
 }
 
 yarrStatus Itkpixv2::checkCom() {
@@ -435,19 +464,21 @@ yarrStatus Itkpixv2::checkCom() {
     logger->debug("Checking communication for {} by reading a register ...", this->name);
     uint32_t regAddr = 21;
     uint32_t regValue = m_cfg[regAddr];
+
+    m_rxcore->flushBuffer();
     this->sendRdReg(m_chipId, regAddr);
-    while(!core->isCmdEmpty()){;} // Required by the rdRegister() above 
+    core->waitCmdEmpty(); // Required by the rdRegister() above 
                                   // (when relying on isCmdEmpty() to actually send commands).
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     // TODO not happy about this, rx knowledge should not be here
     std::vector<RawDataPtr> dataVec = m_rxcore->readData();
     RawDataPtr data;
-    if (dataVec.size() > 0) {
+    if (dataVec.size() > 0 && dataVec[0]->getAdr() == regRxChannel) {
         data = dataVec[0];
     }
 
-    if (data != NULL) {
+    if (data != nullptr) {
         unsigned size = data->getSize();       
         if (!(size == 2 || size == 4 || size == 8 || size == 12 || size == 6)) {
             logger->error("Received wrong number of words ({}) for {}", data->getSize(), this->name);
@@ -510,17 +541,13 @@ uint32_t Itkpixv2::getEfuses() {
     itkpix_efuse_codec::EfuseData efuse_data_old = itkpix_efuse_codec::EfuseData{itkpix_efuse_codec::decodeOldFormat(efuse_data_raw)};
 
     uint32_t chip_sn = efuse_data.chip_sn();
-    uint32_t chip_sn_old = efuse_data_old.chip_sn();
+    logger->info("Chip serial number obtained from e-fuse data: 0x{:x}", chip_sn );
 
-    // https://gitlab.cern.ch/YARR/YARR/-/issues/166
-    if (chip_sn > 0x16000) {
-        logger->info("Chip serial number obtained from e-fuse data: 0x{:x}", chip_sn );
-        return chip_sn;
-    } else {
-        logger->info("Chip serial number decoded with old format from e-fuse data: 0x{:x}", chip_sn_old);
-        return chip_sn_old;
-    }
-    return yarrFailure;
+    // Test for error correction
+    if (chip_sn != ((efuse_data_raw >> 8) & 0xFFFFF))
+        logger->warn("Chip serial number decoded from e-fuse did not match parity bits, tried to error correct.");
+
+    return chip_sn;
 }
 
 std::pair<uint32_t, uint32_t> Itkpixv2::decodeSingleRegRead(uint32_t higher, uint32_t lower) {
@@ -555,14 +582,15 @@ itkpix_efuse_codec::EfuseData Itkpixv2::readEfuses() {
     // put E-fuse programmer circuit block into READ mode
     //
     this->writeRegister(&Itkpixv2::EfuseConfig, 0x0f0f);
-    while(!core->isCmdEmpty()) {}
+    core->waitCmdEmpty();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10)); 
 
     //
     // send E-fuse circuit the reset signal to halt any other state (reset E-fuse block FSM)
     //
     //this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x100);
     //this->writeRegister(&Itkpixv2::GlobalPulseWidth, 200);
-    //while(!core->isCmdEmpty()) {}
+    //core->waitCmdEmpty();
     //this->sendGlobalPulse(m_chipId);
 
     //
@@ -594,14 +622,15 @@ uint32_t Itkpixv2::readEfusesRaw() {
     // put E-fuse programmer circuit block into READ mode
     //
     this->writeRegister(&Itkpixv2::EfuseConfig, 0x0f0f);
-    while(!core->isCmdEmpty()) {}
+    core->waitCmdEmpty();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     //
     // send E-fuse circuit the reset signal to halt any other state (reset E-fuse block FSM)
     //
     //this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x100);
     //this->writeRegister(&Itkpixv2::GlobalPulseWidth, 200);
-    //while(!core->isCmdEmpty()) {}
+    //core->waitCmdEmpty();
     //this->sendGlobalPulse(m_chipId);
 
     //
@@ -624,57 +653,63 @@ uint32_t Itkpixv2::readEfusesRaw() {
 }
 
 uint8_t Itkpixv2::readChipId() {
-    uint16_t _ = 0;
-    uint8_t id = 15;
-    if (readRegister(&Itkpixv2::EfuseReadData0, _, id) != yarrSuccess) {
-        logger->warn("Failed to readback E-fuse 0 data for chip with {}", m_chipId);
+    uint16_t value = 0; // register value of ChipIdSense is the 4-bit chip ID
+    uint8_t _id = 15; // this gives you the 2-LSB from register read
+    if (readRegister(&Itkpixv2::ChipIdSense, value, _id) != yarrSuccess) {
+        logger->warn("Failed to readback ChipIdSense for chip with {}", m_chipId);
         return 255;
     }
-    return id;
+    return value;
 }
 
-void Itkpixv2::confAdc(uint16_t MONMUX, bool doCur) {
+yarrStatus Itkpixv2::confAdc(uint16_t MONMUX, bool doCur) {
     //This only works for voltage MUX values.
     uint16_t OriginalGlobalRT = this->GlobalPulseConf.read();
     uint16_t OriginalMonitorEnable = this->MonitorEnable.read(); //Enabling monitoring
     uint16_t OriginalMonitorV = this->MonitorV.read();
     uint16_t OriginalMonitorI = this->MonitorI.read();
 
+    // this value is AND'ed with all write register functions
+    // if ALL writes are successful, success=true and yarrSuccess is returned
+    bool success = true;
+
     if (doCur)
     {
-        this->writeRegister(&Itkpixv2::MonitorV, 1);      // Forward via VMUX
-        this->writeRegister(&Itkpixv2::MonitorI, MONMUX); // Select what to monitor
+        success = success && (this->writeRegister(&Itkpixv2::MonitorV, 1) == yarrSuccess);      // Forward via VMUX
+        success = success && (this->writeRegister(&Itkpixv2::MonitorI, MONMUX) == yarrSuccess); // Select what to monitor
     }
     else
     {
-        this->writeRegister(&Itkpixv2::MonitorV, MONMUX); // Select what to monitor
+        success = success && (this->writeRegister(&Itkpixv2::MonitorV, MONMUX) == yarrSuccess); // Select what to monitor
     }
 
-    this->writeRegister(&Itkpixv2::MonitorEnable, 1); // Enabling monitoring
-    while(!core->isCmdEmpty()){;}
+    success = success && (this->writeRegister(&Itkpixv2::MonitorEnable, 1) == yarrSuccess); // Enabling monitoring
+    core->waitCmdEmpty();
 
-    this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x40); // Reset ADC
-    this->writeRegister(&Itkpixv2::GlobalPulseWidth, 4);   // Duration = 4 inherited from RD53A
-    while(!core->isCmdEmpty()){;}
+    success = success && (this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x100) == yarrSuccess); // Reset ADC
+    success = success && (this->writeRegister(&Itkpixv2::GlobalPulseWidth, 4) == yarrSuccess);   // Duration = 4 inherited from RD53A
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     this->sendGlobalPulse(m_chipId);
     std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Need to wait long enough for ADC to reset
 
-    this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x1000); //Trigger ADC Conversion
-    while (!core->isCmdEmpty()){;}
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    success = success && (this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x1000) == yarrSuccess); //Trigger ADC Conversion
+    core->waitCmdEmpty();
+    std::this_thread::sleep_for(std::chrono::microseconds(1000));
 
     this->sendGlobalPulse(m_chipId);
     std::this_thread::sleep_for(std::chrono::microseconds(1000)); //This is neccessary to clean. This might be controller dependent.
 
     // Reset register values
-    this->writeRegister(&Itkpixv2::GlobalPulseConf, OriginalGlobalRT);
-    this->writeRegister(&Itkpixv2::MonitorEnable, OriginalMonitorEnable);
-    this->writeRegister(&Itkpixv2::MonitorV, OriginalMonitorV);
-    this->writeRegister(&Itkpixv2::MonitorI, OriginalMonitorI);
-    while (!core->isCmdEmpty()){;}
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    success = success && (this->writeRegister(&Itkpixv2::GlobalPulseConf, OriginalGlobalRT) == yarrSuccess);
+    success = success && (this->writeRegister(&Itkpixv2::MonitorEnable, OriginalMonitorEnable) == yarrSuccess);
+    success = success && (this->writeRegister(&Itkpixv2::MonitorV, OriginalMonitorV) == yarrSuccess);
+    success = success && (this->writeRegister(&Itkpixv2::MonitorI, OriginalMonitorI) == yarrSuccess);
+    core->waitCmdEmpty();
+    std::this_thread::sleep_for(std::chrono::microseconds(1000));
+
+    return (success ? yarrSuccess : yarrFailure);
 }
 
 void Itkpixv2::runRingOsc(uint16_t duration, bool isBankB) {
@@ -682,7 +717,7 @@ void Itkpixv2::runRingOsc(uint16_t duration, bool isBankB) {
 
     this->writeRegister(&Itkpixv2::GlobalPulseConf, isBankB ? 0x4000 : 0x2000); //Ring Osc Enable Rout
     this->writeRegister(&Itkpixv2::GlobalPulseWidth, duration);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     this->sendGlobalPulse(m_chipId);
@@ -690,6 +725,6 @@ void Itkpixv2::runRingOsc(uint16_t duration, bool isBankB) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1)); //This is neccessary to clean. This might be controller dependent.
 
     this->writeRegister(&Itkpixv2::GlobalPulseConf, OriginalGlobalRT); // Recover the original routing
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 }

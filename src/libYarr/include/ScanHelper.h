@@ -11,21 +11,24 @@
 
 #include <string>
 
-#include "AnalysisDataProcessor.h"
-#include "Bookkeeper.h"
-#include "FeDataProcessor.h"
 #include "FeedbackBase.h"
-#include "FrontEnd.h"
-#include "HistoDataProcessor.h"
-#include "HwController.h"
 #include "ScanLoopInfo.h"
 #include "Utils.h"
 
 #include "storage.hpp"
 #include "logging.h"
+#include "LoadJson.h"
 
 #include "ScanOpts.h"
-#include "ScanBase.h"
+
+class AnalysisDataProcessor;
+class Bookkeeper;
+class FeDataProcessor;
+class FrontEndCfg;
+struct FrontEndGeometry;
+class HistoDataProcessor;
+class HwController;
+class ScanBase;
 
 namespace ScanHelper {
         // A 2D vector of int to store algorithm indices for all tiers of analyses
@@ -34,13 +37,36 @@ namespace ScanHelper {
         /// Get a new run number, such that it's different next time
         unsigned newRunCounter();
 
-        json openJsonFile(const std::string& filepath);
+        using JsonHelper::openJsonFile;
         std::unique_ptr<HwController> loadController(const json &ctrlCfg);
-        std::string buildChips(const json &j, Bookkeeper &bookie, HwController *hwCtrl, std::map<unsigned,
-                              std::array<std::string, 2>> &feCfgMap);
+
+        /**
+         * Build all front ends from the chips data.
+         *
+         * @param j Input chip configuration as json.
+         * @param bookie Bookkeeper to store built FrontEnd.
+         * @param hwCtrl Controller to connect to FrontEnd.
+         * @param feCfgMap Record config path name for scan book-keeping.
+         */
+        std::string buildChips(const json &j, Bookkeeper &bookie, HwController *hwCtrl,
+                               std::map<unsigned, std::array<std::string, 2>> &feCfgMap);
         
-        std::string loadChipConfigs(json &j, const bool &createConfig, const std::string &dir);
-        std::string loadChipConfigs(json &j, bool createConfig=false);
+        /**
+         * Build all front ends from the chips data.
+         *
+         * @param j Description of configuration to be loaded.
+         * @param createConfig If set and a default config is requested, save the default.
+         * @param dir Directory to be used in case of relative paths
+         * @param serviceName Configuration service to use
+         */
+        std::string loadChipConfigs(json &j, bool createConfig, const std::string &dir, const std::string &serviceName);
+        /// Call loadChipConfigs with default service (use local files)
+        std::string loadChipConfigs(json &j, bool createConfig, const std::string &dir);
+        /// Call loadChipConfigs with default service and relative path
+        std::string loadChipConfigs(json &j, bool createConfig);
+        /// Call loadChipConfigs with default path and don't createConfig
+        std::string loadChipConfigs(json &j);
+
         int loadConfigFile(const ScanOpts &scanOpts, bool writeConfig, json &config);
 // TODO Do not want to use the raw pointer ScanBase*
         void buildHistogrammers( std::map<unsigned, std::unique_ptr<HistoDataProcessor>>& histogrammers, const json &scanConfig,
@@ -49,6 +75,7 @@ namespace ScanHelper {
 // TODO would prefer not to need bookie --> deep dependency!
 // TODO Do not want to use the raw pointer ScanBase*
         void buildRawDataProcs( std::map<unsigned, std::unique_ptr<FeDataProcessor> > &procs,
+                                const json& scanCfg,
                            Bookkeeper &bookie,
                            const std::string &chipType);
 
@@ -83,7 +110,7 @@ namespace ScanHelper {
                                   int target_tot, int target_charge);
 
         void buildAnalyses( std::map<unsigned, std::vector<std::unique_ptr<AnalysisDataProcessor>> >& analyses,
-                            const json& scanType, Bookkeeper& bookie, const ScanLoopInfo* s, FeedbackClipboardMap *fbMap, int mask_opt, std::string outputDir,
+                            const json& scanType, Bookkeeper& bookie, const ScanLoopInfo* s, FeedbackClipboardMap *fbMap, int mask_opt, const std::string& outputDir,
                             int target_tot, int target_charge);
         void buildAnalysisHierarchy(AlgoTieredIndex& indexTiers,
                                     const json &anaCfg);
@@ -99,14 +126,12 @@ namespace ScanHelper {
        std::string getHostname();
        std::string defaultDbDirPath();
        void writeScanLog(json scanLog, const std::string &filename);
-       void writeFeConfig(FrontEndCfg *feCfg, const std::string &filename);
        std::string createOutputDir(const std::string &scanType, unsigned int runCounter, std::string &outputDir);
        void createSymlink(const std::string &dataDir, const std::string &strippedScan, unsigned int runCounter);
        std::string timestamp(std::time_t);
        void banner(std::shared_ptr<spdlog::logger> &logger, const std::string &msg);
        void listChips();
        void listProcessors();
-       void listScans();
        void listControllers();
        void listScanLoopActions();
        void listKnown();

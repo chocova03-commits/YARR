@@ -77,7 +77,7 @@ void SpecTxCore::maskTrigEnable(uint32_t value, uint32_t mask) {
 }
 
 void SpecTxCore::setTrigConfig(enum TRIG_CONF_VALUE cfg) {
-    SPDLOG_LOGGER_TRACE(stxlog, "Config {0:x}", cfg);
+    SPDLOG_LOGGER_TRACE(stxlog, "Config {0:x}", (uint32_t)cfg);
     SpecCom::writeSingle(TX_ADDR | TRIG_CONF, (uint32_t) cfg);
 }
 
@@ -106,7 +106,7 @@ void SpecTxCore::setTrigWordLength(uint32_t length) {
 
 void SpecTxCore::setTrigWord(uint32_t *word, uint32_t length) {
     for (unsigned i=0; i<length; i++) {
-        SPDLOG_LOGGER_TRACE(stxlog, "[{}] = {0:x}", i, word[i]);
+        SPDLOG_LOGGER_TRACE(stxlog, "[{}] = {:x}", i, word[i]);
     }
 
     for (unsigned i=0; i<length; i++) {
@@ -139,4 +139,23 @@ void SpecTxCore::setTxPolarity(uint32_t value) {
 
 uint32_t SpecTxCore::getTxPolarity() {
     return SpecCom::readSingle(TX_ADDR | TX_POLARITY);
+}
+
+
+void SpecTxCore::setBRAMFullThreshold(uint32_t value) {
+    if(value >= BRAM_MAX_SIZE) {
+        stxlog->error("Error - value {} for BRAM_FULL_THRESHOLD is greater than maximum value {}. Leaving value unset.", value, BRAM_MAX_SIZE);
+    }
+    else {
+        SpecCom::writeSingle(TX_ADDR | BRAM_FULL_THRESHOLD, value);
+    }
+}
+
+void SpecTxCore::setBRAMEmptyThreshold(uint32_t value) {
+    if(value >= BRAM_MAX_SIZE) {
+        stxlog->error("Error - value {} for BRAM_EMPTY_THRESHOLD is greater than maximum value {}. Leaving value unset.", value, BRAM_MAX_SIZE);
+    }
+    else {
+        SpecCom::writeSingle(TX_ADDR | BRAM_EMPTY_THRESHOLD, value);
+    }
 }

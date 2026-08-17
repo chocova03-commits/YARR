@@ -62,10 +62,8 @@ auto container_printer =  [](auto const & l) {
 
 int main(int argc, char **argv) {
     // Setup logger with some defaults
-    std::string defaultLogPattern = "[%T:%e]%^[%=8l][%=15n]:%$ %v";
-    spdlog::set_pattern(defaultLogPattern);
     json j; // empty
-    j["pattern"] = defaultLogPattern;
+    j["pattern"] = logging::defaultLogPattern;
     j["log_config"][0]["name"] = "all";
     j["log_config"][0]["level"] = "info";
     // switch this logger off due to always using default global config
@@ -299,12 +297,12 @@ int main(int argc, char **argv) {
 	    fe.configureGlobal();
 	    std::this_thread::sleep_for(std::chrono::microseconds(sleep));
 
-	    uint8_t chipId = fe.readChipId();
-	    logger->debug("Get 2-LSB chip ID: {}", chipId);
+	    uint16_t chipId = fe.readChipId();
+	    logger->debug("Get 4-LSB chip ID: {}", chipId);
 	    if(chipId == 255) continue;
 
 	    // try establish com assuming quad chip ID
-	    chipId += 12; // assuming quad to be the majority
+	    //chipId += 12; // assuming quad to be the majority
 	    logger->info("Configure chip again with chipId = {}", chipId); // have to do this again in order to be able to read out efuses
 	    cfg["ITKPIXV2"]["Parameter"]["ChipId"] = chipId;
 	    fe.loadConfig(cfg);
@@ -317,6 +315,7 @@ int main(int argc, char **argv) {
 	    logger->debug("efuse {}", efuse);
 
 	    // if cannot read out efuse, try triplet chip ID
+	    // block can be removed if 4-bit ChipIdSense is used
 	    if ( !efuse ) {
 		chipId -= 12; // triplet chip ID
 		logger->warn("Can't read efuse, try triplet chip ID {}", chipId);

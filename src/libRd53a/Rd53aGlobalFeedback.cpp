@@ -9,6 +9,8 @@
 
 #include "Rd53aGlobalFeedback.h"
 
+#include "Bookkeeper.h"
+
 #include "logging.h"
 
 namespace {
@@ -58,7 +60,7 @@ void Rd53aGlobalFeedback::loadConfig(const json &j) {
     }
     if (j.contains("pixelRegs")) {
         m_pixelReg.clear();
-        for(auto i: j["pixelRegs"])
+        for(const auto& i: j["pixelRegs"])
             m_pixelReg.push_back(i);
         if (m_pixelReg.size() != 2) {
             logger->error("Expected 2 values, got {}", m_pixelReg.size());
@@ -117,7 +119,7 @@ void Rd53aGlobalFeedback::writePar() {
             g_tx->setCmdEnable(feCfg->getTxChannel());
             // Write parameter
             dynamic_cast<Rd53a*>(fe)->writeRegister(parPtr, m_values[id]);
-            while(!g_tx->isCmdEmpty()){}
+            g_tx->waitCmdEmpty();
         }
     }
     // Reset CMD mask
@@ -202,7 +204,7 @@ void Rd53aGlobalFeedback::init() {
             }
             rd53a->configurePixels();
         }
-        while(!g_tx->isCmdEmpty()){}
+        g_tx->waitCmdEmpty();
     }
     g_tx->setCmdEnable(keeper->getTxMask());
 }

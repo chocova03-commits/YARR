@@ -11,13 +11,14 @@
 #include <string>
 #include <fstream>
 #include <iomanip>
+#include <unistd.h>
 
 #include "storage.hpp"
 #include "logging.h"
 #include "LoggingConfig.h"
 
 #include "AllChips.h"
-#include "FrontEnd.h"
+#include "FrontEndCfg.h"
 
 auto logger = logging::make_log("cfgCreator");
 
@@ -30,13 +31,7 @@ void printHelp() {
 
 int main (int argc, char *argv[]) {
     // Setup logger with some defaults
-    std::string defaultLogPattern = "[%T:%e]%^[%=8l][%=15n]:%$ %v";
-    spdlog::set_pattern(defaultLogPattern);
-    json j; // empty
-    j["pattern"] = defaultLogPattern;
-    j["log_config"][0]["name"] = "all";
-    j["log_config"][0]["level"] = "info";
-    logging::setupLoggers(j);
+    logging::setupLoggers(logging::defaultConfig());
  
     logger->info("Starting config creator!");
 
@@ -47,7 +42,6 @@ int main (int argc, char *argv[]) {
     std::string outputDir = "configs/";
     std::string chipName = "JohnDoe";
     while ((c = getopt(argc, argv, "ht:s:o:n:")) != -1) {
-        int count = 0;
         switch (c) {
             case 'h':
                 printHelp();

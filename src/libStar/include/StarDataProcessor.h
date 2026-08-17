@@ -1,5 +1,5 @@
-#ifndef ABC_STAR_DATA_PROCESSOR_H
-#define ABC_STAR_DATA_PROCESSOR_H
+#ifndef STAR_DATA_PROCESSOR_H
+#define STAR_DATA_PROCESSOR_H
 
 // #################################
 // # Author:
@@ -9,15 +9,15 @@
 // # Comment:
 // ################################
 
-#include <vector>
 #include <array>
-#include <map>
 #include <thread>
 
 #include "FeDataProcessor.h"
 #include "ClipBoard.h"
 #include "RawData.h"
 #include "HccCfg.h"
+
+struct StarDataProcessorImpl;
 
 /**
    Process Star front-end data to generate hits.
@@ -41,12 +41,15 @@ class StarDataProcessor : public FeDataProcessor {
         /// Connect this instance to data for a particular FrontEnd
         void connect(FrontEndCfg *feCfg, ClipBoard<RawDataContainer> *arg_input, ClipBoard<EventDataBase> *arg_output) override;
         void connect(ClipBoard<FeedbackProcessingInfo> *arg_proc_status) override {statusFb = arg_proc_status;}
-    
+
         void init() override;
+        void loadConfig(const json &config) override;
         void run() override;
         void join() override;
         void process() override;
         virtual void process_core();
+
+        std::unique_ptr<EventDataBase> process_event_core(const RawDataContainer &rdc, std::function<void (std::unique_ptr<FeedbackProcessingInfo>)> push_fb) override;
 
     private:
         ClipBoard<RawDataContainer> *input;
@@ -56,7 +59,9 @@ class StarDataProcessor : public FeDataProcessor {
         std::unique_ptr<std::thread> thread_ptr;
 
         /// Map from HCC input channel (0-10) number to histogram slot
-        std::array<uint8_t, HCC_INPUT_CHANNEL_COUNT> chip_map;
+        std::array<uint8_t, Star::MaxABCsPerHCC> chip_map;
+
+        std::unique_ptr<StarDataProcessorImpl> pimpl;
 };
 
 #endif

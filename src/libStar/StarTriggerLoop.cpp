@@ -6,6 +6,9 @@
 #include <iostream>
 #include <iomanip>
 
+#include "Bookkeeper.h"
+#include "TxCore.h"
+
 #include "logging.h"
 
 namespace {
@@ -17,9 +20,9 @@ StarTriggerLoop::StarTriggerLoop()
 	m_trigDelay(45), // L0_delay 34
 	m_trigFreq(1e3), // 1kHz
 	m_trigTime(10), // 10s
+        m_trigWord{},
 	m_noInject(false),
-	m_digital(false),
-	m_trigWord{}
+        m_digital(false)
 {
 	setTrigCnt(50); // Maximum number of triggers to send
 	min = 0;
@@ -61,7 +64,7 @@ void StarTriggerLoop::init() {
           }
         }
 
-	while(!g_tx->isCmdEmpty());
+	g_tx->waitCmdEmpty();
 }
 
 
@@ -84,7 +87,7 @@ void StarTriggerLoop::end() {
 	SPDLOG_LOGGER_DEBUG(logger, "");
 
 	// Go back to general state of FE, do something here (if needed)
-	while(!g_tx->isCmdEmpty());
+	g_tx->waitCmdEmpty();
 }
 
 void StarTriggerLoop::setTrigWord() {

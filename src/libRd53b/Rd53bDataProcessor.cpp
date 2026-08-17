@@ -35,7 +35,7 @@ bool rd53b_proc_registered =
 
 Rd53bDataProcessor::Rd53bDataProcessor()
 {
-    m_input = NULL;
+    m_input = nullptr;
 
     _wordIdx = 0; // Index of the first 64-bit block. Starting from 0
     _bitIdx = 0;   // Index of the first bit within the 64-bit block. Starting from 0
@@ -53,6 +53,8 @@ Rd53bDataProcessor::Rd53bDataProcessor()
     _unfinishedStreamErrorCnt = 0;
     _expectNewStreamErrorCnt = 0;
     _outOfRangeBitsCnt = 0;
+    _splitEventsCnt = 0;
+    _prevTag = 0xFFFF;
 
     // Data stream components
     _ccol = 0;
@@ -66,6 +68,14 @@ Rd53bDataProcessor::Rd53bDataProcessor()
 
     // Status
     _status = INIT;
+
+    // Debug buffer (sized exactly to the number of slots actually written/read)
+    _debugBuffer.resize(ITKPIX_DEBUG_BUFFERSIZE);
+    _debugIdx = 0;
+
+    // PToT mask-loop state — per-instance so concurrent processors don't share
+    _maskLoopIndex = 0;
+    _checkMaskLoopIndex = true;
 }
 
 Rd53bDataProcessor::~Rd53bDataProcessor()= default;
@@ -93,7 +103,7 @@ void Rd53bDataProcessor::run()
 {
     SPDLOG_LOGGER_TRACE(logger, "");
 
-    thread_ptr.reset(new std::thread(&Rd53bDataProcessor::process, this));
+    thread_ptr = std::make_unique<std::thread>(&Rd53bDataProcessor::process, this);
 }
 
 void Rd53bDataProcessor::join()
@@ -124,7 +134,7 @@ void Rd53bDataProcessor::process()
     logger->info("[{}] Finished raw data processor thread", m_feCfg->getName());
     logger->info("[{}]   Unfinished streams (no EOS): {}", m_feCfg->getName(), _unfinishedStreamErrorCnt);
     logger->info("[{}]   Expect new stream with NS=0: {}", m_feCfg->getName(), _expectNewStreamErrorCnt);
-    logger->info("[{}]     Out-of-range bit requests: {}", m_feCfg->getName(), _outOfRangeBitsCnt);
+    logger->info("[{}]            Split events count: {}", m_feCfg->getName(), _splitEventsCnt);
 }
 
 // Method for retrieving bits from data
@@ -193,6 +203,9 @@ bool Rd53bDataProcessor::retrieve(uint64_t &variable, const unsigned length, con
             else
             {
                 logger->error("[{}] Expect unfinished stream while NS = 1: {}{}. Will start a new event...", m_feCfg->getName(), std::bitset<32>(_data[0]).to_string(), std::bitset<32>(_data[1]).to_string());
+#if USE_ITKPIX_DEBUG_BUFFER==2
+                dumpDebugBuffer();
+#endif
                 _unfinishedStreamErrorCnt++;
                 getPreviousDataBlock();
                 _status = INIT;
@@ -210,6 +223,30 @@ bool Rd53bDataProcessor::retrieve(uint64_t &variable, const unsigned length, con
     }
 
     return true;
+}
+
+// Debug function
+void Rd53bDataProcessor::dumpDebugBuffer() {
+    logger->error("[{}] Dumping last {} data blocks, in hex:", m_feCfg->getName(), ITKPIX_DEBUG_BUFFERSIZE);
+    // _qrow has 55 elements (indices 0-54). Guard against OOB when _ccol is out of
+    // range (corrupted data), which is exactly the situation dumpDebugBuffer is
+    // called in.
+    const uint64_t safe_ccol = (_ccol < 55) ? _ccol : 54;
+    logger->error(
+        "[{}] wordIdx={}, bitIdx={}, rawDataIdx={}, wordCount={}, tag={}, ccol={}, qrow={}, islast_isneighbor={}, hitmap={}",
+        m_feCfg->getName(), _wordIdx, _bitIdx, _rawDataIdx, _wordCount, _tag, _ccol, _qrow[safe_ccol], _islast_isneighbor, _hitmap
+    );
+    logger->error("[{}]", m_feCfg->getName());
+
+    for (int i = _debugIdx; i < _debugIdx + _debugBuffer.size(); i++) {
+        if(i%2 == 0) {
+            logger->error("[{}] NS={}: 0x{:x}", m_feCfg->getName(), ((_debugBuffer[i % ITKPIX_DEBUG_BUFFERSIZE] >> 31) & 0x1), _debugBuffer[i % ITKPIX_DEBUG_BUFFERSIZE]);
+        }
+        else {
+            logger->error("[{}]       0x{:x}", m_feCfg->getName(), _debugBuffer[i % ITKPIX_DEBUG_BUFFERSIZE]);
+        }
+    }
+    logger->error("[{}]", m_feCfg->getName());
 }
 
 // Method for rolling back bit index
@@ -243,6 +280,9 @@ void Rd53bDataProcessor::process_core()
         if (unlikely(!(_data[0] >> 31 & 0x1)))
         {
             logger->error("[{}] Expect new stream while NS = 0: {}{}. Skipping block...", m_feCfg->getName(), std::bitset<32>(_data[0]).to_string(), std::bitset<32>(_data[1]).to_string());
+#if USE_ITKPIX_DEBUG_BUFFER==2
+            dumpDebugBuffer();
+#endif
             _expectNewStreamErrorCnt++;
             return;
         }
@@ -251,9 +291,18 @@ void Rd53bDataProcessor::process_core()
 
         // Create a new event
         // RD53B does not have L1 ID and BCID output in data stream, so these are dummy values for now
-        _curOut->newEvent(_tag, _l1id, _bcid);
-        _events++;
-        sendFeedback(_tag, _bcid);
+        if (!_curOut) {
+            _curOut = std::make_unique<FrontEndData>(_curInV->stat);
+            _curOut->events.reserve(128);
+        }
+        if (_tag != _prevTag) {
+            _curOut->newEvent(_tag, _l1id, _bcid);
+            _events++;
+            sendFeedback(_tag, _bcid);
+            _prevTag = _tag;
+        } else {
+            _splitEventsCnt++;
+        }
     }
 
     // Start looping over data words in the current packet
@@ -280,6 +329,9 @@ void Rd53bDataProcessor::process_core()
                 if (unlikely(!(_data[0] >> 31 & 0x1)))
                 {
                     logger->error("[{}] Expect new stream while NS = 0: {}{}. Skipping block...", m_feCfg->getName(), std::bitset<32>(_data[0]).to_string(), std::bitset<32>(_data[1]).to_string());
+#if USE_ITKPIX_DEBUG_BUFFER==2
+                    dumpDebugBuffer();
+#endif
                     _expectNewStreamErrorCnt++;
                     continue;
                 }
@@ -288,13 +340,22 @@ void Rd53bDataProcessor::process_core()
 
                 // Create a new event
                 // RD53B does not have L1 ID and BCID output in data stream, so these are dummy values for now
-                _curOut->newEvent(_tag, _l1id, _bcid);
-                _events++;
+                if (!_curOut) {
+                    _curOut = std::make_unique<FrontEndData>(_curInV->stat);
+                    _curOut->events.reserve(128);
+                }
+                if (_tag != _prevTag) {
+                    _curOut->newEvent(_tag, _l1id, _bcid);
+                    _events++;
+                    sendFeedback(_tag, _bcid);
+                    _prevTag = _tag;
+                } else {
+                    _splitEventsCnt++;
+                }
                 _status = CCOL;
-                sendFeedback(_tag, _bcid);
                 continue;
             }
-            else if (_ccol >= 0x38) // Internal tag
+            else if (_ccol >= 55) // Internal tag guard: valid range is 56-63 (0b111xxx per RTL); 55 is a format violation
             {
                 // Internal tag is 11-bit. So need to retrieve 5 more bits
                 uint64_t temp = 0;
@@ -303,8 +364,22 @@ void Rd53bDataProcessor::process_core()
 
                 _tag = (_ccol << 5) | temp;
 
+                // Per the data format, the chip encodes internal tags with CCA >= 56 (0b111xxx),
+                // so bits[10:8] of the reconstructed 11-bit tag must be 0b111.
+                // CCA=55 (0b110111) is unreachable from a functioning chip and indicates corrupt data.
+                if ((_tag >> 8) != 0x7) {
+                    logger->error("[{}] Internal tag 0x{:03x} has invalid format marker (bits[10:8]=0b{:03b}, expected 0b111); data is corrupt",
+                                  m_feCfg->getName(), _tag, (_tag >> 8) & 0x7);
+                    _status = INIT; // Reset to resync on the next stream header
+                    return;
+                }
+
                 // Create a new event
                 // There is no L1ID and BCID in RD53B data stream. Currently put dummy values
+                if (!_curOut) {
+                    _curOut = std::make_unique<FrontEndData>(_curInV->stat);
+                    _curOut->events.reserve(128);
+                }
                 _curOut->newEvent(_tag, _l1id, _bcid);
                 _events++;
                 _status = CCOL;
@@ -336,9 +411,13 @@ void Rd53bDataProcessor::process_core()
                 if (_islast_isneighbor & 0x1)
                     ++_qrow[_ccol];
 
-                // Otherwise read the qrow value
-                else if (!retrieve(_qrow[_ccol], 8))
-                    return;
+                // Otherwise read the qrow value (retrieve needs uint64_t; cast down after)
+                else {
+                    uint64_t tmp = 0;
+                    if (!retrieve(tmp, 8))
+                        return;
+                    _qrow[_ccol] = static_cast<uint16_t>(tmp);
+                }
             case HMAP1:
                 _status = HMAP1;
                 // logger->warn("Read hitmap 1");
@@ -396,6 +475,8 @@ void Rd53bDataProcessor::process_core()
                     if (!retrieve(_ToT, _LUT_PlainHMap_To_ColRow_ArrSize[_hitmap] << 2))
                         return;
 
+                    if (_LUT_PlainHMap_To_ColRow_ArrSize[_hitmap] > 0 && _curOut->curEvent->hits.empty())
+                        _curOut->curEvent->hits.reserve(std::max(16u, static_cast<unsigned>(_LUT_PlainHMap_To_ColRow_ArrSize[_hitmap])));
                     int idx = 0;
                     for (unsigned ibus = 0; ibus < 4; ibus++)
                     {
@@ -420,26 +501,29 @@ void Rd53bDataProcessor::process_core()
                             {
                                 // This is now possible if the event is so long that it spreads over raw data containers
                                 // logger->warn("[{}] No header in data fragment!", _channel);
+                                if (!_curOut) {
+                                    _curOut = std::make_unique<FrontEndData>(_curInV->stat);
+                                    _curOut->events.reserve(128);
+                                }
                                 _curOut->newEvent(_tag, _l1id, _bcid);
                                 _events++;
+                                _splitEventsCnt++;
                             }
 
-                            // Reverse enginner the pixel address using mask staging
-                            static unsigned maskLoopIndex = 0;
-                            static bool check_loop_index = true;
-                            if (check_loop_index)
+                            // Reverse engineer the pixel address using mask staging
+                            if (_checkMaskLoopIndex)
                             {
                                 for (unsigned loop = 0; loop < _curOut->lStat.size(); loop++)
                                 {
                                     if (_curOut->lStat.getStyle(loop) == LOOP_STYLE_MASK)
                                     {
-                                        maskLoopIndex = loop;
-                                        check_loop_index = false;
+                                        _maskLoopIndex = loop;
+                                        _checkMaskLoopIndex = false;
                                         break;
                                     }
                                 }
                             }
-                            const unsigned step = _curOut->lStat.get(maskLoopIndex);
+                            const unsigned step = _curOut->lStat.get(_maskLoopIndex);
                             const uint16_t pix_col = (_ccol - 1) * 8 + PToT_maskStaging[step % 4][ibus] + 1;
                             const uint16_t pix_row = step / 2 + 1;
 
@@ -460,6 +544,8 @@ void Rd53bDataProcessor::process_core()
                     {
                         logger->warn("Received fragment with no ToT! ({} , {})", _ccol, _qrow[_ccol]);
                     }
+                    if (_LUT_PlainHMap_To_ColRow_ArrSize[_hitmap] > 0 && _curOut->curEvent->hits.empty())
+                        _curOut->curEvent->hits.reserve(std::max(16u, static_cast<unsigned>(_LUT_PlainHMap_To_ColRow_ArrSize[_hitmap])));
                     for (unsigned ihit = 0; ihit < _LUT_PlainHMap_To_ColRow_ArrSize[_hitmap]; ++ihit)
                     {
                         const uint8_t pix_tot = (_ToT >> (ihit << 2)) & 0xF;
@@ -472,11 +558,17 @@ void Rd53bDataProcessor::process_core()
                         {
                             // This is now possible if an event is so long that it spread over raw data containers
                             // logger->warn("[{}] No header in data fragment!", _channel);
+                            if (!_curOut) {
+                                _curOut = std::make_unique<FrontEndData>(_curInV->stat);
+                                _curOut->events.reserve(128);
+                            }
                             _curOut->newEvent(_tag, _l1id, _bcid);
                             _events++;
+                            _splitEventsCnt++;
                         }
 
-                        _curOut->curEvent->addHit({pix_col, pix_row, pix_tot});
+                        // Yarr_tot = chip_tot + 1 - to avoid ToT = 0 
+                        _curOut->curEvent->addHit({pix_col, pix_row, uint16_t(pix_tot+1)});
                         _hits++;
                     }
                 }
@@ -489,7 +581,43 @@ void Rd53bDataProcessor::process_core()
     }
 }
 
-bool Rd53bDataProcessor::getNextDataBlock()
+bool Rd53bDataProcessor::getNextDataBlock() {
+    // Set data_pre
+    if(unlikely(_data == nullptr)) {
+        // Fake error frame, should never decode this
+        _data_pre[0] = 0xFF800000;
+        _data_pre[1] = 0x00000000;
+    }
+    else {
+        _data_pre[0] = _data[0];
+        _data_pre[1] = _data[1];
+    }
+
+    bool good = getNextDataBlockImpl();
+    while (good && ((_data_t[0] == 0xFFFFDEAD && _data_t[1] == 0xFFFFDEAD) || (((_data_t[0] >> 29) & 0x3) != _chipId && _enChipId))) {
+        good = getNextDataBlockImpl();
+    }
+
+    // Not able to update data block
+    if (!good)
+        return false;
+
+    // Upate the data pointer.
+    _data = _data_t;
+
+    
+    #if USE_ITKPIX_DEBUG_BUFFER > 0
+	    _debugBuffer[_debugIdx] = _data[0];
+	    _debugIdx = (_debugIdx + 1) % ITKPIX_DEBUG_BUFFERSIZE;
+	    _debugBuffer[_debugIdx] = _data[1];
+	    _debugIdx = (_debugIdx + 1) % ITKPIX_DEBUG_BUFFERSIZE;
+    #endif
+    
+    _dataPtrCpy = _dataPtrCpy_t;
+    return good;
+}
+
+bool Rd53bDataProcessor::getNextDataBlockImpl()
 {
     if (_curInV != nullptr && _curInV->size() > 0)
     {
@@ -498,15 +626,24 @@ bool Rd53bDataProcessor::getNextDataBlock()
         {
             _rawDataIdx = 0;
             _wordIdx = 0;
-            _data = &_curInV->data[0]->get(0);
-            if (_data[0] == 0xFFFFDEAD && _data[1] == 0xFFFFDEAD)
-                 return getNextDataBlock();
-            if (((_data[0] >> 29) & 0x3) != _chipId && _enChipId)
-                 return getNextDataBlock();
+            _data_t = &_curInV->data[0]->get(0);
+            _dataPtrCpy_t = _curInV->data[0];
+
             return true;
         }
         _wordIdx += 2; // Increase block index
-        if (_wordIdx >= _curInV->data[_rawDataIdx]->getSize())
+
+        // Guard against out-of-range raw data access before dereferencing.
+        if (unlikely(_rawDataIdx >= static_cast<int>(_curInV->data.size()))) {
+            logger->error("[{}] DataProcessor reached end of raw data container. _curInV size {}, _rawDataIdx {}, 0x{:x} 0x{:x}", m_feCfg->getName(), _curInV->data.size(), _rawDataIdx, _data[0], _data[1]);
+#if USE_ITKPIX_DEBUG_BUFFER > 0
+            dumpDebugBuffer();
+#endif
+            // Force the "cannot get more data" path below.
+            _rawDataIdx = _curInV->size();
+        }
+
+        if (_rawDataIdx < static_cast<int>(_curInV->data.size()) && _wordIdx >= _curInV->data[_rawDataIdx]->getSize())
         {
             _rawDataIdx++;
             _wordIdx = 0;
@@ -543,9 +680,6 @@ bool Rd53bDataProcessor::getNextDataBlock()
         // Keep track of last block
         if (_curInV != nullptr && _curInV->size() > 0)
         {
-            _data_pre[0] = _data[0];
-            _data_pre[1] = _data[1];
-
             // Push out data accumulated so far
             if (_events > 0)
             {
@@ -557,6 +691,7 @@ bool Rd53bDataProcessor::getNextDataBlock()
                 
                 // Reinitalize _curOut buffer
                 _curOut = std::make_unique<FrontEndData>(pushedStat);
+                _curOut->events.reserve(128);
             }
             else
             {
@@ -587,6 +722,7 @@ bool Rd53bDataProcessor::getNextDataBlock()
 
         if(_curOut==nullptr) {
             _curOut = std::make_unique<FrontEndData>(_curInV->stat);
+            _curOut->events.reserve(128);
             _events = 0;
         }
 
@@ -594,17 +730,11 @@ bool Rd53bDataProcessor::getNextDataBlock()
         for (unsigned c = 0; c < _curInV->size(); c++)
             _wordCount += _curInV->data[c]->getSize();
     }
-
-    uint32_t *_data_t = &_curInV->data[_rawDataIdx]->get(_wordIdx);
-
-    // Skip special symbols
-    if (_data_t[0] == 0xFFFFDEAD && _data_t[1] == 0xFFFFDEAD)
-        return getNextDataBlock();
-    if (((_data_t[0] >> 29) & 0x3) != _chipId && _enChipId)
-        return getNextDataBlock();
     
     // Upate the data pointer. Note the meaning of block index is the first block that is *unprocessed*
-    _data = &_curInV->data[_rawDataIdx]->get(_wordIdx);
+    _data_t = &_curInV->data[_rawDataIdx]->get(_wordIdx);
+    _dataPtrCpy_t = _curInV->data[_rawDataIdx];
+
 
     // Return success code
     return true;
@@ -612,33 +742,46 @@ bool Rd53bDataProcessor::getNextDataBlock()
 
 void Rd53bDataProcessor::getPreviousDataBlock()
 {
-    // Correct raw data index and processed raw data size if needed
-    _wordIdx -= 2;
-    if (_wordIdx < 0)
-    {
-        // Special case that we need to go back to the previous raw data container
-        if (--_rawDataIdx < 0)
+    // Iterative: skip 0xFFFFDEAD sentinel words and wrong-chip-ID blocks without
+    // risking stack overflow on large runs of such words.
+    while (true) {
+        _wordIdx -= 2;
+        if (_wordIdx < 0)
         {
-            _data = _data_pre;
-            return;
+            if (--_rawDataIdx < 0)
+            {
+                _data = _data_pre;
+                return;
+            }
+            _wordIdx = _curInV->data[_rawDataIdx]->getSize() - 2;
         }
-        _wordIdx = _curInV->data[_rawDataIdx]->getSize() - 2;
-    }
-    _data = &_curInV->data[_rawDataIdx]->get(_wordIdx); // Also roll back the block index and data word pointer
+        _data = &_curInV->data[_rawDataIdx]->get(_wordIdx);
+        _dataPtrCpy = _curInV->data[_rawDataIdx];
 
-    if (_data[0] == 0xFFFFDEAD && _data[1] == 0xFFFFDEAD)
-        getPreviousDataBlock();
-    if (((_data[0] >> 29) & 0x3) != _chipId && _enChipId)
-        getPreviousDataBlock();
+        if (_data[0] == 0xFFFFDEAD && _data[1] == 0xFFFFDEAD)
+            continue;
+        if (((_data[0] >> 29) & 0x3) != _chipId && _enChipId)
+            continue;
+        break;
+    }
 }
 
 void Rd53bDataProcessor::sendFeedback(unsigned tag, unsigned bcid)
 {
-    std::unique_ptr<FeedbackProcessingInfo> stat(new FeedbackProcessingInfo{.trigger_tag = PROCESSING_FEEDBACK_TRIGGER_TAG_ERROR});
-    FeedbackProcessingInfo &curStatus = *stat;
-    curStatus.trigger_tag = tag;
-    curStatus.bcid = bcid;
-    if (statusFb != nullptr) statusFb->pushData(std::move(stat));
+    if (statusFb == nullptr) return;
+    auto stat = std::make_unique<FeedbackProcessingInfo>();
+    stat->trigger_tag = tag;
+    stat->bcid = bcid;
+    statusFb->pushData(std::move(stat));
+}
 
-    return;
+json Rd53bDataProcessor::getLog() {
+    json log;
+    log["Unfinished streams (no NS)"] = _unfinishedStreamErrorCnt;
+    log["Expected New Stream"] = _expectNewStreamErrorCnt;
+    log["Out of range Req"] = _outOfRangeBitsCnt;
+    log["Split events count"] = _splitEventsCnt;
+    log["Any errors"] = _unfinishedStreamErrorCnt 
+        + _expectNewStreamErrorCnt;
+    return log;
 }

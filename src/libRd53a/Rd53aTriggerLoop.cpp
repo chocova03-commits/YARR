@@ -8,6 +8,9 @@
 
 #include "Rd53aTriggerLoop.h"
 
+#include "Bookkeeper.h"
+#include "HwController.h"
+
 #include "logging.h"
 
 namespace {
@@ -114,12 +117,12 @@ void Rd53aTriggerLoop::init() {
     }
     g_tx->setTrigFreq(m_trigFreq);
     g_tx->setTrigCnt(getTrigCnt());
-    g_tx->setTrigWord(&m_trigWord[0], 32);
+    g_tx->setTrigWord(m_trigWord.data(), 32);
     g_tx->setTrigWordLength(m_trigWordLength);
     g_tx->setTrigTime(m_trigTime);
 
     g_tx->setCmdEnable(keeper->getTxMask());
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     //std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
@@ -139,7 +142,7 @@ void Rd53aTriggerLoop::execPart1() {
     }
     std::this_thread::sleep_for(std::chrono::microseconds(200));
     g_rx->flushBuffer();
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(10));
     g_tx->setTrigEnable(0x1);
 

@@ -6,6 +6,8 @@
 #include "Fei4TriggerLoop.h"
 #include <unistd.h>
 
+#include "Bookkeeper.h"
+
 #include "logging.h"
 
 namespace {
@@ -52,14 +54,14 @@ void Fei4TriggerLoop::init() {
     g_tx->setCmdEnable(keeper->getTxMask());
     keeper->globalFe<Fei4>()->setRunMode(true);
     usleep(100); // Empty could be delayed
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
 }
 
 void Fei4TriggerLoop::end() {
     SPDLOG_LOGGER_TRACE(logger, "");
     // Go back to conf mode, general state of FE should be conf mode
     keeper->globalFe<Fei4>()->setRunMode(false);
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
 }
 
 void Fei4TriggerLoop::execPart1() {

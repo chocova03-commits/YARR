@@ -2,6 +2,7 @@
 #include <memory>
 
 #include "AllStdActions.h"
+#include "Bookkeeper.h"
 #include "LCBUtils.h"
 #include "Utils.h"
 #include "StarSeqGenerator.h"
@@ -294,4 +295,23 @@ TEST_CASE("StarTriggerLoopCount", "[star][trigger_loop]") {
   CAPTURE (nexp);
 
   REQUIRE (nexp == ntotal_trigs);
+}
+
+TEST_CASE("StarTriggerLoopBuildLCBBitstream", "[star][trigger_loop]") {
+
+  SECTION("External sequence") {
+    StarSeqGenerator seqGen(false);
+
+    std::vector<std::string> commands;
+
+    SECTION("HCC Write Reg. Bit 31") {
+      commands = {"reg hcc write 40 0x80000000",};
+    }
+    SECTION("ABC Write Reg. Bit 31") {
+      commands = {"reg abc write 16 0x80000000"};
+    }
+
+    REQUIRE ( seqGen.parseCommandSequence(commands) );
+  }
+
 }

@@ -11,6 +11,7 @@
 #include <string>
 #include <fstream>
 #include <iomanip>
+#include <unistd.h>
 
 #include "storage.hpp"
 #include "logging.h"
@@ -18,6 +19,7 @@
 
 #include "ScanHelper.h"
 #include "Bookkeeper.h"
+#include "HwController.h"
 
 #include "Rd53b.h"
 
@@ -55,13 +57,7 @@ namespace rd53bTest {
 
 int main (int argc, char *argv[]) {
     // Setup logger with some defaults
-    std::string defaultLogPattern = "[%T:%e]%^[%=8l][%=15n]:%$ %v";
-    spdlog::set_pattern(defaultLogPattern);
-    json j; // empty
-    j["pattern"] = defaultLogPattern;
-    j["log_config"][0]["name"] = "all";
-    j["log_config"][0]["level"] = "info";
-    logging::setupLoggers(j);
+    logging::setupLoggers(logging::defaultConfig());
  
     logger->info("\033[1;31m###################\033[0m");
     logger->info("\033[1;31m# RD53B Test Tool #\033[0m");
@@ -69,10 +65,10 @@ int main (int argc, char *argv[]) {
     logger->info("Do not use unless you know what you are doing!");
     logger->info("Do not ask questions related to this tool, as you should know what you are doing!");
     
-    std::time_t now = std::time(NULL);
+    std::time_t now = std::time(nullptr);
     struct tm *lt = std::localtime(&now);
     char c_timestamp[20];
-    strftime(c_timestamp, 20, "%F_%H:%M:%S", lt);
+    (void)strftime(c_timestamp, 20, "%F_%H:%M:%S", lt);
     logger->info("Timestamp: {}", c_timestamp);
     std::string timestamp = c_timestamp;
 
@@ -236,7 +232,7 @@ int main (int argc, char *argv[]) {
     std::ofstream trigOut((outputFolder + "/" + timestamp + "_trigger.bin"), std::ios::binary);
     
     rd53b.sendClear(16);
-    while(!hwCtrl->isCmdEmpty());
+    hwCtrl->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     hwCtrl->flushBuffer();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -250,7 +246,7 @@ int main (int argc, char *argv[]) {
         if (n%100==0) logger->info("Cycle {}/{}", n, total);
         // Send trigger
         hwCtrl->writeFifo(((uint32_t)Rd53b::genTrigger(0xF, (2*n)%50)[0] << 16) |  Rd53b::genTrigger(0xF, ((2*n)%50)+1)[0]);
-        while(!hwCtrl->isCmdEmpty());
+        hwCtrl->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
         std::vector<RawDataPtr> dataVec = hwCtrl->readData();

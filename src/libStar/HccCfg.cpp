@@ -2,6 +2,8 @@
 
 #include "logging.h"
 
+#include "HccNames.h"
+
 namespace {
   auto logger = logging::make_log("StarCfgHCC");
 }
@@ -13,7 +15,7 @@ std::shared_ptr<const HccStarRegInfo> HccStarRegInfo::instance(int version) {
   else version = 0;
 
   if(!instance_var[version]) {
-    instance_var[version].reset(new HccStarRegInfo(version));
+    instance_var[version] = std::make_shared<HccStarRegInfo>(version);
   }
 
   return instance_var[version];
@@ -68,7 +70,7 @@ const std::vector<hccsubregdef> s_hccsubregdefs_common = {
   {HCCStarSubRegister::DATACLKENPRE             ,39	,19	,1}	,
   {HCCStarSubRegister::DATACLKENABLE            ,39	,20	,1}	,
   {HCCStarSubRegister::ICENABLE                 ,40	,0	,11}	,
-  {HCCStarSubRegister::ICTRANSSEL               ,40	,16	,3}	,
+  {HCCStarSubRegister::ICTRANSSEL               ,40	,16	,4}	,
   {HCCStarSubRegister::TRIGMODE                 ,41	,0	,1}	,
   {HCCStarSubRegister::ROSPEED                  ,41	,4	,1}	,
   {HCCStarSubRegister::OPMODE                   ,41	,8	,2}	,
@@ -144,14 +146,14 @@ HccStarRegInfo::HccStarRegInfo(int version) {
   // Temporarily writeable
   std::map<unsigned, std::shared_ptr<RegisterInfo>> regMap;
 
-  for (HCCStarRegister reg : HCCStarRegister::_values()) {
+  for (HCCStarRegister reg : HccNames::listRegs()) {
     if(version == 1
        && (reg == HCCStarRegister(HCCStarRegister::PLL2)
            || reg == HCCStarRegister(HCCStarRegister::PLL3))) {
       continue;
     }
 
-    int addr = reg;
+    int addr = static_cast<int>(reg);
     regMap[addr] = std::make_shared<RegisterInfo>(addr);
   }
 
@@ -168,13 +170,13 @@ HccStarRegInfo::HccStarRegInfo(int version) {
       continue;
     }
 
-    int addr = reg;
+    int addr = static_cast<int>(reg);
     hccWriteMap[addr] = regMap[addr];
   }
 
   for (auto def : hccSubRegDefs(version)) {
     auto reg_id = std::get<0>(def);
-    std::string subregname = std::string(reg_id._to_string());
+    std::string subregname = HccNames::subRegToString(reg_id);
     auto addr = std::get<1>(def);
     auto offset = std::get<2>(def);
     auto width = std::get<3>(def);
@@ -196,7 +198,7 @@ HccCfg::HccCfg(int hcc_version)
 }
 
 void HccCfg::setupMaps(int version) {
-  auto len = HCCStarRegister::_size();
+  auto len = HccNames::listRegs().size();
 
   if(version == 1) {
     len -= 2;
@@ -208,11 +210,11 @@ void HccCfg::setupMaps(int version) {
   m_registerSet.reserve( len );
 
   //all HCC Register addresses we will create
-  for (HCCStarRegister reg : HCCStarRegister::_values()) {
-    int addr = reg;
+  for (HCCStarRegister reg : HccNames::listRegs()) {
+    int addr = (int)reg;
 
     if(version == 1 &&
-       ((addr == HCCStarRegister::PLL2 || addr == HCCStarRegister::PLL3))) {
+       ((reg == HCCStarRegister::PLL2 || reg == HCCStarRegister::PLL3))) {
       continue;
     }
 
@@ -232,21 +234,21 @@ void HccCfg::setupMaps(int version) {
   }
 }
 
-std::array<uint8_t, HCC_INPUT_CHANNEL_COUNT> HccCfg::histoChipMap() const {
+std::array<uint8_t, Star::MaxABCsPerHCC> HccCfg::histoChipMap() const {
   // On HCCv0, input channel numbers are reversed
   // On HCCv1, we map histogram slots based on increasing IC number
 
   // Mask of enabled ICs
-  auto input_enables = getSubRegisterValue("ICENABLE");
-  auto version_1 = m_registerSet.size() != HCCStarRegister::_size();
+  auto input_enables = getSubRegisterValue(HCCStarSubRegister::ICENABLE);
+  auto version_1 = m_registerSet.size() != HccNames::listRegs().size();
 
   size_t offset = 0;
 
-  std::array<uint8_t, HCC_INPUT_CHANNEL_COUNT> chip_map{};
+  std::array<uint8_t, Star::MaxABCsPerHCC> chip_map{};
   chip_map.fill(HCC_INPUT_CHANNEL_BAD_SLOT);
 
   // logger->trace("Build map from mask: {}", input_enables);
-  for(int index=0; index<11; index++) {
+  for(unsigned int index=0; index<Star::MaxABCsPerHCC; index++) {
     int ic = version_1?index:(10-index);
     int mask = 1<<ic;
     if(mask & input_enables) {
@@ -262,33 +264,33 @@ void HccCfg::setDefaults(int version) {
   // NB version 1 only adds status registers
 
   ////  Register* this_Reg = registerMap[0][addr];
-  m_registerMap[HCCStarRegister::Pulse]->setValue(0x00000000);
-  m_registerMap[HCCStarRegister::Delay1]->setValue(0x00000000);
-  m_registerMap[HCCStarRegister::Delay2]->setValue(0x00000000);
-  m_registerMap[HCCStarRegister::Delay3]->setValue(0x00000000);
-  m_registerMap[HCCStarRegister::PLL1]->setValue(0x00ff3b05);
+  m_registerMap[(int)HCCStarRegister::Pulse]->setValue(0x00000000);
+  m_registerMap[(int)HCCStarRegister::Delay1]->setValue(0x00000000);
+  m_registerMap[(int)HCCStarRegister::Delay2]->setValue(0x00000000);
+  m_registerMap[(int)HCCStarRegister::Delay3]->setValue(0x00000000);
+  m_registerMap[(int)HCCStarRegister::PLL1]->setValue(0x00ff3b05);
   if(version == 0) {
-    m_registerMap[HCCStarRegister::PLL2]->setValue(0x00000000);
-    m_registerMap[HCCStarRegister::PLL3]->setValue(0x00000004);
+    m_registerMap[(int)HCCStarRegister::PLL2]->setValue(0x00000000);
+    m_registerMap[(int)HCCStarRegister::PLL3]->setValue(0x00000004);
   }
-  m_registerMap[HCCStarRegister::DRV1]->setValue(0x00000000);
-  m_registerMap[HCCStarRegister::DRV2]->setValue(0x00000014);
-  m_registerMap[HCCStarRegister::ICenable]->setValue(0x00000000);
-  m_registerMap[HCCStarRegister::OPmode]->setValue(0x00020001);
-  m_registerMap[HCCStarRegister::OPmodeC]->setValue(0x00020001);
-  m_registerMap[HCCStarRegister::Cfg1]->setValue(0x00000000);
-  m_registerMap[HCCStarRegister::Cfg2]->setValue(0x0000018e);
-  m_registerMap[HCCStarRegister::ExtRst]->setValue(0x00710003);
-  m_registerMap[HCCStarRegister::ExtRstC]->setValue(0x00710003);
-  m_registerMap[HCCStarRegister::ErrCfg]->setValue(0x00000000);
-  m_registerMap[HCCStarRegister::ADCcfg]->setValue(0x00406600);
+  m_registerMap[(int)HCCStarRegister::DRV1]->setValue(0x00000000);
+  m_registerMap[(int)HCCStarRegister::DRV2]->setValue(0x00000014);
+  m_registerMap[(int)HCCStarRegister::ICenable]->setValue(0x00000000);
+  m_registerMap[(int)HCCStarRegister::OPmode]->setValue(0x00020001);
+  m_registerMap[(int)HCCStarRegister::OPmodeC]->setValue(0x00020001);
+  m_registerMap[(int)HCCStarRegister::Cfg1]->setValue(0x00000000);
+  m_registerMap[(int)HCCStarRegister::Cfg2]->setValue(0x0000018e);
+  m_registerMap[(int)HCCStarRegister::ExtRst]->setValue(0x00710003);
+  m_registerMap[(int)HCCStarRegister::ExtRstC]->setValue(0x00710003);
+  m_registerMap[(int)HCCStarRegister::ErrCfg]->setValue(0x00000000);
+  m_registerMap[(int)HCCStarRegister::ADCcfg]->setValue(0x00406600);
 }
 
 uint32_t HccCfg::getRegisterValue(HCCStarRegister addr) const {
   try {
     return getRegister(addr).getValue();
   } catch(std::out_of_range &e) {
-    logger->info("Failed request for get HCC reg: {}", addr);
+    logger->info("Failed request for get HCC reg: {}", HccNames::regToString(addr));
     for(auto &rm: m_registerMap) {
       logger->debug("Have: {}", rm.first);
     }
@@ -301,7 +303,7 @@ void HccCfg::setRegisterValue(HCCStarRegister addr, uint32_t val) {
   try {
     getRegister(addr).setValue(val);
   } catch(std::out_of_range &e) {
-    logger->info("Failed request for set HCC reg: {}", addr);
+    logger->info("Failed request for set HCC reg: {}", HccNames::regToString(addr));
     for(auto &rm: m_registerMap) {
       logger->debug("Have: {}", rm.first);
     }

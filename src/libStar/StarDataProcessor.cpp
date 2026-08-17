@@ -6,7 +6,10 @@
 #include "AllProcessors.h"
 #include "LoopStatus.h"
 
+#include "StarConstants.h"
 #include "StarChipPacket.h"
+#include "StarProcessor.h"
+#include "StarProcessorPrint.h"
 #include "StarCfg.h"
 
 #include "EventData.h"
@@ -20,7 +23,18 @@ namespace {
 void process_data(RawData &curIn,
                   FrontEndData &curOut,
                   FeedbackProcessingInfo &curStatus,
-                  const std::array<uint8_t, 11> &chip_map);
+                  const std::array<uint8_t, Star::MaxABCsPerHCC> &chip_map);
+
+template<size_t BASE = 1>
+void process_data_template(RawData &curIn,
+                  FrontEndData &curOut,
+                  FeedbackProcessingInfo &curStatus,
+                  const std::array<uint8_t, Star::MaxABCsPerHCC> &chip_map);
+
+void process_raw_data(RawData &curIn,
+                      FrontEndData &curOut,
+                      FeedbackProcessingInfo &curStatus,
+                      const std::array<uint8_t, Star::MaxABCsPerHCC> &chip_map);
 
 bool star_proc_registered =
   StdDict::registerDataProcessor("Star", []() { return std::unique_ptr<FeDataProcessor>(new StarDataProcessor());});
@@ -31,16 +45,44 @@ bool star_proc_registered_ppa =
 bool star_proc_registered_ppb =
   StdDict::registerDataProcessor("Star_vH1A1", []() { return std::unique_ptr<FeDataProcessor>(new StarDataProcessor());});
 
+/**
+ * Private implementation.
+ */
+struct StarDataProcessorImpl {
+  std::function<void (RawData &curIn,
+                      FrontEndData &curOut,
+                      FeedbackProcessingInfo &curStatus,
+                      const std::array<uint8_t, Star::MaxABCsPerHCC> &chip_map)> proc_data = process_data;
+};
+
 StarDataProcessor::StarDataProcessor()
   : FeDataProcessor(),
     input(nullptr),
     output(nullptr),
-    chip_map{}
+    chip_map{},
+    pimpl(std::make_unique<StarDataProcessorImpl>())
 {}
 
 StarDataProcessor::~StarDataProcessor() = default;
 
 void StarDataProcessor::init() {}
+
+void StarDataProcessor::loadConfig(const json &config)
+{
+  logger->debug("Load config");
+  if(config.contains("use_template") && config["use_template"]) {
+    logger->debug("Using templated decoder");
+    if(config.contains("zero_base") && config["zero_base"]) {
+      pimpl->proc_data = process_data_template<0>;
+      logger->debug("Using zero-based row/col");
+    } else {
+      pimpl->proc_data = process_data_template<>;
+    }
+  }
+  if(config.contains("raw_bits") && config["raw_bits"]) {
+      pimpl->proc_data = process_raw_data;
+  }
+}
 
 void StarDataProcessor::connect(FrontEndCfg *feCfg, ClipBoard<RawDataContainer> *arg_input, ClipBoard<EventDataBase> *arg_output) {
   if(feCfg == nullptr) {
@@ -48,7 +90,7 @@ void StarDataProcessor::connect(FrontEndCfg *feCfg, ClipBoard<RawDataContainer> 
   }
   auto cfg = dynamic_cast<StarCfg*>(feCfg);
   if(cfg == nullptr) {
-    throw std::runtime_error("StarDataProcessor::connect given bad config (not StarCfg");
+    throw std::runtime_error("StarDataProcessor::connect given bad config (not StarCfg)");
   }
 
   chip_map = cfg->hcc().histoChipMap();
@@ -86,6 +128,22 @@ void StarDataProcessor::process() {
     process_core();
 }
 
+std::unique_ptr<EventDataBase> StarDataProcessor::process_event_core(const RawDataContainer &curIn, std::function<void (std::unique_ptr<FeedbackProcessingInfo>)> push_fb) {
+    auto output = std::make_unique<FrontEndData>(curIn.stat);
+
+    unsigned size = curIn.size();
+
+    for(unsigned c=0; c<size; c++) {
+        RawDataPtr r = curIn.data[c];
+        // unsigned channel = r->getAdr(); //elink number
+        std::unique_ptr<FeedbackProcessingInfo> fb_stat(new FeedbackProcessingInfo{.trigger_tag = PROCESSING_FEEDBACK_TRIGGER_TAG_ERROR});
+        pimpl->proc_data(*r, *output, *fb_stat, chip_map);
+        push_fb(std::move(fb_stat));
+    }
+
+    return output;
+}
+
 void StarDataProcessor::process_core() {
     while(!input->empty()) {
         // Get data containers
@@ -93,28 +151,132 @@ void StarDataProcessor::process_core() {
         if (curInV == nullptr)
             continue;
 
-        // Create Output Container
-        std::unique_ptr<FrontEndData> curOut(new FrontEndData(curInV->stat));
-
-        unsigned size = curInV->size();
-
-        for(unsigned c=0; c<size; c++) {
-            RawDataPtr r = curInV->data[c];
-            unsigned channel = r->getAdr(); //elink number
-            std::unique_ptr<FeedbackProcessingInfo> stat(new FeedbackProcessingInfo{.trigger_tag = PROCESSING_FEEDBACK_TRIGGER_TAG_ERROR});
-            process_data(*r, *curOut, *stat, chip_map);
-            if (statusFb != nullptr) statusFb->pushData(std::move(stat));
-        }
+        auto curOut = statusFb 
+        ?process_event_core(*curInV, [&](auto fb) {statusFb->pushData(std::move(fb));})
+        :process_event_core(*curInV, [&](auto fb) {});
 
         output->pushData(std::move(curOut));
         // dataCnt++;
     }
 }
 
+template<size_t BASE = 1>
+class MyProc : public EmptyProc {
+    bool seen_error{false};
+
+    FrontEndData &curOut;
+    FeedbackProcessingInfo &curStatus;
+    const std::array<uint8_t, Star::MaxABCsPerHCC> &chip_map;
+
+public:
+
+    void data_header(bool pr_not_lp, uint8_t bcid, bool parity, uint8_t l0id, int flag) {
+        curStatus.trigger_tag = l0id;
+        curStatus.bcid        = bcid;
+
+        curOut.newEvent(l0id, l0id, bcid);
+    }
+
+    void data_cluster(unsigned int input_channel, uint8_t address, int next)
+    {
+        curStatus.n_clusters++;
+
+        int row = ((address>>7)&1) + BASE;
+
+        if(input_channel >= Star::MaxABCsPerHCC) {
+          logger->warn("Bad input channel {} in cluster",
+                       input_channel);
+          return;
+        }
+
+        int histo_chip = chip_map[input_channel];
+        if(histo_chip == HCC_INPUT_CHANNEL_BAD_SLOT) {
+          logger->warn("Bad input channel {} missing in config",
+                       input_channel);
+          return;
+        }
+        logger->trace("Mapped ic {} to histo {}", input_channel, histo_chip);
+
+        int histo_base = histo_chip * Star::StripsPerABCRow;
+
+        // Split hits into two rows of strips
+
+        //NOTE::tot(1) is just dummy value, because this is the standard check in the histogrammers.
+        //row and col both + 1 because pixel row & col numbering start from 1
+        unsigned tot = 1;
+
+        curOut.curEvent->addHit( row,
+                                 histo_base+((address&0x7f)+BASE), tot);
+
+        std::bitset<3> nextPattern (next);
+        for(unsigned i=0; i<3; i++){
+          if(!nextPattern.test(i)) continue;
+          auto nextAddress = address+(3-i);
+          curOut.curEvent->addHit( row,
+                                   histo_base+((nextAddress&0x7f)+BASE), tot);
+
+          // It's an error for cluster to escape either "side"
+          if((address & (~0x7f)) != (nextAddress & (~0x7f))) {
+            logger->warn(" strip address > 128");
+          }
+        }
+    }
+
+    void hcc_read(bool hpr_not_rr, int address, int value) {
+        if(hpr_not_rr) {
+            curStatus.trigger_tag = PROCESSING_FEEDBACK_TRIGGER_TAG_Control;
+        } else {
+            curStatus.trigger_tag = PROCESSING_FEEDBACK_TRIGGER_TAG_RR;
+        }
+    }
+
+    void abc_read(bool hpr_not_rr, int ic, int address, int value, int status) {
+        if(hpr_not_rr) {
+            curStatus.trigger_tag = PROCESSING_FEEDBACK_TRIGGER_TAG_Control;
+        } else {
+            curStatus.trigger_tag = PROCESSING_FEEDBACK_TRIGGER_TAG_RR;
+        }
+
+        if(address >= 0x80 && address <= 0xbf) {
+            //Hit Counter Register Read
+            if (value == 0) {
+                return; //No Hits
+            }
+
+            logger->trace("Adding hits from HitCounter", address);
+
+            curOut.newEvent(0,0,0); //No l0id or bcid
+            int start_channel = (address - 0x80)*4;
+            for (int i=0; i < 4; i++) {
+                int channel = start_channel+i;
+                int row = (channel&1)+1;
+                int hits = (value>>(8*i)) & 0xff;
+                for(int j=0; j<hits; j++) {
+                    curOut.curEvent->addHit( row,
+                                             ic*Star::StripsPerABCRow+( ((channel>>1)&0x7f)+BASE), 1);
+                }
+            }
+        }
+    }
+
+public:
+    MyProc(FrontEndData &curOut,
+           FeedbackProcessingInfo &curStatus,
+           const std::array<uint8_t, Star::MaxABCsPerHCC> &chip_map)
+      : curOut(curOut),
+        curStatus(curStatus),
+        chip_map(chip_map)
+    { }
+
+    bool error() {
+      return seen_error;
+    }
+};
+
 void process_data(RawData &curIn,
                   FrontEndData &curOut,
                   FeedbackProcessingInfo &curStatus,
-                  const std::array<uint8_t, 11> &chip_map) {
+                  const std::array<uint8_t, Star::MaxABCsPerHCC> &chip_map) {
     StarChipPacket packet;
     curStatus.packet_size = curIn.getSize();
 
@@ -122,7 +284,7 @@ void process_data(RawData &curIn,
     for(unsigned iw=0; iw<curIn.getSize(); iw++) {
         for(int i=0; i<4;i++){
             packet.add_word((curIn[iw]>>i*8)&0xFF);
-        }
+	}
     }
     packet.add_word(0x1DC); //add EOP, only to make decoder happy
 
@@ -155,7 +317,7 @@ void process_data(RawData &curIn,
 
             int row = ((cluster.address>>7)&1)+1;
 
-            if(cluster.input_channel >= HCC_INPUT_CHANNEL_COUNT) {
+            if(cluster.input_channel >= Star::MaxABCsPerHCC) {
               logger->warn("Bad input channel {} in cluster",
                            cluster.input_channel);
               continue;
@@ -167,7 +329,7 @@ void process_data(RawData &curIn,
               continue;
             }
             logger->trace("Mapped ic {} to histo {}", cluster.input_channel, histo_chip);
-            int histo_base = histo_chip * 128;
+            int histo_base = histo_chip * Star::StripsPerABCRow;
 
             // Split hits into two rows of strips
             curOut.curEvent->addHit( row,
@@ -208,9 +370,25 @@ void process_data(RawData &curIn,
                 int hits = (packet.value>>(8*i)) & 0xff;
                 for(int j=0; j<hits; j++)
                     curOut.curEvent->addHit( row,
-                                             packet.channel_abc*128+( ((channel>>1)&0x7f)+1), 1);
+                                             packet.channel_abc*Star::StripsPerABCRow+( ((channel>>1)&0x7f)+1), 1);
             }
         }
+        else{
+          
+          logger->trace("Adding contents of RR to FrontEndData object");
+
+          // Not event data
+          curOut.newEvent(0xffffffff, 0xffffffff, 0xffffffff);
+
+          // Split reg value between row and column data, put rest of information in tot
+          FrontEndHit d{};
+          d.row = (packet.value >> 16) & 0xffff; 
+          d.col = (packet.value) & 0xffff;
+          d.tot = 0x8000 | ((packetType & 0x7) << 12) | ((packet.address & 0xff) << 4) | (packet.channel_abc << 0);
+          // Starts with a 1 always, followed by 3 bits for packet type, followed by 8 bits for reg addr, followed by 4 bits for abc ch
+          curOut.curEvent->addHit(d);
+        }
+
     } else if (packetType == TYP_ABC_HPR || packetType == TYP_HCC_HPR) {
         curStatus.trigger_tag = PROCESSING_FEEDBACK_TRIGGER_TAG_Control;
         if(logger->should_log(spdlog::level::trace)) {
@@ -219,6 +397,56 @@ void process_data(RawData &curIn,
             logger->trace("{}", os.str());
         }
     }
+}
+
+template<size_t BASE>
+void process_data_template(RawData &curIn,
+                  FrontEndData &curOut,
+                  FeedbackProcessingInfo &curStatus,
+                  const std::array<uint8_t, Star::MaxABCsPerHCC> &chip_map) {
+    curStatus.packet_size = curIn.getSize();
+    uint8_t *start = (uint8_t*)curIn.getBuf();
+    uint8_t *end = start + (curIn.getSize() * 4);
+
+    MyProc<BASE> proc(curOut, curStatus, chip_map);
+    StarProcessPacket(start, end, proc);
+
+    if(proc.error()) {
+      logger->error("Star packet parsing failed, continuing to report the extracted data\n");
+    }
+
+    logger->debug("Process data");
+
+    if(logger->should_log(spdlog::level::trace)) {
+      std::stringstream os;
+      PrintProc printer(os);
+      StarProcessPacket(start, end, printer);
+      logger->trace("{}", os.str());
+    }
+}
+
+void process_raw_data(RawData &curIn,
+                      FrontEndData &curOut,
+                      FeedbackProcessingInfo &curStatus,
+                      const std::array<uint8_t, Star::MaxABCsPerHCC> &chip_map)
+{
+  // Not event data
+  curOut.newEvent(0xffffffff, 0xffffffff, 0xffffffff);
+
+  curStatus.packet_size = curIn.getSize();
+  curStatus.trigger_tag = PROCESSING_FEEDBACK_TRIGGER_TAG_Control;
+  curStatus.bcid = 0xffffffff;
+
+  const uint32_t *start = curIn.getBuf();
+  const uint32_t *end = start + curIn.getSize();
+
+  for(auto w = start; w != end; w ++) {
+    FrontEndHit d{};
+    d.row = (*w >> 16) & 0xffff;
+    d.col = (*w) & 0xffff;
+    d.tot = 0xffff; // Some kind of flag that this is bit data
+    curOut.curEvent->addHit(d);
+  }
 }
 
 // Need to instantiate something to register the logger

@@ -3,4 +3,6 @@
 #include "StarTriggerLoop.h"
 #include "StarChannelFeedback.h"
 #include "StarCounterLoop.h"
+#include "StarParamFeedback.h"
 #include "StarFelixTriggerLoop.h"
+#include "StarThrottleLoop.h"

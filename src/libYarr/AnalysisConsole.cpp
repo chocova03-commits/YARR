@@ -2,13 +2,17 @@
 
 #include "AllAnalyses.h"
 #include "AllChips.h"
+#include "AllPlotters.h"
 #include "AllStdActions.h"
 #include "ClipBoard.h"
+#include "FrontEndCfg.h"
 #include "ScanHelper.h"
+#include "ThreadPool.h"
 
 #include "logging.h"
 #include "LoggingConfig.h"
 
+#include <iostream>
 #include <getopt.h>
 
 // Compare for example
@@ -52,7 +56,7 @@ class BasicScanInfo : public ScanLoopInfo {
                statVec.push_back(0);
            }
 
-           return {std::move(statVec), styleVec};
+           return {statVec, styleVec};
         }
 };
 
@@ -60,6 +64,7 @@ class AnalysisConsoleImpl {
     AnalysisOpts options;
 
     std::unique_ptr<FrontEnd> frontEnd;
+    ThreadPool m_pool{4}; // hardcoded to 4 threads as not easily configurable and only used for testing
 
     ClipBoard<HistogramBase> clipHistoInput;
     std::vector<std::unique_ptr<ClipBoard<HistogramBase>> > clipResultOutput;
@@ -75,7 +80,7 @@ class AnalysisConsoleImpl {
     clk::time_point all_done;
 
   public:
-    AnalysisConsoleImpl(const AnalysisOpts &opts);
+    AnalysisConsoleImpl(AnalysisOpts opts);
 
     int init();
 
@@ -141,41 +146,38 @@ int AnalysisConsole::parseOptions(int argc, char *argv[], AnalysisOpts &anOpts) 
     anOpts.progName=argv[0];
     const struct option long_options[] =
       {
-        {"help", no_argument, 0, 'h'},
-        {0, 0, 0, 0}};
+        {"help", no_argument, nullptr, 'h'},
+        {nullptr, 0, nullptr, 0}};
 
     int c;
     while (true) {
         int opt_index=0;
-        c = getopt_long(argc, argv, "hs:y:m:c:t:po:W:d:u:i:l:QIz", long_options, &opt_index);
+        c = getopt_long(argc, argv, "hpc:l:m:o:s:t:y:", long_options, &opt_index);
         int count = 0;
         if(c == -1) break;
         switch (c) {
         case 'h':
             printHelp();
             return 0;
-        case 's':
-            anOpts.scanFile = std::string(optarg);
-            break;
-        case 'l': // Logger config file
-            anOpts.logCfgPath = std::string(optarg);
-            break;
-        case 'y':
-            anOpts.chipType = std::string(optarg);
-            break;
-        case 'm':
-            anOpts.mask_opt = atoi(optarg);
+        case 'p':
+            anOpts.doPlots = true;
             break;
         case 'c':
             anOpts.chipConfigPath = std::string(optarg);
             break;
-        case 'p':
-            anOpts.doPlots = true;
+        case 'l': // Logger config file
+            anOpts.logCfgPath = std::string(optarg);
+            break;
+        case 'm':
+            anOpts.mask_opt = atoi(optarg);
             break;
         case 'o':
             anOpts.outputDir = std::string(optarg);
             if (anOpts.outputDir.back() != '/')
                 anOpts.outputDir = anOpts.outputDir + "/";
+            break;
+        case 's':
+            anOpts.scanFile = std::string(optarg);
             break;
         case 't':
             optind -= 1; //this is a bit hacky, but getopt doesn't support multiple
@@ -194,6 +196,9 @@ int AnalysisConsole::parseOptions(int argc, char *argv[], AnalysisOpts &anOpts) 
                 }
                 count++;
             }
+            break;
+        case 'y':
+            anOpts.chipType = std::string(optarg);
             break;
         case '?':
             if (optopt == 's') {
@@ -234,8 +239,8 @@ int AnalysisConsole::parseOptions(int argc, char *argv[], AnalysisOpts &anOpts) 
     return 1;
 }
 
-AnalysisConsoleImpl::AnalysisConsoleImpl(const AnalysisOpts &opts)
-  : options(opts)
+AnalysisConsoleImpl::AnalysisConsoleImpl(AnalysisOpts opts)
+  : options(std::move(opts))
 {
 }
 
@@ -513,7 +518,8 @@ void AnalysisConsoleImpl::saveAndPlot() {
         const std::string filename = options.outputDir + "config_post_analysis.json";
         logger->info("Saving config of FE {} to {}",
                      feCfg->getName(), filename);
-        ScanHelper::writeFeConfig(feCfg, filename);
+        auto plotter = StdDict::getPlotter("Default");
+        plotter->writeFeConfig(feCfg, filename, m_pool);
     }
 
     // Save the output of the final level of output
@@ -573,14 +579,14 @@ void AnalysisConsoleImpl::reportTimings() const {
 void printHelp() {
     std::cout << "Analysis console help:\n";
     std::cout << " -h: Shows this help.\n";
-    std::cout << " -s <scan_type> : Scan config\n";
-    std::cout << " -c fe_config.json : Provide initial front end configuration\n";
-    std::cout << " -y fe_type : FrontEnd config type\n";
-    std::cout << " -t <target_charge> [<tot_target>] : Set target values for threshold/charge (and tot).\n";
     std::cout << " -p: Enable plotting of results.\n";
-    std::cout << " -o <dir> : Output directory. (Default ./data/reanalysis)\n";
-    std::cout << " -m <int> : 0 = pixel masking disabled, 1 = start with fresh pixel mask, default = pixel masking enabled\n";
+    std::cout << " -c fe_config.json : Provide initial front end configuration\n";
     std::cout << " -l <log_cfg.json> : Provide logger configuration.\n";
+    std::cout << " -m <int> : 0 = pixel masking disabled, 1 = start with fresh pixel mask, default = pixel masking enabled\n";
+    std::cout << " -o <dir> : Output directory. (Default ./data/reanalysis)\n";
+    std::cout << " -s <scan_type> : Scan config\n";
+    std::cout << " -t <target_charge> [<tot_target>] : Set target values for threshold/charge (and tot).\n";
+    std::cout << " -y fe_type : FrontEnd config type\n";
 }
 
 int AnalysisConsoleImpl::init() {
@@ -593,9 +599,7 @@ int AnalysisConsoleImpl::init() {
         loggerConfig["outputDir"] = options.outputDir;
     } else {
         // default log setting
-        loggerConfig["pattern"] = options.defaultLogPattern;
-        loggerConfig["log_config"][0]["name"] = "all";
-        loggerConfig["log_config"][0]["level"] = "info";
+        loggerConfig = logging::defaultConfig();
         loggerConfig["outputDir"]="";
     }
     spdlog::info("Configuring logger ...");

@@ -11,12 +11,12 @@
 #include <random>
 #include <iostream>
 #include "EventData.h"
+#include "ItkpixLayout.h"
 
 
 class HitMapGenerator{
-    //This is suboptimal and temporary - will need to change vector of vectors into something
-    //1-D, contiguously stored
-    typedef std::vector<std::vector<uint16_t>> HitMap;
+
+    typedef ItkpixLayout<uint16_t> HitMap;
 
 
     public:
@@ -40,13 +40,13 @@ class HitMapGenerator{
 
 
         //geometry and config
-        uint m_seed, m_nCol, m_nRow, m_nCCol, m_nQRow, m_nColInCCol, m_nRowInQRow;
-        float m_occupancy;
+        uint m_seed, m_nCCol, m_nQRow, m_nColInCCol, m_nRowInQRow;
+        float m_occupancy = 0.0f;
 
         //output
         HitMap m_hitMap;
         FrontEndEvent m_truthEvt;
-        uint m_nGenerated;
+        uint m_nGenerated = 0;
 };
 
 #endif

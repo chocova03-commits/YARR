@@ -5,7 +5,10 @@
 */
 #include "HitMapGenerator.h"
 
-HitMapGenerator::HitMapGenerator(const uint nCol, const uint nRow, const uint nColInCCol, const uint nRowInQRow, const uint seed): m_nCol(nCol), m_nRow(nRow), m_nColInCCol(nColInCCol), m_nRowInQRow(nRowInQRow), m_seed(seed){
+HitMapGenerator::HitMapGenerator(const uint nCol, const uint nRow, const uint nColInCCol, const uint nRowInQRow, const uint seed)
+  : m_seed(seed),
+    m_nColInCCol(nColInCCol), m_nRowInQRow(nRowInQRow)
+{
     //initialize the pdfs for assigning a hit and for
     //the ToT value of that hit
     m_hitProb = std::uniform_real_distribution<float>(0., 1.);
@@ -39,11 +42,12 @@ void HitMapGenerator::randomQCore(const uint CCol, const uint QRow){
             //std::cout << hitprob << " vs occupancy " << m_occupancy << "\n";
             if (hitprob < m_occupancy){
                 //Then give it a tot!
-                m_hitMap[pixCol][pixRow] = m_totProb(generator);
+                uint16_t tot = m_totProb(generator);
+                m_hitMap(pixCol, pixRow) = tot;//m_totProb(generator);
                 
                 //and save it into the truth output, respecting the
                 //decoder numbering conventions
-                m_truthEvt.addHit(pixRow + 1, pixCol + 1, m_hitMap[pixCol][pixRow] - 1);
+                m_truthEvt.addHit(pixRow + 1, pixCol + 1, m_hitMap(pixCol, pixRow) - 1);
             }
         }
     }
@@ -53,7 +57,7 @@ void HitMapGenerator::randomQCore(const uint CCol, const uint QRow){
 void HitMapGenerator::randomHitMap(float occupancy){
     //Generate uniformly random hit map for dev/testing purposes
     //initialize the hit map with all zeros
-    m_hitMap   = std::vector<std::vector<uint16_t>>(m_nCol, std::vector<uint16_t>(m_nRow, 0));
+    m_hitMap   = ItkpixLayout<uint16_t>();
     m_truthEvt = FrontEndEvent(0, 0, m_nGenerated);
     m_occupancy = occupancy;
     

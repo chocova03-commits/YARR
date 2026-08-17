@@ -5,6 +5,7 @@
 // # Description: Strobe Delay Analysis class for Star
 // ################################
 
+#include "StarConstants.h"
 #include "StarStrobeDelayAnalysis.h"
 #include "AllAnalyses.h"
 #include "StarJsonData.h"
@@ -12,10 +13,6 @@
 #include "Histo2d.h"
 #include "StdHistogrammer.h"
 #include "StdTriggerAction.h"
-
-// NB if we don't include this, it compiles, but we get a linker error,
-// presumably because it picks up names from C rather than C++
-#include <cmath>
 
 #include "lmcurve.h"
 #include "logging.h"
@@ -58,6 +55,11 @@ void StarStrobeDelayAnalysis::init(const ScanLoopInfo *s) {
             } else {
                 m_injections = trigLoop->getTrigCnt();
             }
+        }
+
+        if (l->isPixelFeedbackLoop()) {
+            alog->debug("Found pixel feedback loop");
+            m_fb = std::make_unique<PixelFeedbackSender>(feedback);
         }
     }
 
@@ -147,12 +149,12 @@ void StarStrobeDelayAnalysis::processHistogram(HistogramBase *h) {
                 m_strobeDelayHistos[ident]->fill(strobeDelay, thisBin);
 
 		// Fill 2D histogram of occupancy vs strobe delay vs channel number for each chip and each row
-		unsigned iChip = (col-1)/128;
-		unsigned iChipRow = iChip*2 + (row-1);
-		unsigned binInChip  = (col-1)%128;
+		unsigned iChip = (col-1)/Star::StripsPerABCRow;
+		unsigned iChipRow = iChip*Star::RowsPerABC + (row-1);
+		unsigned binInChip  = (col-1)%Star::StripsPerABCRow;
 		if (m_hOccVsStrobeDelayVsChannelPerRow[iChipRow] == nullptr) {
 		  std::string name = "OccVsStrobeDelayVsChanChip" + std::to_string(iChip) + "Row" + std::to_string(row);
-		  auto hOccVsSDVsChPerRow = std::make_unique<Histo2d>(name, 128, 0, 128, m_strobeDelayBins, m_strobeDelayMin-((double)m_strobeDelayStep/2.0), m_strobeDelayMax+((double)m_strobeDelayStep/2.0));
+		  auto hOccVsSDVsChPerRow = std::make_unique<Histo2d>(name, Star::StripsPerABCRow, 0, Star::StripsPerABCRow, m_strobeDelayBins, m_strobeDelayMin-((double)m_strobeDelayStep/2.0), m_strobeDelayMax+((double)m_strobeDelayStep/2.0));
 		  hOccVsSDVsChPerRow->setXaxisTitle("Channel number");
 		  hOccVsSDVsChPerRow->setYaxisTitle("Strobe Delay");
 		  hOccVsSDVsChPerRow->setZaxisTitle("Occupancy");
@@ -170,19 +172,23 @@ void StarStrobeDelayAnalysis::processHistogram(HistogramBase *h) {
 		  m_rightEdgeMap[ident] = fitParams[1][0];
 
 		  // Dump SD plots if desired
-		  if (m_dumpDebugSDPlots && row == nRow/2 && col%10 == 0) {
+		  if (m_dumpDebugSDPlots && row == nRow/Star::RowsPerABC && col%10 == 0) {
 		    output->pushData(std::move(m_strobeDelayHistos[ident]));
 		  }
 		  m_strobeDelayHistos[ident].reset(nullptr);
                 }
         }
     }
+
+    if (m_strobeDelayCnt == m_strobeDelayBins) {
+        pushData();
+    }
 }
 
 //! Once all scan inputs have been collected, finds optimal strobe delay for each chip and dumps results and control plots
 /*!
 */
-void StarStrobeDelayAnalysis::end() {
+void StarStrobeDelayAnalysis::pushData() {
 
   // Make histograms of left/right edge for all channels
   auto hDistLeftEdge = std::make_unique<Histo1d>("LeftEdgeDist", m_strobeDelayBins, m_strobeDelayMin-((double)m_strobeDelayStep/2.0), m_strobeDelayMax+((double)m_strobeDelayStep/2.0));
@@ -197,16 +203,20 @@ void StarStrobeDelayAnalysis::end() {
   auto upJD = std::make_unique<StarJsonData>("JsonData_StarStrobeDelayResult");
   upJD->setJsonDataType("JsonData_StarStrobeDelayResult");
 
+  unsigned nChips = (nCol/Star::StripsPerABCRow);
+
+  auto feedbackData = std::make_unique<Histo2d>("feedback", nChips, 0, nChips, 1, 0, 1);
+
   // For each chip, find max left edge and min right edge then define optimal strobe delay as the 57% point between the two 
-  for (unsigned int iChip=0; iChip<(nCol/128); iChip++){
+  for (unsigned int iChip=0; iChip<nChips; iChip++){
     upJD->initialiseStarChannelsDataAtProp({"ABCStar_" + std::to_string(iChip), "OptimalStrobeDelay"}, 1);
     double maxLeftEdgeForChip = 0.0;
     double minRightEdgeForChip = 100.0;
-    for (unsigned row=0; row<2; row++) {
+    for (unsigned row=0; row<Star::RowsPerABC; row++) {
       upJD->initialiseStarChannelsDataAtProp({"ABCStar_" + std::to_string(iChip), "LeftEdge", "Row" + std::to_string(row)});
       upJD->initialiseStarChannelsDataAtProp({"ABCStar_" + std::to_string(iChip), "RightEdge", "Row" + std::to_string(row)});
-      for (unsigned iStrip=0; iStrip<128; iStrip++) {
-	unsigned iChannel = iStrip + row*nCol + 128*iChip;
+      for (unsigned iStrip=0; iStrip<Star::StripsPerABCRow; iStrip++) {
+	unsigned iChannel = iStrip + row*nCol + Star::StripsPerABCRow*iChip;
 	double leftEdgeThisChannel = m_leftEdgeMap.at(iChannel);
 	double rightEdgeThisChannel = m_rightEdgeMap.at(iChannel);
 	hDistLeftEdge->fill(leftEdgeThisChannel);
@@ -229,10 +239,13 @@ void StarStrobeDelayAnalysis::end() {
     alog->debug("  Found optimal strobe delay = {} for chip {}", strobeDelayOpt, iChip);
     upJD->setValForProp({"ABCStar_" + std::to_string(iChip), "OptimalStrobeDelay"}, 0, strobeDelayOpt);   
 
-    // TODO: Write optimal value to STR_DEL in the front end configuration.
-    //       Complicated by working out the mapping from histogram position
-    //       to the right AbcCfg (HccCfg::histoChipMap gets half-way, but
-    //       might need to assume something).
+    // Pass configuration to (eg) StarParamFeedback
+    // The chips in this histogram are in histogram order, and are rearranged
+    // (via histoChipMap) by the front end code.
+    if(m_fb) {
+      alog->info("Feedback strobe delay for chip {}: {}", iChip, strobeDelayOpt);
+    }
+    feedbackData->fill(iChip, 0, strobeDelayOpt);
   } // end loop over chips
 
   double leftEdgeMean = hDistLeftEdge->getMean();
@@ -251,19 +264,19 @@ void StarStrobeDelayAnalysis::end() {
   output->pushData(std::move(hDistRightEdge));
 
   // Output occupancy map vs SD vs channel per chip/row
-  for (unsigned int row=0; row<2; row++){
+  for (unsigned int row=0; row<Star::RowsPerABC; row++){
     auto hOccVsSDVsCh = std::make_unique<Histo2d>("OccVsStrobeDelayVsChan_Row" + std::to_string(row), nCol, 0, nCol, m_strobeDelayBins,  m_strobeDelayMin-((double)m_strobeDelayStep/2.0), m_strobeDelayMax+((double)m_strobeDelayStep/2.0));
-    for (unsigned int iChip=0; iChip<(nCol/128); iChip++) {
-      auto hOccVsStrobeDelayPerRow = m_hOccVsStrobeDelayVsChannelPerRow[iChip*2 + row]->profileY();
+    for (unsigned int iChip=0; iChip<(nCol/Star::StripsPerABCRow); iChip++) {
+      auto hOccVsStrobeDelayPerRow = m_hOccVsStrobeDelayVsChannelPerRow[iChip*Star::RowsPerABC + row]->profileY();
       const unsigned n_par = FIT_N_PAR;
       upJD->initialiseStarChannelsDataAtProp({"ABCStar_" + std::to_string(iChip), "FitParamsLeft", "Row" + std::to_string(row)}, n_par);
       upJD->initialiseStarChannelsDataAtProp({"ABCStar_" + std::to_string(iChip), "FitParamsRight", "Row" + std::to_string(row)}, n_par);
       upJD->initialiseStarChannelsDataAtProp({"ABCStar_" + std::to_string(iChip), "Width", "Row" + std::to_string(row)}, 1);
-      for (unsigned int iStrip=0; iStrip<128; iStrip++){
+      for (unsigned int iStrip=0; iStrip<Star::StripsPerABCRow; iStrip++){
 	for (unsigned int sd=m_strobeDelayMin; sd<=m_strobeDelayMax; sd+=m_strobeDelayStep){
-	  int binNum = m_hOccVsStrobeDelayVsChannelPerRow[iChip*2 + row]->binNum(iStrip, sd);
-	  double binContent = m_hOccVsStrobeDelayVsChannelPerRow[iChip*2 + row]->getBin(binNum);
-	  hOccVsSDVsCh->fill(iChip*128 + iStrip, sd, binContent);
+	  int binNum = m_hOccVsStrobeDelayVsChannelPerRow[iChip*Star::RowsPerABC + row]->binNum(iStrip, sd);
+	  double binContent = m_hOccVsStrobeDelayVsChannelPerRow[iChip*Star::RowsPerABC + row]->getBin(binNum);
+	  hOccVsSDVsCh->fill(iChip*Star::StripsPerABCRow + iStrip, sd, binContent);
 	} // end loop over points
       } // end loop over strips
       std::vector<std::vector<double>> fitParamsPerRow = fitDoubleScurve(*hOccVsStrobeDelayPerRow);
@@ -285,9 +298,15 @@ void StarStrobeDelayAnalysis::end() {
   for (auto i=m_hOccVsStrobeDelayVsChannelPerRow.begin(); i!=m_hOccVsStrobeDelayVsChannelPerRow.end(); i++) {
     output->pushData(std::move((*i).second));
   }
-   
+
+  if(m_fb) {
+    m_fb->feedback(id, std::move(feedbackData));
+  }
 }
 
+void StarStrobeDelayAnalysis::end() {
+  // Nothing to do on shutdown
+}
 
 //! Find first x-axis value for which y-value goes above/below a certain fraction of the maximum
 /*!

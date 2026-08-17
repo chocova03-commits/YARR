@@ -195,7 +195,7 @@ class Fei4PixelFeedback : public LoopActionBase, public PixelFeedbackReceiver {
             g_tx->setCmdEnable(dynamic_cast<FrontEndCfg*>(fe)->getTxChannel());
             fe->configurePixels(lsb, msb+1);
             g_tx->setCmdEnable(keeper->getTxMask());
-            while(!g_tx->isCmdEmpty());
+            g_tx->waitCmdEmpty();
         }
 
         enum FeedbackType fbType;

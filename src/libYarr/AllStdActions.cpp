@@ -1,6 +1,12 @@
 #include "AllStdActions.h"
 #include "ClassRegistry.h"
 
+#include "StdDataLoop.h"
+#include "StdDataGatherer.h"
+#include "StdDataAction.h"
+#include "StdRepeater.h"
+#include "StdParameterLoop.h"
+
 #include "logging.h"
 
 namespace {
@@ -8,7 +14,7 @@ namespace {
 }
 
 #include <functional>
-typedef ClassRegistry<LoopActionBase> OurRegistry;
+using OurRegistry = ClassRegistry<LoopActionBase>;
 
 static OurRegistry &registry() {
   static OurRegistry instance;
@@ -39,7 +45,7 @@ namespace StdDict {
     bool registerLoopAction(std::string name,
                             std::function<std::unique_ptr<LoopActionBase>()> f)
     {
-        return registry().registerClass(name, f);
+        return registry().registerClass(std::move(name), std::move(f));
     }
 
     std::unique_ptr<LoopActionBase> getLoopAction(std::string name) {

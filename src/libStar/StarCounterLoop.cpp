@@ -6,6 +6,9 @@
 #include <iostream>
 #include <iomanip>
 
+#include "Bookkeeper.h"
+#include "TxCore.h"
+
 #include "logging.h"
 
 namespace {
@@ -17,9 +20,9 @@ StarCounterLoop::StarCounterLoop()
 	m_trigDelay(45), // L0_delay 34
 	m_trigFreq(1e3), // 1kHz
 	m_trigTime(10), // 10s
-	m_noInject(false),
 	m_trigWordLength(0),
-	m_trigWord{}
+        m_trigWord{},
+        m_noInject(false)
 {
 	setTrigCnt(50); // Maximum number of triggers to send
 
@@ -60,8 +63,7 @@ void StarCounterLoop::init() {
             }
         }
 
-	while(!g_tx->isCmdEmpty());
-
+	g_tx->waitCmdEmpty();
 }
 
 
@@ -77,10 +79,10 @@ void StarCounterLoop::execPart1() {
         auto fe = keeper->getFe(id);
         SPDLOG_LOGGER_DEBUG(logger, fe->isActive());
         if (!fe->isActive()) {continue;}
-        ((StarChips*) fe)->setAndWriteABCSubRegister("ENCOUNT", 1, 0xf);
+        ((StarChips*) fe)->setAndWriteABCSubRegister(ABCStarSubRegister::ENCOUNT, 1, 0xf);
         SPDLOG_LOGGER_DEBUG(logger, "Did ENCOUNT");
-        ((StarChips*) fe)->setAndWriteABCSubRegister("PR_ENABLE", 0, 0xf);
-        ((StarChips*) fe)->setAndWriteABCSubRegister("LP_ENABLE", 0, 0xf);
+        ((StarChips*) fe)->setAndWriteABCSubRegister(ABCStarSubRegister::PR_ENABLE, 0, 0xf);
+        ((StarChips*) fe)->setAndWriteABCSubRegister(ABCStarSubRegister::LP_ENABLE, 0, 0xf);
         ((StarChips*) fe)->sendCmd(LCB::fast_command(LCB::FastCmdType::ABC_HIT_COUNT_RESET,0));
         SPDLOG_LOGGER_DEBUG(logger, "Reset sent, sending start");
         ((StarChips*) fe)->sendCmd(LCB::fast_command(LCB::FastCmdType::ABC_HIT_COUNT_START,4));
@@ -116,7 +118,7 @@ void StarCounterLoop::end() {
 	SPDLOG_LOGGER_DEBUG(logger, "");
 
 	// Go back to general state of FE, do something here (if needed)
-	while(!g_tx->isCmdEmpty());
+	g_tx->waitCmdEmpty();
 }
 
 void StarCounterLoop::setTrigWord() {

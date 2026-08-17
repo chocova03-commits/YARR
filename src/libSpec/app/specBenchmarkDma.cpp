@@ -15,27 +15,30 @@ int main(int argc, char *argv[]) {
     std::fstream file_write("benchmarkDma_write.out", std::ios::out);
     std::fstream file_read("benchmarkDma_read.out", std::ios::out);
 
-    int maxCycles = 400;
-    int maxLoops = 100;
+    constexpr int maxCycles = 400;
+    constexpr int maxLoops = 100;
 
     double overall_time = 0;
     double overall_data = 0;
 
-    timeval start, end;
+    timeval start = {}, end = {};
+    
+    constexpr size_t MAX_WORDS = 256 * (maxCycles+1);
+    std::array<uint32_t, MAX_WORDS> data_buf{};
 
     std::cout << std::endl << "==========================================" << std::endl;
     std::cout << "Starting DMA Write Benchmark:" << std::endl;
     for (int cycles=0; cycles<maxCycles; cycles++) {
-        const size_t size = 256*(cycles+1);
-        uint32_t data[size];
+        const size_t size = 256 * (cycles + 1);
+
         // Prepare data pattern
-        memset(data, 0x5A, size*4);
+        memset(data_buf.data(), 0x5A, size*4);
         
         // Write to Spec
-        gettimeofday(&start, NULL);
+        gettimeofday(&start, nullptr);
         for (int loops=0; loops<maxLoops; loops++)
-           if (mySpec.writeDma(0x0, data, size)) return 1;
-        gettimeofday(&end, NULL);
+           if (mySpec.writeDma(0x0, data_buf.data(), size)) return 1;
+        gettimeofday(&end, nullptr);
 
         // Analyze time
         double total_data = size*4*maxLoops/1024.0/1024.0;
@@ -57,14 +60,13 @@ int main(int argc, char *argv[]) {
     std::cout << "===========================================" << std::endl;
     std::cout << "Starting DMA Read Benchmark:" << std::endl;
     for (int cycles=0; cycles<maxCycles; cycles++) {
-        const size_t size = 256*(cycles+1);
-        uint32_t data[size];
+        const size_t size = 256 * (cycles + 1);
 
         // Read from Spec
-        gettimeofday(&start, NULL);
+        gettimeofday(&start, nullptr);
         for (int loops=0; loops<maxLoops; loops++)
-            if(mySpec.readDma(0x0, data, size)) return 1;
-        gettimeofday(&end, NULL);
+            if(mySpec.readDma(0x0, data_buf.data(), size)) return 1;
+        gettimeofday(&end, nullptr);
         
         // Analyze time
         double total_data = size*4*maxLoops/1024.0/1024.0;

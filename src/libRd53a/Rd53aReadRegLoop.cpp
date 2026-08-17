@@ -8,6 +8,9 @@
 
 #include "Rd53aReadRegLoop.h"
 
+#include "Bookkeeper.h"
+#include "HwController.h"
+
 #include "logging.h"
 
 namespace {
@@ -21,9 +24,9 @@ Rd53aReadRegLoop::Rd53aReadRegLoop() : LoopActionBase(LOOP_STYLE_NOP) {
     m_RingOscRep=1;
 }
 
-uint16_t Rd53aReadRegLoop::ReadRegister(Rd53Reg Rd53aGlobalCfg::*ref, Rd53a *tmpFE = NULL) {
+uint16_t Rd53aReadRegLoop::ReadRegister(Rd53Reg Rd53aGlobalCfg::*ref, Rd53a *tmpFE = nullptr) {
 
-    if(tmpFE==NULL)
+    if(tmpFE==nullptr)
         tmpFE= keeper->globalFe<Rd53a>();
 
     g_rx->flushBuffer();
@@ -39,7 +42,7 @@ uint16_t Rd53aReadRegLoop::ReadRegister(Rd53Reg Rd53aGlobalCfg::*ref, Rd53a *tmp
         data = dataVec[0];
     }
     
-    if(data != nullptr)
+    if(data == nullptr)
     {
         logger->warn("Warning!!!, No Word Recieved in ReadRegister");
         return 65535;
@@ -66,9 +69,9 @@ uint16_t Rd53aReadRegLoop::ReadRegister(Rd53Reg Rd53aGlobalCfg::*ref, Rd53a *tmp
 }
 
 //Configures the ADC, reads the register returns the first recieved register.
-uint16_t Rd53aReadRegLoop::ReadADC(unsigned short Reg,  bool doCur=false,  Rd53a *tmpFE = NULL) {
+uint16_t Rd53aReadRegLoop::ReadADC(unsigned short Reg,  bool doCur=false,  Rd53a *tmpFE = nullptr) {
 
-    if(tmpFE==NULL)
+    if(tmpFE==nullptr)
         tmpFE= keeper->globalFe<Rd53a>();
 
     g_tx->setCmdEnable(dynamic_cast<FrontEndCfg*>(tmpFE)->getTxChannel());
@@ -82,11 +85,11 @@ uint16_t Rd53aReadRegLoop::ReadADC(unsigned short Reg,  bool doCur=false,  Rd53a
 
 }
 
-//Runs readADC twice, for two difference bias configurations in the temp/rad sensors. Returns the difference to the user. 
-std::pair<uint16_t,uint16_t> Rd53aReadRegLoop::ReadTemp(unsigned short Reg, Rd53a *tmpFE = NULL) {
+//Runs readADC twice, for two difference bias configurations in the temp/rad sensors. Returns the difference to the user.
+std::pair<uint16_t,uint16_t> Rd53aReadRegLoop::ReadTemp(unsigned short Reg, Rd53a *tmpFE = nullptr) {
 
     //Sensor Config
-    if(tmpFE==NULL)
+    if(tmpFE==nullptr)
         tmpFE= keeper->globalFe<Rd53a>();
 
 
@@ -243,13 +246,13 @@ void Rd53aReadRegLoop::execPart1() {
                         keeper->globalFe<Rd53a>()->writeRegister(OscRegisters[tmpCount],0);
                     }
                 }
-                while(!g_tx->isCmdEmpty()) {}
+                g_tx->waitCmdEmpty();
 
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 
                 // Run oscillators for some time
                 keeper->globalFe<Rd53a>()->runRingOsc(m_RingOscDur);
-                while(!g_tx->isCmdEmpty()) {}
+                g_tx->waitCmdEmpty();
 
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 
@@ -322,7 +325,7 @@ void Rd53aReadRegLoop::loadConfig(const json &config) {
     }
 
     if (config.contains("VoltMux"))
-        for(auto Reg : config["VoltMux"])
+        for(const auto& Reg : config["VoltMux"])
         {
             if( ( int(Reg) >=3 && int(Reg)<=8) || (int(Reg)>=14 && int(Reg)<=15) )
                 m_TempMux.push_back(Reg);
@@ -330,11 +333,11 @@ void Rd53aReadRegLoop::loadConfig(const json &config) {
                 m_VoltMux.push_back(Reg);
         }
     if (config.contains("CurMux"))
-        for(auto Reg : config["CurMux"])
+        for(const auto& Reg : config["CurMux"])
             m_CurMux.push_back(Reg);
 
     if (config.contains("Registers"))
-        for (auto Reg: config["Registers"]) {
+        for (const auto& Reg: config["Registers"]) {
             m_STDReg.push_back(Reg);
 
             // If Reg is ALL, instead loop over all registers

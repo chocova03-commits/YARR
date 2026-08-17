@@ -4,10 +4,19 @@
 // # Comment: StarChip FrontEnd class
 // ################################
 
+#include "StarConstants.h"
 #include "StarChips.h"
 #include "StarChipsBroadcast.h"
 
+#include "AbcNames.h"
+#include "HccNames.h"
+#include "StarProcessor.h"
+
+#include "HwController.h"
+#include "TxCore.h"
+
 #include <chrono>
+#include <optional>
 
 #include "logging.h"
 
@@ -37,8 +46,8 @@ StarChips::StarChips(int abc_version, int hcc_version)
 {
 	m_txcore  = nullptr;
 	active = false;
-	geo.nRow = 2;
-	geo.nCol = 128;
+	geo.nRow = Star::RowsPerABC;
+	geo.nCol = Star::StripsPerABCRow;
 
 
 	//Create dummy configuration as placeholder for globalFe in preScan routines
@@ -72,22 +81,22 @@ void StarChips::setHccId(unsigned hccID) {
   //Let's reset the HCC communications ID.
   //  Use a broadcast write of the required ID+fuse on reg 17
   uint32_t newReg17val = (hccID<<28) | m_fuse_id;
-  sendCmd(write_hcc_register(17, newReg17val, 0xf));
+  sendCmd(write_hcc_register((int)HCCStarRegister::Addressing, newReg17val, 0xf));
   logger->info("Set HCC ID to {} (sent on reg17 0x{:08x})", hccID, newReg17val);
 }
 
 void StarChips::resetHCCStars() {
-    logger->debug("Sending fast command #{} HCC_REG_RESET", LCB::HCC_REG_RESET);
+    logger->debug("Sending fast command #{} HCC_REG_RESET", std::to_string(LCB::HCC_REG_RESET));
     this->sendCmd(LCB::fast_command(LCB::HCC_REG_RESET, 0) );
 }
 
 void StarChips::resetABCStars() {
 	uint8_t delay = 0; //2 bits BC delay
 
-	logger->debug("Sending fast command #{} ABC_REG_RESET", LCB::ABC_REG_RESET);
+	logger->debug("Sending fast command #{} ABC_REG_RESET", std::to_string(LCB::ABC_REG_RESET));
 	sendCmd(LCB::fast_command(LCB::ABC_REG_RESET, delay) );
 
-	logger->debug("Sending fast command #{} ABC_SLOW_COMMAND_RESET", LCB::ABC_SLOW_COMMAND_RESET);
+	logger->debug("Sending fast command #{} ABC_SLOW_COMMAND_RESET", std::to_string(LCB::ABC_SLOW_COMMAND_RESET));
 	sendCmd(LCB::fast_command(LCB::ABC_SLOW_COMMAND_RESET, delay) );
 
 	// TODO: This should be done somewhere, but only after we're
@@ -99,7 +108,7 @@ void StarChips::resetABCStars() {
 void StarChips::resetAllHard(){
 	logger->info("Global reseting all HCC and ABC on the same LCB control segment");
 
-    logger->debug("Sending fast command #{} LOGIC_RESET", LCB::LOGIC_RESET);
+    logger->debug("Sending fast command #{} LOGIC_RESET", std::to_string(LCB::LOGIC_RESET));
     sendCmd(LCB::fast_command(LCB::LOGIC_RESET, 0) );
 
     // Reset HCCs
@@ -123,7 +132,7 @@ void StarChips::resetAllHard(){
     resetABCStars();
 
     // Star PR&LP to ABCs
-    logger->debug("Sending fast command #{} HCC_START_PRLP", LCB::HCC_START_PRLP);
+    logger->debug("Sending fast command #{} HCC_START_PRLP", std::to_string(LCB::HCC_START_PRLP));
 	sendCmd(LCB::fast_command(LCB::HCC_START_PRLP, 0) );
 }
 
@@ -136,14 +145,14 @@ void StarChips::configure() {
 
 	this->writeRegisters();
 
-    logger->debug("Sending fast command #{} LOGIC_RESET", LCB::LOGIC_RESET);
+    logger->debug("Sending fast command #{} LOGIC_RESET", std::to_string(LCB::LOGIC_RESET));
     sendCmd(LCB::fast_command(LCB::LOGIC_RESET, 0) );
 
     logger->debug("Sending lonely_BCR");
     sendCmd(LCB::lonely_bcr());
 
     // Make histo size match number of configured ABCs
-    geo.nCol = 128 * numABCs();
+    geo.nCol = Star::StripsPerABCRow * numABCs();
 }
 
 void StarChips::sendCmd(uint16_t cmd){
@@ -184,15 +193,13 @@ void StarChips::sendCmd(std::array<uint16_t, 9> cmd){
 
 bool StarChips::writeTrims(){
     //Write only TrimDAC registers so we don't overwrite the prescan when doing a trim
-    auto num_abc = numABCs();
-    int hccId = getHCCchipID();
-
     // Then each ABC
     eachAbc([&](auto &abc) {
             int this_chipID = abc.getABCchipID();
 
             logger->info("Write ABC {} trim registers", this_chipID);
-            for(unsigned int addr = ABCStarRegister::TrimDAC0; addr <= ABCStarRegister::TrimDAC39; addr++) {
+            for(auto r = ABCStarRegister::TrimDAC0; r <= ABCStarRegister::TrimDAC39; ++r) {
+                unsigned int addr = (unsigned int)r;
                 logger->debug("Writing Register {} for chipID {}", addr, this_chipID);
                 writeABCRegister(addr, abc);
             }
@@ -240,39 +247,77 @@ bool StarChips::writeRegisters(){
 
 //Will write value for setting name for the HCC if name starts with "HCC_" otherwise will write the setting for all ABCs if name starts with "ABCs_"
 yarrStatus StarChips::writeNamedRegister(std::string name, const uint16_t reg_value) {
-  std::string strPrefix = name.substr (0,4);
+  auto plusPos = name.find('+');
+  std::string name_reg = name.substr(0, plusPos); 
+  std::string strPrefix = name_reg.substr (0,4);
   //if we deal with a setting for the HCC, look up in register map.
   if (strPrefix=="HCC_") {
-    auto subRegName = name.substr(4);
-    if(!HCCStarSubRegister::_is_valid(subRegName.c_str())) {
+    auto subRegName = name_reg.substr(4);
+    if(subRegName == "FD_DATAIN_FINEDELAY") {
+      // Write the same value to all FD_DATAIN_FINEDELAY sub regs
+      logger->trace("Writing {} to all FD_DATAIN_FINEDELAY sub-registers.", reg_value);
+
+      for(size_t i = 0; i < Star::MaxABCsPerHCC; i++){
+        auto subRegName_i = subRegName.substr(0,9) + std::to_string(i) + subRegName.substr(9);
+        auto subRegEnum_i = HccNames::subRegFromString(subRegName_i).value();
+        setAndWriteHCCSubRegister(subRegEnum_i, reg_value);
+      }
+    }
+    else if(!HccNames::subRegStringIsValid(subRegName)) {
       logger->error(" --> Error: Could not find HCC sub-register \"{}\"", subRegName);
       return yarrFailure;
     } else {
-      setAndWriteHCCSubRegister(subRegName, reg_value);
+      auto subRegEnum = HccNames::subRegFromString(subRegName).value();
+      setAndWriteHCCSubRegister(subRegEnum, reg_value);
     }
   } else  if (strPrefix=="ABCs") {
-    auto subRegName = name.substr(5); // Including _
+    auto subRegName = name_reg.substr(5); // Including _
     if(subRegName == "MASKs") {
       // Special case for digitial scan
       uint32_t val = (reg_value == 0)?0:0xffffffff;
       logger->trace("Writing {:08x} to mask register for all ABCStar chips.", val);
       eachAbc([&](auto &cfg) {
-          for(int m = ABCStarRegister::MaskInput(0);
-              m <= ABCStarRegister::MaskInput(7); m++) {
-            cfg.setRegisterValue(ABCStarRegister::_from_integral(m), val);
-            sendCmd( write_abc_register(m, val,
+          for(auto m = ABCStarRegisters::MaskInput(0);
+              m <= ABCStarRegisters::MaskInput(7); ++m) {
+            int addr = (int)m;
+            cfg.setRegisterValue(m, val);
+            sendCmd( write_abc_register(addr, val,
                                         getHCCchipID(), cfg.getABCchipID()));
           }
         });
-    } else if(!ABCStarSubRegister::_is_valid(subRegName.c_str())) {
+    } else if(subRegName == "TRIMs") {
+      // Write the same value to all trim regs
+
+      logger->trace("Writing {} to trim register for all ABCStar chips.", reg_value);
+
+      // Set trim registers in memory
+      eachAbc([&](auto &cfg) {
+          for (unsigned chan=0; chan<Star::StripsPerABC; chan++) {
+              cfg.setTrimDACRaw(chan, reg_value);
+          }
+      });
+
+      // Now send the register config to the front-ends
+      eachAbc([&](auto &cfg) {
+          for(ABCStarRegister m = ABCStarRegisters::TrimLo(0);
+              m <= ABCStarRegisters::TrimHi(7); ++m) {
+            writeABCRegister((int)m, cfg);
+          }
+        });
+    } else if(!AbcNames::subRegFromString(subRegName).has_value()) {
       logger->error(" --> Error: Could not find ABC sub-register \"{}\"", subRegName);
       return yarrFailure;
     } else {
       logger->trace("Writing {} on setting '{}' for all ABCStar chips.", reg_value, name);
+      auto abcRegEnum = AbcNames::subRegFromString(subRegName).value();
       eachAbc([&](auto &cfg) {
-          setAndWriteABCSubRegister(subRegName, cfg, reg_value);
+          setAndWriteABCSubRegister(abcRegEnum, cfg, reg_value);
         });
     }
+  }
+  if (plusPos != std::string::npos && name.substr(plusPos) == "+BCR") {
+    logger->debug("Sending lonely_BCR after register write");
+    sendCmd(LCB::lonely_bcr());
   }
   return yarrSuccess;
 }
@@ -313,14 +358,155 @@ void StarChips::readRegisters(){
 
 }
 
+struct HccReadProc : public EmptyProc {
+  std::optional<std::pair<int, int>> result;
+
+  void hcc_read(bool hpr_not_rr, int address, int value) {
+    if(hpr_not_rr) {
+      return;
+    }
+    result = std::make_pair(address, value);
+  }
+};
+
+struct AbcReadProc : public EmptyProc {
+  std::optional<std::tuple<int, int, int>> result;
+
+  void abc_read(bool hpr_not_rr, int ic, int address, int value, int status) {
+    if(hpr_not_rr) {
+      return;
+    }
+    result = std::make_tuple(ic, address, value);
+  }
+};
+
+AsyncAccess::AsyncReg32 StarChips::readHCCRegisterAsync(AsyncAccess::AsyncContext &ctxt, HCCStarRegister reg)
+{
+  int reg_addr = (int)reg;
+  return AsyncAccess::AsyncReg32
+    (ctxt,
+     [&, reg_addr](TxCore &) {
+       sendCmd(read_hcc_register(reg_addr, getHCCchipID()));
+     },
+     [this](const RawData &d) {
+       if(d.getAdr() != getRxChannel()) {
+         // Ignore data for other FEs
+         return false;
+       }
+
+       HccReadProc proc;
+       uint8_t *start = (uint8_t*)d.getBuf();
+       uint8_t *end = start + (d.getSize() * 4);
+       StarProcessPacket(start, end, proc);
+
+       // Ignore if hcc reg read not found
+       return proc.result.has_value();
+     },
+     [reg_addr](const RawData &d) -> uint32_t {
+       HccReadProc proc;
+       uint8_t *start = (uint8_t*)d.getBuf();
+       uint8_t *end = start + (d.getSize() * 4);
+       StarProcessPacket(start, end, proc);
+
+       if(proc.result) {
+         auto [addr, value] = proc.result.value();
+         if(addr != reg_addr) {
+           throw std::runtime_error("Bad register address in HCC readback");
+         }
+         return value;
+       } else {
+         throw std::runtime_error("Bad packet for HCC readback");
+       }
+     });
+}
+
+AsyncAccess::AsyncReg32 StarChips::readABCRegisterAsync(AsyncAccess::AsyncContext &ctxt, ABCStarRegister reg, int chipID)
+{
+  int reg_addr = (int)reg;
+
+  return AsyncAccess::AsyncReg32
+    (ctxt,
+     [&, reg_addr, chipID](TxCore &) {
+       sendCmd(read_abc_register(reg_addr, getHCCchipID(), chipID));
+     },
+     [this](const RawData &d) {
+       if(d.getAdr() != getRxChannel()) {
+         // Ignore data for other FEs
+         return false;
+       }
+
+       AbcReadProc proc;
+       uint8_t *start = (uint8_t*)d.getBuf();
+       uint8_t *end = start + (d.getSize() * 4);
+       StarProcessPacket(start, end, proc);
+
+       // Ignore if hcc reg read not found
+       return proc.result.has_value();
+     },
+     [reg_addr](const RawData &d) {
+       AbcReadProc proc;
+       uint8_t *start = (uint8_t*)d.getBuf();
+       uint8_t *end = start + (d.getSize() * 4);
+       StarProcessPacket(start, end, proc);
+       if(proc.result) {
+         auto [chip, addr, value] = proc.result.value();
+         if(addr != reg_addr) {
+           throw std::runtime_error("Bad register address in ABC readback");
+         }
+         return value;
+       } else {
+         throw std::runtime_error("Bad packet for ABC readback");
+       }
+     });
+}
+
+yarrStatus StarChips::checkCom() {
+    if(!m_run_check_com) {
+      logger->info("Skipping checkCom, set RunCheckCom in config");
+      return yarrSuccess;
+    }
+
+    logger->debug("Start check communication with Hybrid");
+
+    // Run commands in separate thread
+    AsyncAccess::AsyncContext ctxt(*m_txcore, *m_rxcore);
+
+    // First read back HCC HPR reg
+    auto hcc_hpr = readHCCRegisterAsync(ctxt, HCCStarRegister::HPR);
+
+    uint32_t hpr_value = hcc_hpr.result.get();
+
+    logger->debug("Read back HCC HPR register: {:08x}", hpr_value);
+
+    if(hpr_value == 0) {
+      logger->error("Bad HCC HPR value {:08x}", hpr_value);
+      return yarrFailure;
+    }
+
+    std::vector<AsyncAccess::AsyncReg32> abc_vars;
+
+    eachAbc([&](auto &abc) { abc_vars.push_back(readABCRegisterAsync(ctxt, ABCStarRegister::HPR, abc.getABCchipID())); });
+
+    for(auto &aa: abc_vars) {
+      auto abc_value = aa.result.get();
+
+      if(abc_value == 0) {
+        logger->error("Bad ABC HPR value {:08x}", abc_value);
+        return yarrFailure;
+      }
+    }
+
+    return yarrSuccess;
+}
+
 void StarChips::writeHCCRegister(int addr) {
-    uint32_t value = m_hcc.getRegisterValue(HCCStarRegister::_from_integral(addr));
+    uint32_t value = m_hcc.getRegisterValue(HCCStarRegister(addr));
     logger->debug("Doing HCC write register with value 0x{:08x} from registerMap[addr={}]", value, addr);
     sendCmd(write_hcc_register(addr, value, getHCCchipID()));
 }
 
 void StarChips::writeABCRegister(int addr, AbcCfg &cfg) {
-    uint32_t value = cfg.getRegisterValue(ABCStarRegister::_from_integral(addr));
+    uint32_t value = cfg.getRegisterValue((ABCStarRegister)addr);
     auto id = cfg.getABCchipID();
     logger->debug("Doing ABC ID {} writeRegister {} with value 0x{:08x}", id, addr, value);
     sendCmd(write_abc_register(addr, value, getHCCchipID(), id));

@@ -17,13 +17,16 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 #include <memory> // unique_ptr
+#include <spdlog/spdlog.h>
 
 // YARR
 #include "HwController.h"
-#include "FrontEnd.h"
+#include "FrontEndCfg.h"
 #include "AllChips.h"
 #include "ScanHelper.h" // openJson
 #include "Utils.h"
+#include "logging.h"
+#include "LoggingConfig.h"
 
 void print_usage(char* argv[]) {
     std::cerr << " write-register" << std::endl;
@@ -35,6 +38,7 @@ void print_usage(char* argv[]) {
     std::cerr << "   -i          Position of chip in connectivity file chips list, starting from 0 (default: all chips). Can take multiple chip positions, and results will always be returned in order of the chips in the connectivity file" << std::endl;
     std::cerr << "   -n          Chip name (if given will override use of chip index). Can take multiple chip names, and results will always be returned in order of the chips in the connectivity file." << std::endl;
     std::cerr << "   -f          Force write even if register cannot be read." << std::endl;
+    std::cerr << "   -d          Enable debug print out." << std::endl;
     std::cerr << "   -h|--help   Print this help message and exit" << std::endl;
     std::cerr << std::endl;
 }
@@ -50,7 +54,10 @@ std::unique_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, json &jconn
         throw std::runtime_error(e.str());
     }
     auto chip_config = chip_configs[fe_num];
-    fe->init(&*hw, FrontEndConnectivity(chip_config["tx"], chip_config["rx"]));
+    unsigned regRx = chip_config["rx"];
+    if(chip_config.contains("regRx"))
+      regRx = chip_config["regRx"];
+    fe->init(&*hw, FrontEndConnectivity(chip_config["tx"], chip_config["rx"], regRx));
     auto chip_register_file_path = chip_config["__config_path__"];
     fs::path pconfig{chip_register_file_path};
     if(!fs::exists(pconfig)) {
@@ -72,9 +79,10 @@ int main(int argc, char* argv[]) {
     uint32_t register_value = 0;
     bool use_chip_name = false;
     bool force = false;
+    bool debug = false;
 
     int c = 0;
-    while (( c = getopt(argc, argv, "r:c:i:n:fh")) != -1) {
+    while (( c = getopt(argc, argv, "r:c:i:n:fdh")) != -1) {
         switch (c) {
             case 'r' :
                 hw_controller_filename = optarg;
@@ -100,6 +108,9 @@ int main(int argc, char* argv[]) {
             case 'f' :
                 force = true;
                 break;
+            case 'd':
+                debug = true;
+                break;
             default :
                 std::cerr << "Invalid option '" << c << "' supplied, aborting" << std::endl;
                 return 1;
@@ -109,6 +120,12 @@ int main(int argc, char* argv[]) {
     if (optind > argc - 2) {
         std::cerr << "ERROR: Missing positional arguments" << std::endl;
         return 1;
+    }
+
+    if (debug) {
+        auto loggerConfig = logging::defaultConfig();
+        logging::setupLoggers(loggerConfig);
+        spdlog::set_level(spdlog::level::trace);
     }
 
     register_name = argv[optind++];
@@ -162,7 +179,6 @@ int main(int argc, char* argv[]) {
             std::cerr << "WARNING: Chip config for chip at index " << ichip << " in connectivity file does not exist, skipping (" << chip_register_file_path << ")" << std::endl;
             continue;
         }
-
         auto fe = init_fe(hw, jconn, ichip);
         if(!fe) {
             std::cerr << "WARNING: Skipping chip at index " << ichip << " in connectivity file" << std::endl;
@@ -172,8 +188,9 @@ int main(int argc, char* argv[]) {
         std::string current_chip_name = cfg->getName();
         if (!use_chip_name) {
             if ( chip_idx.size() == 0 || (std::find(chip_idx.begin(), chip_idx.end(), ichip)!= chip_idx.end()) ) {
-                hw->setCmdEnable(cfg->getTxChannel()); 
-                hw->setRxEnable(cfg->getRxChannel());
+                hw->initRxChannels({cfg->getRegRxChannel()});
+                hw->setCmdEnable(cfg->getTxChannel());
+                hw->setRxEnable(cfg->getRegRxChannel());
                 hw->checkRxSync(); // Must be done per fe (Aurora link) and after setRxEnable().
                 if (fe->readUpdateWriteNamedRegister(register_name, register_value) != yarrSuccess) {
                     std::cerr << "ERROR: failed to readUpdateWrite register for " << current_chip_name << "!" << std::endl;
@@ -182,12 +199,16 @@ int main(int argc, char* argv[]) {
                         fe->writeNamedRegister(register_name, register_value);
                     }
                     error_cnt++;
+                }else{
+                    fe->writeNamedRegister(register_name, register_value);
+                    hw->waitCmdEmpty();
                 }
-            }
+	        }
         } else {
             if (std::find(chip_name.begin(), chip_name.end(), current_chip_name) != chip_name.end()) {
-                hw->setCmdEnable(cfg->getTxChannel()); 
-                hw->setRxEnable(cfg->getRxChannel());
+                hw->initRxChannels({cfg->getRegRxChannel()});
+                hw->setCmdEnable(cfg->getTxChannel());
+                hw->setRxEnable(cfg->getRegRxChannel());
                 hw->checkRxSync(); // Must be done per fe (Aurora link) and after setRxEnable().
                 if (fe->readUpdateWriteNamedRegister(register_name, register_value) != yarrSuccess) {
                     std::cerr << "ERROR: failed to readUpdateWrite register for " << current_chip_name << "!" << std::endl;
@@ -196,12 +217,12 @@ int main(int argc, char* argv[]) {
                         fe->writeNamedRegister(register_name, register_value);
                     }
                     error_cnt++;
+                }else{
+                    fe->writeNamedRegister(register_name, register_value);
                 }
             }
         }
     }
-
-    std::cerr << "Done." << std::endl;
 
     return error_cnt;
 }

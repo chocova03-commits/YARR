@@ -11,11 +11,18 @@
 #include "ClipBoard.h"
 #include "RawData.h"
 
+/**
+ * Gather data.
+ *
+ * Loop over received data until stopped (via SIGINT).
+ */
 class StdDataGatherer: public LoopActionBase, public StdDataAction {
     public:
         StdDataGatherer();
+        //   /** Connect to output data queue. */
         //void connect(ClipBoard<RawDataContainer> *clipboard);
 
+        /** Stop gathering data. */
         void kill() {
             killswitch = true;
         }
@@ -24,14 +31,15 @@ class StdDataGatherer: public LoopActionBase, public StdDataAction {
 
     private:
         //ClipBoard<RawDataContainer> *storage;
-        unsigned counter;
+        unsigned counter = 0;
         void init() override;
         void end() override;
         void execPart1() override;
         void execPart2() override;
-        bool killswitch;
-
-        uint32_t m_maxConsecutiveRxReads = 4096;
+        bool killswitch = false;
+        bool m_passData = false;
+        uint32_t m_maxConsecutiveRxReads = 2048;
+        uint32_t m_maxRxReadSize = 10*1024*1024/4; // 100MB
 };
 
 #endif

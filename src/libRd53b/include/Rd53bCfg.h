@@ -9,7 +9,7 @@
 // # Date: May 2020
 // ################################
 
-#include "FrontEnd.h"
+#include "FrontEndCfg.h"
 #include "Constants.h"
 #include "Units.h"
 
@@ -20,12 +20,11 @@ class Rd53bCfg : public FrontEndCfg, public Rd53bGlobalCfg, public Rd53bPixelCfg
     public:
         Rd53bCfg();
 
-        void maskPixel(unsigned col, unsigned row) override {
-            this->setEn(col, row, 0);
-            this->setHitbus(col, row, 0);
-        }
         
-        unsigned getPixelEn(unsigned col, unsigned row) override {
+        void maskPixel(unsigned col, unsigned row, bool doAltMask = false) override;
+        unsigned getPixelEn(unsigned col, unsigned row, bool doAltMask = false) override {
+            if(doAltMask)
+                return this->getHitbus(col, row);
             return this->getEn(col, row);
         }
 
@@ -64,8 +63,8 @@ class Rd53bCfg : public FrontEndCfg, public Rd53bGlobalCfg, public Rd53bPixelCfg
         float m_injCap;                   //fF
         std::array<float, 2> m_vcalPar;   //mV, [0] + [1]*x
         std::array<float, 3> m_adcCalPar; //mV, [0] + [1]*x, R_IMUX = [2]
-        std::array<std::array<float, 2>, 3> m_radSenPar;  // Not used yet
-        std::array<std::array<float, 2>, 3> m_tempSenPar;  // Not used yet
+        std::array<std::array<float, 2>, 3> m_radSenPar = {};  // Not used yet
+        std::array<std::array<float, 2>, 3> m_tempSenPar = {};  // Not used yet
         std::array<float, 3> m_nf;               // MOS temperature sensor <digital SLDO, analog SLDO, center>
         int m_irefTrim;                                 // Iref trim bit
         float m_kSenseInA;                                 // Multiplicator of IinA
@@ -75,6 +74,8 @@ class Rd53bCfg : public FrontEndCfg, public Rd53bGlobalCfg, public Rd53bPixelCfg
         float m_kShuntA;                              // kFactor of the analog shunt circuit
         float m_kShuntD;                              // kFactor of the digital shunt circuit
         std::array<float, 3> m_ntcCalPar;                 // Steinhart coefficients
+        std::array<unsigned, 50> m_nBadPixel;                  // Count of how many bad pixels per core column
+        bool m_nBadPixelInitialized;
 };
 
 #endif

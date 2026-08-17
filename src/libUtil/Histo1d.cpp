@@ -175,22 +175,20 @@ void Histo1d::toJson(json &j) const {
     for (unsigned i=0; i<lStat.size(); i++)
         j["loopStatus"][i] = (lStat.get(i));
 
-    for (unsigned int i=0; i<bins; i++)
-        j["Data"][i] = data[i];
+    j["Data"] = data;
 }
 
 void Histo1d::toFile(const std::string &prefix, const std::string &dir, bool jsonType) const{
-    std::string filename = dir + prefix + "_" + HistogramBase::name;
-    for (unsigned i=0; i<lStat.size(); i++)
-        filename += "_" + std::to_string(lStat.get(i));
-    if (jsonType) {
-        filename += ".json";
-    } else {
-        filename += ".dat";
-    }
+    std::string ext = "";
+    if (jsonType) 
+        ext = "json";
+    else
+        ext = "dat";
+    std::string filename = createFilename(prefix, dir, ext);
     std::fstream file(filename, std::fstream::out | std::fstream::trunc);
-    json j;
+
     // jsonType
+    json j;
     if (jsonType) {
         toJson(j);
         file << std::setw(4) << j;
@@ -272,12 +270,15 @@ bool Histo1d::fromJson(const json &j) {
 void Histo1d::plot(const std::string &prefix, const std::string &dir) const {
     hlog->info("Plotting {}", HistogramBase::name);
 
-    std::string output = dir + prefix + "_" + HistogramBase::name;
-    for (unsigned i=0; i<lStat.size(); i++)
-        output += "_" + std::to_string(lStat.get(i));
-    output += ".png";
+    auto check_terminal = getenv("YARR_GNUPLOT_TERMINAL");
+    std::string term_name = "png";
+    if(check_terminal != nullptr) {
+      term_name = check_terminal;
+    }
+
+    std::string output = createFilename(prefix, dir, term_name);
     std::string input;
-    input+="\"set terminal png size 1280, 1024;";
+    input+="\"set terminal " + term_name + " size 1280, 1024;";
     input+="unset key;";
     input+="set xlabel '"  +HistogramBase::xAxisTitle+"';";
     input+="set ylabel '"  +HistogramBase::yAxisTitle+"';";
@@ -293,8 +294,10 @@ void Histo1d::plot(const std::string &prefix, const std::string &dir) const {
     FILE *gnu = popen(cmd.c_str(), "w");
     std::stringstream ss;
     toStream(ss);
-    fprintf(gnu,"%s",ss.str().c_str());
-    pclose(gnu);
+    if (fprintf(gnu,"%s",ss.str().c_str()) < 0)
+        hlog->warn("Failed to write histogram data to gnuplot");
+    if (pclose(gnu) != 0)
+        hlog->warn("gnuplot exited with error while plotting {}", name);
 }
 
 int Histo1d::binNum(double x) const {

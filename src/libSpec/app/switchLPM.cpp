@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <unistd.h>
 
 #include "SpecCom.h"
 #include "logging.h"
@@ -10,26 +11,32 @@
 auto logger = logging::make_log("switchLPM");
 
 void printHelp() {
-    std::cout << "./bin/switchLPM on/off \n -e <int>: enabled TX channels (decimal number from binary pattern starting from TX 0 as the least significant bit, for example 13 to switch on 1101, i.e. all TX channels apart from TX 1) \n -s <int> spec number \n -f <int> AC signal frequency in kHz (required to be > 80kHz for a square wave)" << std::endl;
+    std::cout << "./bin/switchLPM on/off \n\
+     -e <int>: enabled TX channels (decimal number from binary pattern starting from TX 0 as the least significant bit, for example 13 to switch on 1101, i.e. all TX channels apart from TX 1) \n -s <int> spec number \n\
+     -f <int>: AC signal frequency in kHz (required to be > 80kHz for a square wave) \n\
+     -m : apply the value of -e as a mask over the current value instead of overwriting it, e.g. if you enabled channel tx=1 (-e 2) in the past and you want to enable tx=0 you can do -m -e 1 and it will read the current value (2) apply 1 as OR mask and write back the result (3) \n\
+     -s <int>: specify which spec card to use, default is 0." << std::endl;
 }
 
 int main(int argc, char **argv) {
     // Setup logger with some defaults
-    std::string defaultLogPattern = "[%T:%e]%^[%=8l][%=15n]:%$ %v";
-    spdlog::set_pattern(defaultLogPattern);
-    json j; // empty
-    j["pattern"] = defaultLogPattern;
-    j["log_config"][0]["name"] = "all";
-    j["log_config"][0]["level"] = "info";
-    logging::setupLoggers(j);
+    logging::setupLoggers(logging::defaultConfig());
     
+    if (argc < 2) {
+	logger->critical("No arguments given, please specify 'on' or 'off'!");
+	printHelp();
+	return -1;
+    }
+
     // Init spec
     logger->info("Init spec");
-    int c;	
+    int c;
     int specNum = 0;
     int enableTX = 15;
     int enable = 0;
+    bool masked = false;
     int frequency = 100;
+    int value = 0;
 
     if (strcmp(argv[1], "on") == 0){
 	enable=1; 
@@ -37,11 +44,14 @@ int main(int argc, char **argv) {
 	enable=0;
     }
 
-    while ((c = getopt(argc, argv, "he:f:s:")) != -1) {
+    while ((c = getopt(argc, argv, "hme:f:s:")) != -1) {
 		switch (c) {
 		case 'h':
 		    printHelp();
 		    return 0;
+	        case 'm':
+		    masked = true;
+		    break;
 		case 'e':
 		    enableTX = std::stoi(optarg);
 		    break;
@@ -67,7 +77,15 @@ int main(int argc, char **argv) {
     logger->info("Start writing to low power enable register  ...");
     logger->info("Enabling LPM on TX channels {} of Spec Card {}, using Frequency {} kHz", enable*enableTX, specNum, frequency );
 
-    mySpec.writeSingle(0x7<<14 | 0x0, enable*enableTX); 
+    if (masked) 
+	    value = mySpec.readSingle(0x7<<14 | 0x0);
+
+    if (enable)
+	value |= enableTX;
+    else
+	value &= ~enableTX;
+
+    mySpec.writeSingle(0x7<<14 | 0x0, value&0xf); 
     int count=0;
     count=160000/(2*frequency);
 

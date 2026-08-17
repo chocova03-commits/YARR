@@ -4,7 +4,10 @@
 
 #include "AllChips.h"
 #include "AllStdActions.h"
+#include "Bookkeeper.h"
 #include "FeedbackBase.h"
+#include "FrontEndClipBoards.h"
+#include "FrontEndConnectivity.h"
 #include "ScanFactory.h"
 
 #include "logging.h"
@@ -60,12 +63,11 @@ TEST_CASE("FeedbackTestGlobal", "[Feedback]") {
     unsigned rx_channel = 0;
     FrontEndConnectivity fe_conn(0,rx_channel);
     fe->init(&empty, fe_conn);
-    bookie.addFe(std::move(fe), fe_conn);
-    unsigned feUid = bookie.getId(bookie.getLastFe());
+    unsigned feUid = bookie.addFe(std::move(fe), fe_conn);
 
     auto g_fe = StdDict::getFrontEnd("FEI4B");
     g_fe->makeGlobal();
-    g_fe->init(&empty, FrontEndConnectivity(0,0));
+    g_fe->init(&empty, fe_conn);
     bookie.initGlobalFe(std::move(g_fe));
 
     json js;
@@ -115,7 +117,7 @@ TEST_CASE("FeedbackTestGlobal", "[Feedback]") {
     // Skip pre/post scan
     scan.run();
 
-    bookie.getEntry(feUid).fe->clipRawData.finish();
+    bookie.getEntry(feUid).fe->clipboards().clipRawData.finish();
 
     t.join();
 
@@ -137,12 +139,11 @@ TEST_CASE("FeedbackTestPixel", "[Feedback]") {
     fe->setActive(true);
     FrontEndConnectivity fe_conn(0,rx_channel);
     fe->init(&empty, fe_conn);
-    bookie.addFe(std::move(fe), fe_conn);
-    unsigned feUid = bookie.getId(bookie.getLastFe());
+    unsigned feUid = bookie.addFe(std::move(fe), fe_conn);
 
     auto g_fe = StdDict::getFrontEnd("FEI4B");
     g_fe->makeGlobal();
-    g_fe->init(&empty, FrontEndConnectivity(0,0));
+    g_fe->init(&empty, fe_conn);
     bookie.initGlobalFe(std::move(g_fe));
 
     json js;
@@ -195,7 +196,7 @@ TEST_CASE("FeedbackTestPixel", "[Feedback]") {
     // Skip pre/post scan
     scan.run();
 
-    bookie.getEntry(feUid).fe->clipRawData.finish();
+    bookie.getEntry(feUid).fe->clipboards().clipRawData.finish();
 
     t.join();
 

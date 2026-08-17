@@ -182,7 +182,7 @@ int main(int argc, char* argv[]) {
 
         // Enable RingOscA
         feItkpixv2.writeRegister(&Itkpixv2::RingOscAEn, 0xff);
-        while (!hw->isCmdEmpty()){;}
+        hw->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
 
         // Repeat measurements
@@ -195,7 +195,7 @@ int main(int argc, char* argv[]) {
                 // Reset bank A counters
                 feItkpixv2.writeRegister(&Itkpixv2::RingOscAClear, 1);
                 feItkpixv2.writeRegister(&Itkpixv2::RingOscAClear, 0);
-                while (!hw->isCmdEmpty()){;}
+                hw->waitCmdEmpty();
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                 // Run oscillators for some time
@@ -223,7 +223,7 @@ int main(int argc, char* argv[]) {
 	    feItkpixv2.writeRegister(&Itkpixv2::RingOscBEnFf,1);
 	    feItkpixv2.writeRegister(&Itkpixv2::RingOscBEnLvt,1);
 
-        while (!hw->isCmdEmpty()){;}
+        hw->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         for (unsigned i = 0; i < RingOscRep; i++)
         {
@@ -233,7 +233,7 @@ int main(int argc, char* argv[]) {
                 // Reset bank B counters
                 feItkpixv2.writeRegister(&Itkpixv2::RingOscBClear, 1);
                 feItkpixv2.writeRegister(&Itkpixv2::RingOscBClear, 0);
-                while (!hw->isCmdEmpty()){;}
+                hw->waitCmdEmpty();
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                 // Run oscillators for some time
@@ -256,7 +256,5 @@ int main(int argc, char* argv[]) {
         for(int i=0; i<42; i++) {std::cout << RingValuesFreq[i] << " ";}
         std::cout << std::endl;
     }
-    std::cerr << "Done." << std::endl;
-
     return 0;
 }

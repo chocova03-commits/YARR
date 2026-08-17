@@ -28,7 +28,7 @@ class DataArchiver : public HistogramAlgorithm {
         }
         ~DataArchiver() override { if(fileHandle.is_open()) fileHandle.close(); }
 
-        bool open(std::string filename);
+        bool open(const std::string& filename);
 
         void create(const LoopStatus &stat) override {}
 
@@ -153,6 +153,33 @@ class TagMap : public HistogramAlgorithm {
         Histo2d *h;
 };
 
+/**
+ * Occupancy histogram distributed by tag.
+ *
+ * Build a 3d histogram with the z axis being the L0tag.
+ * The z-axis (Tag) can be limited by setting "tag_count"
+ * to avoid requiring large amount of memory unnecessarily.
+ */
+class TagOccupancyMap : public HistogramAlgorithm {
+    public:
+        TagOccupancyMap() : HistogramAlgorithm() {
+            r = nullptr;
+            h = nullptr;
+        }
+        ~TagOccupancyMap() override = default;
+
+        void create(const LoopStatus &stat) override;
+
+        void loadConfig(const json &cfg) override;
+
+        void processEvent(FrontEndData *data) override;
+
+        static const std::string outputName()  { return "TagOccupancyMap"; }
+    private:
+        unsigned tag_count{256};
+        Histo3d *h;
+};
+
 class L1Dist : public HistogramAlgorithm {
     public:
         L1Dist() : HistogramAlgorithm() {
@@ -173,6 +200,32 @@ class L1Dist : public HistogramAlgorithm {
         unsigned l1id;
         unsigned bcid_offset;
         unsigned current_tag;
+};
+
+/**
+ * Build histogram of L1/L0 data from raw events.
+ */
+class L1Hist : public HistogramAlgorithm {
+    public:
+        L1Hist() : HistogramAlgorithm() {
+            r = nullptr;
+        }
+
+        ~L1Hist() override = default;
+
+        void create(const LoopStatus &stat) override;
+
+        void processEvent(FrontEndData *data) override;
+
+        void loadConfig(const json &config) override;
+
+        static std::string outputName() { return "L1Hist"; }
+
+    private:
+        Histo1d *h{};
+
+        /// Divisor to record modulo after
+        size_t divisor{1000};
 };
 
 class L13d : public HistogramAlgorithm {
@@ -212,5 +265,58 @@ class HitsPerEvent : public HistogramAlgorithm {
         static std::string outputName() { return "HitDist"; }
     private:
         Histo1d *h;
+};
+
+/**
+ * Build histogram of BCID data from raw events.
+ */
+class BcHist : public HistogramAlgorithm {
+    public:
+        BcHist() : HistogramAlgorithm() {
+            r = nullptr;
+        }
+
+        ~BcHist() override = default;
+
+        void create(const LoopStatus &stat) override;
+
+        void processEvent(FrontEndData *data) override;
+
+        void loadConfig(const json &config) override;
+
+        static std::string outputName() { return "BcHist"; }
+
+    private:
+        Histo1d *h{};
+
+        /// Divisor to record modulo after
+        size_t divisor{3564};
+};
+
+/**
+ * Build histogram of event data interpreted from raw bits.
+ */
+class RawDataHistogram : public HistogramAlgorithm {
+    public:
+        RawDataHistogram() : HistogramAlgorithm() {
+            r = nullptr;
+        }
+
+        ~RawDataHistogram() override = default;
+
+        void create(const LoopStatus &stat) override;
+
+        void processEvent(FrontEndData *data) override;
+
+        void loadConfig(const json &config) override;
+
+        static std::string outputName() { return "RawData"; }
+
+    private:
+        Histo1d *h{};
+
+        /// Width in bits
+        size_t width{32};
+        size_t offset{0};
 };
 #endif

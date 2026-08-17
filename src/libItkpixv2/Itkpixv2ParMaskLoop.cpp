@@ -8,6 +8,8 @@
 
 #include "Itkpixv2ParMaskLoop.h"
 
+#include "Bookkeeper.h"
+
 #include "logging.h"
 
 namespace {
@@ -21,6 +23,8 @@ Itkpixv2ParMaskLoop::Itkpixv2ParMaskLoop() : LoopActionBase(LOOP_STYLE_MASK) {
     m_cur = 0;
     loopType = typeid(this);
     m_done = false;
+    m_maskType = 0;
+    m_applyEnMask = false;
 }
 
 void Itkpixv2ParMaskLoop::init() {
@@ -41,7 +45,7 @@ void Itkpixv2ParMaskLoop::init() {
     }
     
     itkpix->configurePixelMaskParallel();
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
 }
 
 void Itkpixv2ParMaskLoop::execPart1() {
@@ -70,7 +74,7 @@ void Itkpixv2ParMaskLoop::execPart1() {
         
     }
     itkpix->configurePixelMaskParallel();
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
     
     g_tx->setCmdEnable(keeper->getTxMask());
     g_stat->set(this, m_cur);

@@ -8,17 +8,9 @@
 // # Description: Star n-point gain analysis
 // ################################
 
-#include <map>
-#include <memory>
 #include <string>
-#include <tuple>
-#include <utility>
 #include <vector>
 
-#include "HistogramBase.h"
-#include "Histo1d.h"
-#include "Histo2d.h"
-#include "Histo3d.h"
 #include "ScanLoopInfo.h"
 #include "StarConversionTools.h"
 #include "StdAnalysis.h"
@@ -33,23 +25,37 @@ class StarNPointGainAnalysis : public NPointGain {
         void loadConfig(const json& config) override;
 
     private:
-        // conversion functions for injection and threshold units
+        /// @brief Convert injection units from BCAL to fC
+        /// @param inj Charge injection in BCAL units
+        /// @return Charge injection in fC
         double convertInjectionUnit(double inj) override;
+
+        /// @brief Convert threshold units from BVT to mV
+        /// This conversion is applied to both response and output noise.
+        /// @param thr Threshold in BVT units
+        /// @return Threshold in mV
         double convertThresholdUnit(double thr) override;
 
-        // fitting and related functions
-        std::vector<double> guessInitialFitParams(const std::vector<double>& thresholds) override;
-        std::vector<std::vector<double>> createAverageResponseCurves();
+        /// @brief Convert input noise units from fC to ENC
+        /// @param noise Input noise in fC
+        /// @return Input noise in ENC
+        double convertInputNoiseUnit(double noise) override;
 
-        // 128 strips per side per chip
-        static const unsigned s_stripsPerRow = 128;
+        /// @brief Guess the initial fit parameters for the response curve fit
+        /// @param thresholds Vector of response values
+        /// @return Initial guess for fit parameters
+        std::vector<double> guessInitialFitParams(const std::vector<double>& thresholds) override;
+
+        /// @brief Create an averaged response curve for for each chip
+        /// @return Vector of vectors of averaged response curves (index by [chip][injection])
+        std::vector<std::vector<double>> createAverageResponseCurves();
 
         // response function and associated parameters
         StarConversionTools* m_conversionTool;
 
         // member variables
-        bool m_convertBVTtomV = false;
-        std::string m_thresholdUnit = "BVT";
+        bool m_convertBVTtomV = true;
+        std::string m_thresholdUnit = "mV";
 };
 
 #endif

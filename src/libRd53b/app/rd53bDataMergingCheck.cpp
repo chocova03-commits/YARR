@@ -61,13 +61,7 @@ std::unique_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, json &jconn
 
 int main(int argc, char **argv) {
     // Setup logger with some defaults
-    std::string defaultLogPattern = "[%T:%e]%^[%=8l][%=15n]:%$ %v";
-    spdlog::set_pattern(defaultLogPattern);
-    json j; // empty
-    j["pattern"] = defaultLogPattern;
-    j["log_config"][0]["name"] = "all";
-    j["log_config"][0]["level"] = "info";
-    logging::setupLoggers(j);
+    logging::setupLoggers(logging::defaultConfig());
     
     // Init spec
     logger->info("Init spec");
@@ -206,7 +200,7 @@ int main(int argc, char **argv) {
 
             // Wait for fifo to be empty
             std::this_thread::sleep_for(std::chrono::microseconds(10));
-            while(!hw->isCmdEmpty());
+            hw->waitCmdEmpty();
 
             if (!skip_config){
                 // Wait for sync
@@ -287,7 +281,7 @@ int main(int argc, char **argv) {
                 return 1; 
             }
 
-            while(!hw->isCmdEmpty()){;}
+            hw->waitCmdEmpty();
 
             std::this_thread::sleep_for(std::chrono::microseconds(200));
 
@@ -321,7 +315,7 @@ int main(int argc, char **argv) {
 
             // Wait for fifo to be empty
             std::this_thread::sleep_for(std::chrono::microseconds(10));
-            while(!hw->isCmdEmpty());
+            hw->waitCmdEmpty();
 
             int chip_id=jchip["RD53B"]["Parameter"]["ChipId"];
 
@@ -336,7 +330,7 @@ int main(int argc, char **argv) {
 
 
 
-            while(!hw->isCmdEmpty()){;}
+            hw->waitCmdEmpty();
 
             std::this_thread::sleep_for(std::chrono::microseconds(200));
 

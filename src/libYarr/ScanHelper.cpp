@@ -11,16 +11,24 @@ namespace fs = std::filesystem;
 
 #include "AllAnalyses.h"
 #include "AllChips.h"
+#include "AllConfigurations.h"
 #include "AllHistogrammers.h"
 #include "AllHwControllers.h"
 #include "AllProcessors.h"
 #include "AllStdActions.h"
+#include "Bookkeeper.h"
 
 #include "AnalysisAlgorithm.h"
-#include "HistogramAlgorithm.h"
+#include "Configuration.h"
+#include "FrontEndCfg.h"
+#include "FrontEndClipBoards.h"
+#include "HistogramProcessor.h"
 #include "StdHistogrammer.h" // needed for special handling of DataArchiver
 #include "StdAnalysis.h" // needed for special handling of HistogramArchiver
 #include "ScanFactory.h"
+
+#include "yarr.h"
+
 
 #include "logging.h"
 #include "LoggingConfig.h"
@@ -72,27 +80,6 @@ namespace ScanHelper {
         return runCounter;
     }
 
-    // Open file and parse into json object
-    json openJsonFile(const std::string& filepath) {
-        std::ifstream file(filepath);
-        if (!file) {
-            throw std::runtime_error("could not open file");
-        }
-        json j;
-        try {
-            j = json::parse(file);
-        } catch (json::parse_error &e) {
-            throw std::runtime_error(e.what());
-            throw std::runtime_error(e.what());
-        }
-        file.close();
-        // variant produces null for some parse errors
-        if(j.is_null()) {
-            throw std::runtime_error("Parsing json file produced null");
-        }
-        return j;
-    }
-
     // Load controller config and return fully loaded object
     std::unique_ptr<HwController> loadController(const json &ctrlCfg) {
         std::unique_ptr<HwController> hwCtrl = nullptr;
@@ -142,105 +129,186 @@ namespace ScanHelper {
         return hwCtrl;
     }
 
+    std::string loadChipConfigs(json &config) {
+        return loadChipConfigs(config, false, "", "");
+    }
+
     std::string loadChipConfigs(json &config, bool createConfig) {
-        return loadChipConfigs(config, createConfig, "");
+        return loadChipConfigs(config, createConfig, "", "");
     }
 
-    std::string loadChipConfigs(json &config, const bool &createConfig, const std::string &dir) {
-        std::string chipType;
-        if (!config.contains("chipType") || !config.contains("chips")) {
-            shlog->error("Invalid config, chip type or chips not specified!");
-            throw (std::runtime_error("buildChips failure"));
-        }
-        chipType = config["chipType"];
-        shlog->info("Chip type: {}", chipType);
-        shlog->info("Chip count {}", config["chips"].size());
-        // Loop over chips
-        for (unsigned i = 0; i < config["chips"].size(); i++) {
-            shlog->info("Loading chip #{}", i);
-            json &chip = config["chips"][i];
-            if (!chip.contains("enable") || !chip.contains("config")) {
-                shlog->error("Connectivity config for chip #{} malformed, skipping!", i);
-                continue;
-            }
-
-            if (chip["enable"] == 0) {
-                shlog->warn(" ... chip not enabled, skipping!");
-                continue;
-            }
-            // Check if config path is:
-            // - relative to exectuteable (default)
-            // - relative to connectivity file
-            // - absolute
-            // - relative to "YARR_CONFIG_PATH" env var
-            // - database (TODO)
-            std::string chipConfigPath;
-            bool pullFromDb = false;
-            if (chip.contains("path")) {
-                if (chip["path"] == "relToExec") {
-                    chipConfigPath = chip["config"];
-                } else if (chip["path"] == "relToCon") {
-                    chipConfigPath = dir + "/" + std::string(chip["config"]);
-                } else if (chip["path"] == "abs") {
-                    chipConfigPath = chip["config"];
-                } else if (chip["path"] == "relToYarrPath") {
-                    std::string yarr_path = "";
-                    if (std::getenv("YARR_CONFIG_PATH"))
-                        yarr_path = std::string(std::getenv("YARR_CONFIG_PATH"));
-                    chipConfigPath = yarr_path + "/" + std::string(chip["config"]);
-                } else if (chip["path"] == "db") {
-                    pullFromDb = true;
-                }
-            } else {
-                // default is relative to exec
-                chipConfigPath = chip["config"];
-            }
-            chip["__config_path__"] = chipConfigPath;
-
-            // TODO should be a shared pointer
-            auto fe=StdDict::getFrontEnd(chipType);
-            auto *feCfg = dynamic_cast<FrontEndCfg *>(fe.get());
-            if (std::filesystem::exists(chipConfigPath)) {
-                // Load config
-                shlog->info("Loading config file: {}", chipConfigPath);
-                json cfg;
-                try {
-                    cfg = ScanHelper::openJsonFile(chipConfigPath);
-                } catch (std::runtime_error &e) {
-                    shlog->error("Error opening chip config: {}", e.what());
-                    throw (std::runtime_error("buildChips failure"));
-                }
-                chip["__config_data__"] = cfg;
-            } else {
-                shlog->warn("Config file not found, creating new file from defaults!");
-                // Rename in case of multiple default configs
-                feCfg->setName(feCfg->getName() + "_" + std::to_string((int) chip["rx"]));
-                shlog->warn("Creating new config of FE {} at {}", feCfg->getName(), chipConfigPath);
-                json jTmp;
-                feCfg->writeConfig(jTmp);
-                chip["__config_data__"] = jTmp;
-                if(createConfig) {
-                    if(chip["enable"] == 1) {
-                        std::ofstream oFTmp(chipConfigPath);
-                        oFTmp << std::setw(4) << jTmp;
-                        oFTmp.close();
-                    }
-                }
-            }
-        }
-        return chipType;
+    std::string loadChipConfigs(json &config, bool createConfig, const std::string &dir) {
+        // Default configuration service (interpreted by AllConfigurations)
+        return loadChipConfigs(config, createConfig, dir, "");
     }
+
+    std::string loadChipConfigs(json &config, bool createConfig, const std::string &dir, const std::string &configService) {
+      auto configuration = StdDict::getConfiguration(configService);
+      std::string chipType;
+      if (!config.contains("chipType") || !config.contains("chips")) {
+          shlog->error("Invalid config, chip type or chips not specified!");
+          throw (std::runtime_error("buildChips failure"));
+      }
+
+      chipType = config["chipType"];
+      shlog->info("Chip type: {}", chipType);
+      shlog->info("Chip count {}", config["chips"].size());
+
+      // Loop over chips
+      for (unsigned i = 0; i < config["chips"].size(); i++) {
+          shlog->info("Loading chip #{}", i);
+          json &chip = config["chips"][i];
+
+          if (!chip.contains("enable") || !chip.contains("config")) {
+              shlog->error("Connectivity config for chip #{} malformed, skipping!", i);
+              continue;
+          }
+
+          if (chip["enable"] == 0) {
+              shlog->warn(" ... chip not enabled, skipping!");
+              continue;
+          }
+
+          std::string chipConfigPath;
+          std::string globalConfigPath;
+          bool pullFromDb = false;
+
+          // Resolve chip configuration path
+          if (chip.contains("path")) {
+              if (chip["path"] == "relToExec") {
+                  chipConfigPath = chip["config"];
+              } else if (chip["path"] == "relToCon") {
+                  chipConfigPath = dir + "/" + std::string(chip["config"]);
+              } else if (chip["path"] == "abs") {
+                  chipConfigPath = chip["config"];
+              } else if (chip["path"] == "relToYarrPath") {
+                  std::string yarr_path = "";
+                  if (std::getenv("YARR_CONFIG_PATH")) {
+                      yarr_path = std::string(std::getenv("YARR_CONFIG_PATH"));
+                  }
+                  chipConfigPath = yarr_path + "/" + std::string(chip["config"]);
+              } else if (chip["path"] == "db") {
+                  pullFromDb = true;
+              }
+          } else {
+              chipConfigPath = chip["config"];
+          }
+          chip["__config_path__"] = chipConfigPath;
+
+          // Resolve GlobalOverwrite path
+          if (chip.contains("globalOverwrite")) {
+              if (chip.contains("path")) {
+                  if (chip["path"] == "relToExec") {
+                      globalConfigPath = chip["globalOverwrite"];
+                  } else if (chip["path"] == "relToCon") {
+                      globalConfigPath = dir + "/" + std::string(chip["globalOverwrite"]);
+                  } else if (chip["path"] == "abs") {
+                      globalConfigPath = chip["globalOverwrite"];
+                  } else if (chip["path"] == "relToYarrPath") {
+                      std::string yarr_path = "";
+                      if (std::getenv("YARR_CONFIG_PATH")) {
+                          yarr_path = std::string(std::getenv("YARR_CONFIG_PATH"));
+                      }
+                      globalConfigPath = yarr_path + "/" + std::string(chip["globalOverwrite"]);
+                  } else if (chip["path"] == "db") {
+                      pullFromDb = true;
+                  }
+              } else {
+                  globalConfigPath = chip["globalOverwrite"];
+              }
+          }
+          chip["__global_config_path__"] = globalConfigPath;
+
+          if(pullFromDb) {
+              shlog->warn("Pulling from DB not implemented");
+          }
+
+          // Load config
+          shlog->info("Loading config file: {}", chipConfigPath);
+          json cfg = configuration->getFrontEndConfig(chipConfigPath);
+          if (cfg == "default") {
+              shlog->warn("Making defulat config for {}!", chipType);
+              auto fe = StdDict::getFrontEnd(chipType);
+              auto *feCfg = dynamic_cast<FrontEndCfg *>(fe.get());
+
+              // Rename in case of multiple default configs
+              feCfg->setName(feCfg->getName() + "_" + std::to_string((int)chip["rx"]));
+              shlog->warn("Creating new config of FE {} at {}", feCfg->getName(), chipConfigPath);
+              cfg = json{};
+              feCfg->writeConfig(cfg);
+
+              if (createConfig && chip["enable"] == 1) {
+                  std::ofstream oFTmp(chipConfigPath);
+                  oFTmp << std::setw(4) << cfg;
+                  oFTmp.close();
+              }
+          }
+
+          chip["__config_data__"] = cfg;
+
+          // Load GlobalOverwrite, if specified
+          if (std::filesystem::exists(globalConfigPath)) {
+              shlog->info("Loading global overwrite config file: {}", globalConfigPath);
+              json cfg;
+              try {
+                  cfg = ScanHelper::openJsonFile(globalConfigPath);
+              } catch (std::runtime_error &e) {
+                  shlog->error("Error opening chip config: {}", e.what());
+                  throw (std::runtime_error("buildChips failure"));
+              }
+              chip["__global_data__"] = cfg;
+          }else {
+            shlog->info("GlobalConfig overwrite file not found, skipping overwrite.");
+          }
+
+
+          // Ensure we navigate to "GlobalConfig" inside both configurations
+            if (chip["__config_data__"].contains(chipType) &&
+            chip["__config_data__"][chipType].contains("GlobalConfig") &&
+            chip["__global_data__"].contains(chipType) &&
+            chip["__global_data__"][chipType].contains("GlobalConfig")) {
+
+
+            json &chipGlobalConfig = chip["__config_data__"][chipType]["GlobalConfig"];
+            json &overwriteGlobalConfig = chip["__global_data__"][chipType]["GlobalConfig"];
+
+            // Apply overwrites only to existing keys inside "GlobalConfig"
+            for (auto &[key, value] : overwriteGlobalConfig.items()) {
+              if (chipGlobalConfig.contains(key)) {
+                chipGlobalConfig[key] = value;
+                shlog->info("Overwriting parameter '{}' inside GlobalConfig with value: {}", key, value.dump());
+              } else {
+                shlog->warn("Parameter '{}' not found in chip GlobalConfig, skipping overwrite.", key);
+              }
+            }
+          } else {
+            if (std::filesystem::exists(globalConfigPath)) {
+            shlog->warn("The structure of your json file(s) may be wrong. Skipping overwrite.");
+            }
+          }
+
+      }
+      return chipType;
+  }
+
+
 
     void buildRawDataProcs( std::map<unsigned, std::unique_ptr<FeDataProcessor> > &procs,
+                             const json& scanCfg,
             Bookkeeper &bookie,
             const std::string &chipType) {
         bhlog->info("Loading RawData processors ..");
+        json procConfig;
+        if(scanCfg["scan"].contains("processor")) {
+            procConfig = scanCfg["scan"]["processor"]["config"];
+        }
         for (unsigned id = 0; id<bookie.getNumOfEntries(); id++) {
             auto fe = bookie.getFe(id);
             procs[id] = StdDict::getDataProcessor(chipType);
-            procs[id]->connect(dynamic_cast<FrontEndCfg*>(fe), &bookie.getFe(id)->clipRawData, &bookie.getFe(id)->clipData);
-            procs[id]->connect(&bookie.getFe(id)->clipProcFeedback);
-            // TODO load global processor config
+            procs[id]->loadConfig(procConfig);
+            auto &cp = fe->clipboards();
+            procs[id]->connect(dynamic_cast<FrontEndCfg*>(fe), &cp.clipRawData, &cp.clipData);
+            procs[id]->connect(&cp.clipProcFeedback);
             // TODO load chip specific config
         }
     }
@@ -259,10 +327,15 @@ namespace ScanHelper {
                 continue;
             }
             std::string chipConfigPath = chip["__config_path__"];
-            FrontEndConnectivity fe_conn((unsigned)chip["tx"], (unsigned)chip["rx"]);
-            bookie.addFe(StdDict::getFrontEnd(chipType), fe_conn);
-            bookie.getLastFe()->init(hwCtrl, fe_conn);
-            auto *feCfg = dynamic_cast<FrontEndCfg*>(bookie.getLastFe());
+	    unsigned regRx = chip["rx"];
+	    if (chip.contains("regRx")){ 
+	      regRx = chip["regRx"];
+	    }
+            FrontEndConnectivity fe_conn((unsigned)chip["tx"], (unsigned)chip["rx"], regRx);
+            unsigned last_id = bookie.addFe(StdDict::getFrontEnd(chipType), fe_conn);
+            auto fe = bookie.getFe(last_id);
+            fe->init(hwCtrl, fe_conn);
+            auto *feCfg = dynamic_cast<FrontEndCfg*>(fe);
             const json &cfg=chip["__config_data__"];
             feCfg->loadConfig(cfg);
             if (chip.contains("locked")) {
@@ -273,19 +346,48 @@ namespace ScanHelper {
                     locked = (int)chip["locked"];
                 feCfg->setLocked(locked);
             }
-            
-            // Check for hidden clipboard monitor parameter, and start them if true
-            if (chip.contains("clipboardMonitor")) {
-                if(chip["clipboardMonitor"] > 0) {
-                    bookie.addFeClipboardMonitor((unsigned)bookie.getNumOfEntries() - 1, feCfg->getName());
+            if (chip.contains("active")) {
+                bool active = false;
+                if (!chip["active"].is_boolean()) {
+                    shlog->warn("WARNING 'active' flag should be a boolean");
+                } else {
+                    active = chip["active"];
                 }
+                fe->setActive(active);
+            }
+
+            if (chip.contains("activeLoop")) {
+                bool activeLoop = false;
+                if (!chip["activeLoop"].is_boolean()) {
+                    shlog->warn("WARNING 'activeLoop' flag should be a boolean");
+                } else {
+                    activeLoop = chip["activeLoop"];
+                }
+                fe->setActiveLoop(activeLoop);
+            }
+
+            // Check for hidden clipboard monitor parameter, enabled by default;
+            // set to false/0 to opt out for a given chip.
+            bool clipboardMonitor = true;
+            if (chip.contains("clipboardMonitor")) {
+                clipboardMonitor = chip["clipboardMonitor"] > 0;
+            }
+            if (clipboardMonitor) {
+                bookie.addFeClipboardMonitor((unsigned)bookie.getNumOfEntries() - 1, feCfg->getName());
             }
 
             std::size_t botDirPos = chipConfigPath.find_last_of('/');
-            std::string  cfgFile=chipConfigPath.substr(botDirPos, chipConfigPath.length());
-            feCfgMap[bookie.getId(bookie.getLastFe())] = {chipConfigPath, cfgFile};
+            std::string cfgFile;
+            if(botDirPos == std::string::npos) {
+              shlog->debug("Failed to extract name from path, using fe->getName() instead");
+              cfgFile = feCfg->getName();
+              shlog->debug(" {} -> {}", chipConfigPath, feCfg->getName());
+            } else {
+              cfgFile=chipConfigPath.substr(botDirPos, chipConfigPath.length());
+            }
+            feCfgMap[last_id] = {chipConfigPath, cfgFile};
         }
-        
+
         // Check for hidden config-level parameter clipboardMonitorRefreshTime
         if(config.contains("clipboardMonitorRefreshTime"))
             bookie.setFeClipboardMonitorRefreshTime((unsigned)config["clipboardMonitorRefreshTime"]);
@@ -297,15 +399,9 @@ namespace ScanHelper {
 
 
     int loadConfigFile(const ScanOpts &scanOpts, bool writeConfig, json &config) {
+        auto configuration = StdDict::getConfiguration(scanOpts.configurationType);
         // load controller configs
-        json ctrlCfg;
-        try {
-            ctrlCfg = ScanHelper::openJsonFile(scanOpts.ctrlCfgPath);
-        } catch(std::runtime_error &e) {
-            shlog->error("Error opening controller config ({}): {}",
-                    scanOpts.ctrlCfgPath, e.what());
-            throw (std::runtime_error("loadConfigFile failure"));
-        }
+        json ctrlCfg = configuration->getControllerConfiguration(scanOpts.ctrlCfgPath);
 
         if(!ctrlCfg.contains("ctrlCfg")) {
             shlog->critical("#ERROR# missing controller config");
@@ -341,24 +437,28 @@ namespace ScanHelper {
         }
 
         // load FE configs
-        json chipConfig=json::array();
-        for (std::string const &sTmp: scanOpts.cConfigPaths) {
-            json feconfig;
-            try {
-                feconfig = ScanHelper::openJsonFile(sTmp);
-            } catch (std::runtime_error &e) {
-                shlog->critical("#ERROR# opening connectivity or chip configs ({}): {}", sTmp, e.what());
-                return -1;
+        json chipConfig = configuration->getConnectivity(scanOpts.cConfigPaths);
+
+        if(chipConfig.size() != scanOpts.cConfigPaths.size()) {
+            // Should be earlier message
+            shlog->critical("#ERROR# opening connectivity failed");
+            return -1;
+        }
+
+        for (json &feconfig: chipConfig) {
+            std::string path;
+            // If it might be relevant, config service can add where it was read from
+            if (feconfig.contains("_read_path")) {
+                path = feconfig["_read_path"];
             }
-            loadChipConfigs(feconfig, writeConfig, Utils::dirFromPath(sTmp));
-            chipConfig.push_back(feconfig);
+            loadChipConfigs(feconfig, writeConfig, Utils::dirFromPath(path), scanOpts.configurationType);
         }
 
         // Load scans
         json scan;
         try {
             if (!scanOpts.scanType.empty())
-                scan = openJsonFile(scanOpts.scanType);
+                scan = configuration->getScanConfiguration(scanOpts.scanType);
         } catch (std::runtime_error &e) {
             shlog->critical("#ERROR# opening scan config: {}", e.what());
             return -1;
@@ -377,7 +477,6 @@ namespace ScanHelper {
         bhlog->info("Loading histogrammer ...");
 
         const json &histoCfg = scanCfg["scan"]["histogrammer"];
-        const json &anaCfg = scanCfg["scan"]["analysis"];
 
         for (unsigned id=0; id<bookie.getNumOfEntries(); id++) {
             auto fe = bookie.getFe(id);
@@ -386,7 +485,10 @@ namespace ScanHelper {
                 histogrammers[id] = std::make_unique<HistogrammerProcessor>( );
                 auto& histogrammer = dynamic_cast<HistogrammerProcessor&>( *(histogrammers[id]) );
 
-                histogrammer.connect(&fe->clipData, &fe->clipHisto);
+                auto &e = bookie.getEntry(id);
+                auto &cp = e.fe->clipboards();
+
+                histogrammer.connect(&cp.clipData, &cp.clipHisto);
 
                 auto add_histo = [&](const std::string& algo_name, const json& subHistoCfg) {
                     auto histo = StdDict::getHistogrammer(algo_name);
@@ -397,7 +499,7 @@ namespace ScanHelper {
                         if(!status) {
                             bhlog->error("Unable to open DataArchiver output file \"{}\"", output_filename);
                             throw std::runtime_error("Can't open requested output data file \"" + output_filename + "\"");
-                        } 
+                        }
                     }
                     if(histo) {
                         histo->loadConfig(subHistoCfg);
@@ -409,17 +511,17 @@ namespace ScanHelper {
                 };
 
                 if(histoCfg.contains("n_count")) {
-                    int nHistos = histoCfg["n_count"];
+                    unsigned int nHistos = histoCfg["n_count"];
 
-                    for (int j=0; j<nHistos; j++) {
+                    for (unsigned int j=0; j<nHistos; j++) {
                         std::string algo_name = histoCfg[std::to_string(j)]["algorithm"];
                         add_histo(algo_name, histoCfg[std::to_string(j)]["config"]);
                     }
                 } else {
                     std::size_t nHistos = histoCfg.size();
-                    for (int j=0; j<nHistos; j++) {
+                    for (unsigned int j=0; j<nHistos; j++) {
                         std::string algo_name = histoCfg[j]["algorithm"];
-                        add_histo(algo_name, histoCfg[std::to_string(j)]["config"]);
+                        add_histo(algo_name, histoCfg[j]["config"]);
                     }
                 }
                 histogrammer.setMapSize(fe->geo.nCol, fe->geo.nRow);
@@ -532,7 +634,7 @@ namespace ScanHelper {
 
     void buildAnalyses( std::map<unsigned, std::vector<std::unique_ptr<AnalysisDataProcessor>> >& analyses,
             const json& scanCfg, Bookkeeper& bookie,
-                        const ScanLoopInfo* s, FeedbackClipboardMap *fbData, int mask_opt, std::string outputDir,
+                        const ScanLoopInfo* s, FeedbackClipboardMap *fbData, int mask_opt, const std::string& outputDir,
                         int target_tot, int target_charge) {
         balog->info("Loading analyses ...");
 
@@ -548,26 +650,10 @@ namespace ScanHelper {
             throw(std::runtime_error("buildAnalyses failure"));
         }
 
-        bool indexed;
-
-        // Is this an array of objects, or "n_count" + indexed by string "0"
-        if (anaCfg.contains("n_count")) {
-            indexed = true;
-        } else {
-            indexed = false;
-        }
-
-        auto get_algorithm = [indexed, &anaCfg](int index) {
-            if(indexed) {
-                return anaCfg[std::to_string(index)];
-            } else {
-                return anaCfg[index];
-            }
-        };
-
         for (unsigned id=0; id<bookie.getNumOfEntries(); id++ ) {
             auto fe = bookie.getFe(id);
             if (fe->isActive()) {
+                auto &cp = fe->clipboards();
                 buildAnalysisForFrontEnd(analyses[id],
                                          id,
                                          bookie.getFeCfg(id),
@@ -575,8 +661,8 @@ namespace ScanHelper {
                                          fe->geo,
                                          algoIndexTiers,
                                          &(*fbData)[id],
-                                         fe->clipResult,
-                                         fe->clipHisto,
+                                         cp.clipResult,
+                                         cp.clipHisto,
                                          s,
                                          mask_opt,
                                          outputDir,
@@ -604,7 +690,7 @@ namespace ScanHelper {
             }
         };
 
-        int nAnas = indexed ? (size_t)anaCfg["n_count"] : anaCfg.size();
+        unsigned int nAnas = indexed ? (size_t)anaCfg["n_count"] : anaCfg.size();
 
         balog->debug("Found {} analysis!", nAnas);
 
@@ -624,7 +710,7 @@ namespace ScanHelper {
         // Algorithm indices
         std::deque<int> indices(nAnas);
         std::iota(std::begin(indices), std::end(indices), 0);
-        int loopcnt = 0;
+        unsigned int loopcnt = 0;
 
         while (not indices.empty()) {
             int j = indices.front();
@@ -735,14 +821,6 @@ namespace ScanHelper {
         return s;
     }
 
-    void writeFeConfig(FrontEndCfg *feCfg, const std::string &filename) {
-        std::ofstream backupCfgFile(filename);
-        json backupCfg;
-        feCfg->writeConfig(backupCfg);
-        backupCfgFile << std::setw(4) << backupCfg;
-        backupCfgFile.close();
-    }
-
     void writeScanLog(json scanLog, const std::string &filename) {
         if (scanLog.contains("ctrlCfg")
           && scanLog["ctrlCfg"].contains("ctrlCfg")
@@ -794,7 +872,8 @@ namespace ScanHelper {
     std::string timestamp(std::time_t now) {
         struct tm *lt = std::localtime(&now);
         char timestamp[20];
-        strftime(timestamp, 20, "%F_%H:%M:%S", lt);
+        if (strftime(timestamp, 20, "%F_%H:%M:%S", lt) == 0)
+            return "unknown-time";
         return timestamp;
     }
     void banner(std::shared_ptr<spdlog::logger> &logger, const std::string &msg) {
@@ -830,12 +909,6 @@ namespace ScanHelper {
         }
     }
 
-    void listScans() {
-        for(std::string &scan_name: StdDict::listScans()) {
-            std::cout << "  " << scan_name << "\n";
-        }
-    }
-
     void listControllers() {
         for(auto &h: StdDict::listHwControllers()) {
             std::cout << "  " << h << std::endl;
@@ -864,9 +937,6 @@ namespace ScanHelper {
         std::cout << " Known histogram algorithms:\n";
         listHistogrammers();
 
-        std::cout << " Known Scans:\n";
-        listScans();
-
         std::cout << " Known ScanLoop actions:\n";
         listScanLoopActions();
 
@@ -886,23 +956,28 @@ namespace ScanHelper {
         std::string dbUserCfgPath = defaultDbDirPath();
 
         std::cout << "Help:" << std::endl;
-        std::cout << " -h: Shows this." << std::endl;
-        std::cout << " -s <scan_type> : Scan config" << std::endl;
-        std::cout << " -c <connectivity.json> [<cfg2.json> ...]: Provide connectivity configuration, can take multiple arguments." << std::endl;
-        std::cout << " -r <ctrl.json> Provide controller configuration." << std::endl;
-        std::cout << " -t <target_charge> [<tot_target>] : Set target values for threshold/charge (and tot)." << std::endl;
-        std::cout << " -p: Enable plotting of results." << std::endl;
+        std::cout << " -h, --help: Shows this." << std::endl;
+        std::cout << " -v, --version: Print version." << std::endl;
         std::cout << " -g: Enable making data pipeline graph." << std::endl;
-        std::cout << " -o <dir> : Output directory. (Default ./data/)" << std::endl;
-        std::cout << " -m <int> : 0 = pixel masking disabled, 1 = start with fresh pixel mask, default = pixel masking enabled" << std::endl;
         std::cout << " -k: Report known items (Scans, Hardware etc.)\n";
-        std::cout << " -W: Enable using Local DB." << std::endl;
+        std::cout << " -p: Enable plotting of results." << std::endl;
+        std::cout << " -y, --skip-config: Disable configuring front-ends prior to running the scan." << std::endl;
+        std::cout << " -z, --skip-reset: Disable sending global front-end reset command prior to running the scan." << std::endl;
+        std::cout << " -I: Set interactive mode." << std::endl;
+        std::cout << " -Q: Set QC scan mode." << std::endl;
+        std::cout << " -c <connectivity.json> [<cfg2.json> ...]: Provide connectivity configuration, can take multiple arguments." << std::endl;
         std::cout << " -d <database.json> : Provide database configuration. (Default " << dbCfgPath << ")" << std::endl;
         std::cout << " -i <site.json> : Provide site configuration. (Default " << dbSiteCfgPath << ")" << std::endl;
-        std::cout << " -u <user.json> : Provide user configuration. (Default " << dbUserCfgPath << ")" << std::endl;
         std::cout << " -l <log_cfg.json> : Provide logger configuration." << std::endl;
-        std::cout << " -Q: Set QC scan mode." << std::endl;
-        std::cout << " -I: Set interactive mode." << std::endl;
+        std::cout << " -m <int> : 0 = pixel masking disabled, 1 = start with fresh pixel mask, default = pixel masking enabled" << std::endl;
+        std::cout << " -n <int> : Number of threads used to write and plot output files. (Default: hardware concurrency, fallback 4)" << std::endl;
+        std::cout << " -o <dir> : Output directory. (Default ./data/)" << std::endl;
+        std::cout << " -r <ctrl.json> Provide controller configuration." << std::endl;
+        std::cout << " -s <scan_type> : Scan config" << std::endl;
+        std::cout << " -t <target_charge> [<tot_target>] : Set target values for threshold/charge (and tot)." << std::endl;
+        std::cout << " -u <user.json> : Provide user configuration. (Default " << dbUserCfgPath << ")" << std::endl;
+        std::cout << " -W: Enable using Local DB." << std::endl;
+        std::cout << " --skip-config: Disable configuring front-ends prior to running the scan." << std::endl;
         std::cout << " --skip-reset: Disable sending global front-end reset command prior to running the scan." << std::endl;
     }
 
@@ -913,31 +988,51 @@ namespace ScanHelper {
         scanOpts.dbUserCfgPath = defaultDbUserCfgPath();
         for (int i=1;i<argc;i++)scanOpts.commandLineStr.append(std::string(argv[i]).append(" "));
         scanOpts.progName=argv[0];
+        // Not documented in --help: a hidden pass-phrase to enable the
+        // pirate-speak log easter egg. Anything other than an exact match
+        // is silently ignored.
+        constexpr int PIRATE_OPT = 1000;
         const struct option long_options[] =
         {
-            {"skip-reset", no_argument, 0, 'z'},
-            {"help", no_argument, 0, 'h'},
-            {0, 0, 0, 0}};
+            {"help", no_argument, nullptr, 'h'},
+            {"version", no_argument, nullptr, 'v'},
+            {"skip-config", no_argument, nullptr, 'y'},
+            {"skip-reset", no_argument, nullptr, 'z'},
+            {"yarr", required_argument, nullptr, PIRATE_OPT},
+            {nullptr, 0, nullptr, 0}};
         int c;
         while (true) {
             int opt_index=0;
-            c = getopt_long(argc, argv, "hn:ks:m:r:c:t:pgo:W:d:u:i:l:QIz", long_options, &opt_index);
+            c = getopt_long(argc, argv, "ghkpvyzIQc:d:i:l:m:n:o:r:s:t:u:W:", long_options, &opt_index);
             int count = 0;
             if(c == -1) break;
             switch (c) {
+                case 'g':
+                    scanOpts.makeGraph = true;
+                    break;
                 case 'h':
                     printHelp();
                     return 0;
-                    break;
                 case 'k':
                     ScanHelper::listKnown();
                     return 0;
-                case 's':
-                    scanOpts.scan_config_provided = true;
-                    scanOpts.scanType = std::string(optarg);
+                case 'p':
+                    scanOpts.doPlots = true;
                     break;
-                case 'm':
-                    scanOpts.mask_opt = atoi(optarg);
+                case 'v':
+                    std::cout << yarr::version::get().dump(4) << std::endl;
+                    return 0;
+                case 'y':
+                    scanOpts.doConfigureBeforeScan = false;
+                    break;
+                case 'z':
+                    scanOpts.doResetBeforeScan = false;
+                    break;
+                case 'I':
+                    scanOpts.setInteractiveMode = true;
+                    break;
+                case 'Q':
+                    scanOpts.setQCMode = true;
                     break;
                 case 'c':
                     optind -= 1; //this is a bit hacky, but getopt doesn't support multiple
@@ -946,19 +1041,32 @@ namespace ScanHelper {
                         scanOpts.cConfigPaths.push_back(std::string(argv[optind]));
                     }
                     break;
-                case 'r':
-                    scanOpts.ctrlCfgPath = std::string(optarg);
+                case 'd': // Database config file
+                    scanOpts.dbCfgPath = std::string(optarg);
                     break;
-                case 'p':
-                    scanOpts.doPlots = true;
+                case 'i': // Database config file
+                    scanOpts.dbSiteCfgPath = std::string(optarg);
                     break;
-                case 'g':
-                    scanOpts.makeGraph = true;
+                case 'l': // Logger config file
+                    scanOpts.logCfgPath = std::string(optarg);
+                    break;
+                case 'm':
+                    scanOpts.mask_opt = atoi(optarg);
+                    break;
+                case 'n':
+                    scanOpts.nThreadsOutput = static_cast<unsigned>(atoi(optarg));
                     break;
                 case 'o':
                     scanOpts.outputDir = std::string(optarg);
                     if (scanOpts.outputDir.back() != '/')
                         scanOpts.outputDir = scanOpts.outputDir + "/";
+                    break;
+                case 'r':
+                    scanOpts.ctrlCfgPath = std::string(optarg);
+                    break;
+                case 's':
+                    scanOpts.scan_config_provided = true;
+                    scanOpts.scanType = std::string(optarg);
                     break;
                 case 't':
                     optind -= 1; //this is a bit hacky, but getopt doesn't support multiple
@@ -978,30 +1086,17 @@ namespace ScanHelper {
                         count++;
                     }
                     break;
-                case 'W': // Write to DB
-                    scanOpts.dbUse = true;
-		    scanOpts.dbTag = std::string(optarg);
-                    break;
-                case 'd': // Database config file
-                    scanOpts.dbCfgPath = std::string(optarg);
-                    break;
-                case 'l': // Logger config file
-                    scanOpts.logCfgPath = std::string(optarg);
-                    break;
-                case 'i': // Database config file
-                    scanOpts.dbSiteCfgPath = std::string(optarg);
-                    break;
                 case 'u': // Database config file
                     scanOpts.dbUserCfgPath = std::string(optarg);
                     break;
-                case 'Q':
-                    scanOpts.setQCMode = true;
+                case 'W': // Write to DB
+                    scanOpts.dbUse = true;
+                    scanOpts.dbTag = std::string(optarg);
                     break;
-                case 'I':
-                    scanOpts.setInteractiveMode = true;
-                    break;
-                case 'z':
-                    scanOpts.doResetBeforeScan = false;
+                case PIRATE_OPT:
+                    if (std::string(optarg) == "yarrharrfiddledeedee") {
+                        scanOpts.pirateMode = true;
+                    }
                     break;
                 case '?':
                     if (optopt == 's') {

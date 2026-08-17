@@ -12,6 +12,8 @@
 #include <typeinfo>
 #include <cstddef>
 
+#include "Bookkeeper.h"
+
 namespace {
   auto logger = logging::make_log("Rd53aTwoParameterLoop");
 }
@@ -99,7 +101,7 @@ void Rd53aTwoParameterLoop::end() {
 
 void Rd53aTwoParameterLoop::writePar(Rd53Reg Rd53aGlobalCfg::*p, uint32_t m) {
     keeper->globalFe<Rd53a>()->writeRegister(p, m);
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     //std::this_thread::sleep_for(std::chrono::milliseconds(20));
 }
 

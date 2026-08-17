@@ -16,9 +16,11 @@
 #include <condition_variable>
 #include <chrono>
 
-#include "RawData.h"
 #include <typeinfo>
 
+/**
+ * Store of data flowing between DataProcessors.
+ */
 template <class T>
 class ClipBoard {
     public:
@@ -35,6 +37,7 @@ class ClipBoard {
         ClipBoard& operator=(const ClipBoard &l) = delete;
         ClipBoard& operator=(const ClipBoard &&l) = delete;
 
+        /// Add data to the clipboard.
         void pushData(std::unique_ptr<T> data) {
             queueMutex.lock();
             if (data != NULL) {
@@ -47,6 +50,11 @@ class ClipBoard {
             cvNotEmpty.notify_all();
         }
 
+        /**
+         * Extract data from the clipboard.
+         *
+         * NB. caller takes ownership of data
+         */
         // User has to take of deletin popped data
         std::unique_ptr<T> popData() {
             queueMutex.lock();
@@ -60,13 +68,19 @@ class ClipBoard {
             return tmp;
         }
 
+        /// Clear all data and counters
         void clearData() {
             queueMutex.lock();
             std::deque<std::unique_ptr<T>> emptyQueue;
             std::swap(dataQueue, emptyQueue);
+            numDataIn = 0;
+            numDataOut = 0;
             queueMutex.unlock();
         }
 
+        /**
+         * Return number of items in the clipboard
+         */
         int size() const {
           return dataQueue.size();
         }
@@ -79,6 +93,9 @@ class ClipBoard {
             return numDataOut;
         }
 
+        /**
+         * Is the clipboard empty?
+         */
         bool empty() {
             std::lock_guard<std::mutex> lock(queueMutex);
             return rawEmpty();
@@ -107,6 +124,7 @@ class ClipBoard {
         }
 
         void reset() {
+            this->clearData();
             doneFlag = false;
             numDataIn = 0;
             numDataOut = 0;
@@ -117,6 +135,7 @@ class ClipBoard {
             return dataQueue.empty();
         }
 
+        /// Condition that this clipboard is not empty.
         std::condition_variable cvNotEmpty;
 
         std::mutex queueMutex;
@@ -126,9 +145,5 @@ class ClipBoard {
         std::atomic<unsigned> numDataIn;
         std::atomic<unsigned> numDataOut;
 };
-
-template class ClipBoard<RawData>;
-// template class ClipBoard<Fei4Data>;
-
 
 #endif

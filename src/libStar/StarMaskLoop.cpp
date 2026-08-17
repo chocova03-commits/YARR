@@ -1,5 +1,8 @@
 #include "StarMaskLoop.h"
 
+#include "Bookkeeper.h"
+#include "TxCore.h"
+
 #include <iomanip>
 
 #include "logging.h"
@@ -90,12 +93,12 @@ void StarMaskLoop::init() {
       initMasks();
     }
 
-    while(g_tx->isCmdEmpty() == 0);
+    g_tx->waitCmdEmpty();
 }
 
 void StarMaskLoop::end() {
     SPDLOG_LOGGER_DEBUG(logger, "End");
-    while(g_tx->isCmdEmpty() == 0);
+    g_tx->waitCmdEmpty();
 }
 
 void StarMaskLoop::execPart1() {
@@ -125,10 +128,8 @@ void StarMaskLoop::execPart1() {
     applyMask(static_cast<StarChips*>(fe), masks, enables);
   }
 
-  while(g_tx->isCmdEmpty() == 0) {
-    // This might no longer be useful
-    logger->trace("Waiting for cmd to empty");
-  }
+  g_tx->waitCmdEmpty();
+  logger->trace("Complete waiting for cmd to empty");
 }
 
 void StarMaskLoop::printMask(MaskType chans, std::ostream &os) const {
@@ -189,20 +190,18 @@ void StarMaskLoop::applyMask(StarChips* fe, MaskType masks, MaskType enables) {
   // configuration architecture.
 
   //Looping over MaskInput registers
-  for (int j=ABCStarRegister::MaskInput(0), index = 0;
-       j<=ABCStarRegister::MaskInput(7);
-       j++, index++) {
+  for (auto index = 0; index<=7; index++) {
+    int m_addr = (int)ABCStarRegisters::MaskInput(index);
     logger->trace("write mask: {} 0x{:08x}", index, masks[index]);
-    writeReg(fe->write_abc_register(j, masks[index], 0xf));
+    writeReg(fe->write_abc_register(m_addr, masks[index], 0xf));
   }
 
   if(!m_onlyMask) {
     //Looping over CAL ENABLE registers
-    for (int j=ABCStarRegister::CalReg(0), index = 0;
-         j<=ABCStarRegister::CalReg(7);
-         j++, index++) {
-      logger->trace("write cal: {} 0x{:08x}", j, enables[index]);
-      writeReg(fe->write_abc_register(j, enables[index], 0xf));
+    for (int index = 0; index <= 7; index++) {
+      int addr = (int)ABCStarRegisters::CalReg(index);
+      logger->trace("write cal: {} 0x{:08x}", addr, enables[index]);
+      writeReg(fe->write_abc_register(addr, enables[index], 0xf));
     }
   }
 }

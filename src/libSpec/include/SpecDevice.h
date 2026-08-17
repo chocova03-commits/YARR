@@ -9,8 +9,8 @@
 // #          Modified for SPEC card
 // ################################
 
-#include <pthread.h>
 #include <fcntl.h>
+#include <mutex>
 #include <string>
 
 namespace specDriver {
@@ -21,15 +21,15 @@ class UserMemory;
 	
 class SpecDevice {
 private:
-	unsigned int pagesize;
-	unsigned int pageshift;
-	unsigned int pagemask;
-    struct flock filelock;	
+	unsigned int pagesize = 0;
+	unsigned int pageshift = 0;
+	unsigned int pagemask = 0;
+    struct flock filelock = {};
 protected:
-	int handle;
-	int device;
+	int handle = -1;
+	int device = 0;
     std::string name;
-	pthread_mutex_t mmap_mutex;
+	mutable std::mutex mmap_mutex;
 public:
 	SpecDevice(int number);
 	~SpecDevice();
@@ -46,8 +46,8 @@ public:
 	inline UserMemory& mapUserMemory( void *mem, unsigned int size ) 
 		{ return mapUserMemory(mem,size,true); }
 
-	inline void mmap_lock() { pthread_mutex_lock( &mmap_mutex ); }
-	inline void mmap_unlock() { pthread_mutex_unlock( &mmap_mutex ); }
+	inline void mmap_lock() { mmap_mutex.lock(); }
+	inline void mmap_unlock() { mmap_mutex.unlock(); }
 
     int waitForInterrupt(unsigned int int_id) const;
 	void clearInterruptQueue(unsigned int int_id) const;

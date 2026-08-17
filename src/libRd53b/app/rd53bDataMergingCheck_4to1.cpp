@@ -1,9 +1,12 @@
 #include <cstdint>
 #include <string>
 #include <iomanip>
+#include <iostream>
 
 #include <filesystem>
 namespace fs = std::filesystem;
+
+#include <unistd.h>
 
 #include "SpecCom.h"
 #include "logging.h"
@@ -11,7 +14,7 @@ namespace fs = std::filesystem;
 #include "storage.hpp"
 // YARR
 #include "HwController.h"
-#include "FrontEnd.h"
+#include "FrontEndCfg.h"
 #include "AllChips.h"
 #include "ScanHelper.h"
 #include "Utils.h"
@@ -45,7 +48,10 @@ std::unique_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, json &jconn
         throw std::runtime_error(e.str());
     }
     auto chip_config = chip_configs[fe_num];
-    fe->init(&*hw, FrontEndConnectivity(chip_config["tx"], chip_config["rx"]));
+    unsigned regRx = chip_config["rx"];
+    if(chip_config.contains("regRx"))
+      regRx = chip_config["regRx"];
+    fe->init(&*hw, FrontEndConnectivity(chip_config["tx"], chip_config["rx"], regRx));
     auto chip_register_file_path = chip_config["__config_path__"];
     fs::path pconfig{chip_register_file_path};
     if(!fs::exists(pconfig)) {
@@ -62,13 +68,7 @@ std::unique_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, json &jconn
 
 int main(int argc, char **argv) {
     // Setup logger with some defaults
-    std::string defaultLogPattern = "[%T:%e]%^[%=8l][%=15n]:%$ %v";
-    spdlog::set_pattern(defaultLogPattern);
-    json j; // empty
-    j["pattern"] = defaultLogPattern;
-    j["log_config"][0]["name"] = "all";
-    j["log_config"][0]["level"] = "info";
-    logging::setupLoggers(j);
+    logging::setupLoggers(logging::defaultConfig());
     
     // Init spec
     logger->info("Init spec");
@@ -213,7 +213,7 @@ int main(int argc, char **argv) {
 
             // Wait for fifo to be empty
             std::this_thread::sleep_for(std::chrono::microseconds(10));
-            while(!hw->isCmdEmpty());
+            hw->waitCmdEmpty();
 
             if (!skip_config){
                 // Wait for sync
@@ -293,7 +293,7 @@ int main(int argc, char **argv) {
                 return 1; 
             }
 
-            while(!hw->isCmdEmpty()){;}
+            hw->waitCmdEmpty();
 
             std::this_thread::sleep_for(std::chrono::microseconds(200));
 
@@ -327,7 +327,7 @@ int main(int argc, char **argv) {
 
             // Wait for fifo to be empty
             std::this_thread::sleep_for(std::chrono::microseconds(10));
-            while(!hw->isCmdEmpty());
+            hw->waitCmdEmpty();
 
             int chip_id=jchip["RD53B"]["Parameter"]["ChipId"];
 
@@ -340,7 +340,7 @@ int main(int argc, char **argv) {
                 fe->writeNamedRegister("SerSelOut2", 1);
             }
 
-            while(!hw->isCmdEmpty()){;}
+            hw->waitCmdEmpty();
 
             std::this_thread::sleep_for(std::chrono::microseconds(200));
 

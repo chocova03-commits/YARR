@@ -8,6 +8,7 @@
 // ################################
 
 #include "AllChips.h"
+#include "HwController.h"
 #include "Rd53a.h"
 #include "RawData.h"
 
@@ -61,46 +62,46 @@ void Rd53a::configure() {
     EnCoreColDiff2.write(0);
     // Write globals
     this->configureGlobal();
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     // Write pixels
     this->configurePixels();
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     // Turn on clock to matrix
     this->writeRegister(&Rd53a::EnCoreColSync, tmp_enCoreColSync);
     this->writeRegister(&Rd53a::EnCoreColLin1, tmp_enCoreColLin1);
     this->writeRegister(&Rd53a::EnCoreColLin2, tmp_enCoreColLin2);
     this->writeRegister(&Rd53a::EnCoreColDiff1, tmp_enCoreColDiff1);
     this->writeRegister(&Rd53a::EnCoreColDiff2, tmp_enCoreColDiff2);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 }
 
 void Rd53a::configureInit() {
     this->writeRegister(&Rd53a::GlobalPulseRt, 0x007F); // Reset a whole bunch of things
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     this->globalPulse(m_chipId, 8);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     //Sync frames required by BDAQ
     for (int i=0;i<32;++i)
         this->sync();
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     this->writeRegister(&Rd53a::GlobalPulseRt, 0x4100); //activate monitor and prime sync FE AZ
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     this->globalPulse(m_chipId, 8);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     this->ecr();
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     this->bcr();
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 }
 
 void Rd53a::configureGlobal() {
     for (unsigned addr=0; addr<numRegs; addr++) {
         this->wrRegister(m_chipId, addr, m_cfg[addr]);
         if (addr % 20 == 0)
-            while(!core->isCmdEmpty()){;}
+            core->waitCmdEmpty();
     }
 }
 
@@ -120,9 +121,9 @@ void Rd53a::configurePixels() {
             //if (pixRegs[Rd53aPixelCfg::toIndex(col, row)] != 0x0)
             //    std::cout << "[" << col << "][" << row << "] = 0x" << std::hex << pixRegs[Rd53aPixelCfg::toIndex(col, row)] << std::dec << std::endl;
             //if (row % 24 == 0)
-            //    while(!core->isCmdEmpty()){;}
+            //    core->waitCmdEmpty();
         }
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
     }
 }
 
@@ -142,11 +143,11 @@ void Rd53a::configurePixels(std::vector<std::pair<unsigned, unsigned>> &pixels) 
         this->writeRegister(&Rd53a::PixPortal, pixRegs[Rd53aPixelCfg::toIndex(pixel.first, pixel.second)]);
         counter++;
         if (counter == 100 ) {
-            while(!core->isCmdEmpty()){;}
+            core->waitCmdEmpty();
             counter = 0;
         }
     }
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 }
 
 yarrStatus Rd53a::writeNamedRegister(std::string name, const uint16_t value) {
@@ -253,7 +254,7 @@ yarrStatus Rd53a::checkCom() {
     uint32_t regAddr = 21;
     uint32_t regValue = m_cfg[regAddr];
     rdRegister(m_chipId, regAddr);
-    while(!core->isCmdEmpty()){;} // Required by the rdRegister() above 
+    core->waitCmdEmpty();         // Required by the rdRegister() above 
                                   // (when relying on isCmdEmpty() to actually send commands).
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
@@ -264,7 +265,7 @@ yarrStatus Rd53a::checkCom() {
         data = dataVec[0];
     }
 
-    if (data != NULL) {
+    if (data != nullptr) {
         if (!(data->getSize() == 2 || data->getSize() == 4 || data->getSize() == 8 || data->getSize() == 12 || data->getSize() == 6)) {
             logger->error("Received wrong number of words ({}) for {}", data->getSize(), this->name);
             return yarrFailure;

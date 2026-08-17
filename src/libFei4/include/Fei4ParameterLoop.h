@@ -7,6 +7,7 @@
 #define FEI4PARAMETERLOOP_H
 
 #include "Fei4.h"
+#include "Bookkeeper.h"
 #include "LoopActionBase.h"
 
 #include "logging.h"
@@ -66,7 +67,7 @@ class Fei4ParameterLoop : public LoopActionBase{
 
         void writePar() {
             keeper->globalFe<Fei4>()->writeRegister(parPtr, cur);
-            while(!g_tx->isCmdEmpty());
+            g_tx->waitCmdEmpty();
         }
 
         unsigned cur;

@@ -11,9 +11,8 @@
 #include <cmath>
 #include <functional>
 #include <tuple>
-#include <iostream>
 
-#include "FrontEnd.h"
+#include "FrontEndCfg.h"
 
 #include "AbcCfg.h"
 #include "HccCfg.h"
@@ -26,39 +25,38 @@ class StarCfg : public FrontEndCfg {
   StarCfg(int abc_version, int hcc_version);
   ~StarCfg() override;
 
-  //Function to make all Registers for the ABC
-  void configure_ABC_Registers(int chipID);
-
   /// Return value of HCC register
-  uint32_t getHCCRegister(HCCStarRegister addr);
+  uint32_t getHCCRegister(HCCStarRegister addr) const;
 
   /// Set value of HCC register
   void     setHCCRegister(HCCStarRegister addr, uint32_t val);
 
   /// Get value of ABC register (by ABC communications ID)
-  uint32_t getABCRegister(ABCStarRegister addr, int32_t chipID );
+  uint32_t getABCRegisterByID(ABCStarRegister addr, int32_t chipID );
 
   /// Set value of ABC register (by ABC communications ID)
-  void     setABCRegister(ABCStarRegister addr, uint32_t val, int32_t chipID);
+  void     setABCRegisterByID(ABCStarRegister addr, uint32_t val, int32_t chipID);
 
   /// Return value of HCC register (integer version)
-  inline const uint32_t getHCCRegister(uint32_t addr) {
-    return getHCCRegister(HCCStarRegister::_from_integral(addr));
+  inline const uint32_t getHCCRegister(uint32_t addr) const {
+    return getHCCRegister((HCCStarRegister)addr);
   }
 
   /// Set value of HCC register (integer version)
   inline void setHCCRegister(uint32_t addr, uint32_t val) {
-    setHCCRegister(HCCStarRegister::_from_integral(addr), val);
+    setHCCRegister((HCCStarRegister)addr, val);
   }
 
   /// Get value of ABC register (by integer address and ABC communications ID)
-  inline const uint32_t getABCRegister(uint32_t addr, int32_t chipID ) {
-    return getABCRegister(ABCStarRegister(ABCStarRegs::_from_integral(addr)), chipID);
+  inline const uint32_t getABCRegisterByID(uint32_t addr, int32_t chipID )
+  {
+    return getABCRegisterByID((ABCStarRegister)addr, chipID);
   }
 
   /// Set value of ABC register (by integer address and ABC communications ID)
-  inline void setABCRegister(uint32_t addr, uint32_t val, int32_t chipID) {
-    setABCRegister(ABCStarRegister(ABCStarRegs::_from_integral(addr)), val, chipID);
+  inline void setABCRegisterByID(uint32_t addr, uint32_t val, int32_t chipID)
+  {
+    setABCRegisterByID((ABCStarRegister)addr, val, chipID);
   }
 
   /// Get the ID used to communicate with this HCC
@@ -93,61 +91,74 @@ class StarCfg : public FrontEndCfg {
   /// Remove all ABCs
   void clearABCchipIDs() { m_ABCchips.clear();}
 
-  /// Set value of named register field (either ABC or HCC)
-  void setSubRegisterValue(int chipIndex, std::string subRegName, uint32_t value) {
-    if (!chipIndex && HCCStarSubRegister::_is_valid(subRegName.c_str())) { //If HCC, looking name
-      return m_hcc.setSubRegisterValue(subRegName, value);
-    } else if (chipIndex && ABCStarSubRegister::_is_valid(subRegName.c_str())) { //If looking for an ABC subregister enum
-        if (abcAtIndex(chipIndex))
-            return abcFromIndex(chipIndex).setSubRegisterValue(subRegName, value);
-    }else {
-      std::cerr << " --> Error: Could not find register \""<< subRegName << "\"" << std::endl;
-    }
+  /// Set value of HCC register field
+  void setHCCSubRegisterValue(HCCStarSubRegister subReg, uint32_t value) {
+      m_hcc.setSubRegisterValue(subReg, value);
   }
 
-  /// Get value of named register field (either ABC or HCC)
-  uint32_t getSubRegisterValue(int chipIndex, std::string subRegName) {
-    if (!chipIndex && HCCStarSubRegister::_is_valid(subRegName.c_str())) { //If HCC, looking name
-      return m_hcc.getSubRegisterValue(subRegName);
-    } else if (chipIndex && ABCStarSubRegister::_is_valid(subRegName.c_str())) { //If looking for an ABC subregister enum
-        if (abcAtIndex(chipIndex))
-            return abcFromIndex(chipIndex).getSubRegisterValue(subRegName);
-    }else {
-      std::cerr << " --> Error: Could not find register \""<< subRegName << "\"" << std::endl;
-    }
+  /// Set value of ABC register field
+  void setABCSubRegisterValue(unsigned input_channel, ABCStarSubRegister subReg, uint32_t value) {
+      if (isAbcForInputChannel(input_channel))
+          abcForInputChannel(input_channel).setSubRegisterValue(subReg, value);
+  }
+
+  /// Get value of HCC register field
+  uint32_t getHCCSubRegisterValue(HCCStarSubRegister subReg) const {
+    return m_hcc.getSubRegisterValue(subReg);
+  }
+
+  /// Get value of ABC register field
+  uint32_t getABCSubRegisterValue(unsigned input_channel, ABCStarSubRegister subReg) const {
+    if (isAbcForInputChannel(input_channel))
+        return abcForInputChannel(input_channel).getSubRegisterValue(subReg);
     return 0;
   }
 
-  /// Get register address for named register field (either ABC or HCC)
-  int getSubRegisterParentAddr(int chipIndex, std::string subRegName) {
-    if (!chipIndex && HCCStarSubRegister::_is_valid(subRegName.c_str())) { //If HCC, looking name
-      return m_hcc.getSubRegisterParentAddr(subRegName);
-    } else if (chipIndex && ABCStarSubRegister::_is_valid(subRegName.c_str())) { //If looking for an ABC subregister enum
-      return m_abc_info->getSubRegisterParentAddr(subRegName);
-    }else {
-      std::cerr << " --> Error: Could not find register \""<< subRegName << "\"" << std::endl;
-    }
-    return 0;
-  }
+  /// Get register address for HCC register field
+  int getHCCSubRegisterParentAddr(HCCStarSubRegister subReg);
 
-  /// Get register value for named register field (either ABC or HCC)
-  uint32_t getSubRegisterParentValue(int chipIndex, std::string subRegName) {
-    if (!chipIndex && HCCStarSubRegister::_is_valid(subRegName.c_str())) { //If HCC, looking name
-      return m_hcc.getSubRegisterParentValue(subRegName);
-    } else if (chipIndex && ABCStarSubRegister::_is_valid(subRegName.c_str())) { //If looking for an ABC subregister enum
-        if (abcAtIndex(chipIndex))
-            return abcFromIndex(chipIndex).getSubRegisterParentValue(subRegName);
-    }else {
-      std::cerr << " --> Error: Could not find register \""<< subRegName << "\"" << std::endl;
-    }
-    return 0;
-  }
+  /// Get register address for ABC register field
+  int getABCSubRegisterParentAddr(ABCStarSubRegister subReg);
 
-  void maskPixel(unsigned col, unsigned row) override {}
-  unsigned getPixelEn(unsigned col, unsigned row) override {
+  /// Get register value for named register field (HCC)
+  uint32_t getHCCSubRegisterParentValue(HCCStarSubRegister subReg);
+
+  /// Get register value for named register field (ABC input channel)
+  uint32_t getABCSubRegisterParentValue(unsigned input_channel, ABCStarSubRegister subReg);
+
+  void maskPixel(unsigned col, unsigned row, bool doAltMask = false) override {}
+  unsigned getPixelEn(unsigned col, unsigned row, bool doAltMask = false) override {
     return 1; // getPixelEn() was desgined for Pixels, further modification is needed for StarChip
   }
   void enableAll() override;
+
+  /// Report mapping info to logger (for debugging)
+  void logMappings() const;
+
+  /// Is there an ABC associated with HCC input channel
+  bool isAbcForInputChannel(unsigned input_channel) const {
+    assert(input_channel < Star::MaxABCsPerHCC);
+    return (m_ABCchips.count(input_channel) > 0);
+  }
+
+  /// Return ABC associated with HCC input channel
+  AbcCfg &abcForInputChannel(int hccIC) {
+    return abcFromIndex(hccIC + 1);
+  }
+
+  /// Return ABC associated with HCC input channel
+  const AbcCfg &abcForInputChannel(int hccIC) const {
+    return abcFromIndex(hccIC + 1);
+  }
+
+  /// Is there an ABC associated with chip position in histogram.
+  bool isAbcForHistoChip(unsigned histo_chip) const;
+
+  /// Return ABC associated with chip position in histogram.
+  AbcCfg &abcForHistoChip(unsigned histo_chip);
+
+  /// Return ABC associated with chip position in histogram.
+  const AbcCfg &abcForHistoChip(unsigned histo_chip) const;
 
   /**
    * Obtain the corresponding charge [e] from the input VCal
@@ -159,12 +170,6 @@ class StarCfg : public FrontEndCfg {
    * Not fully implmented yet.
    */
   double toCharge(double vcal, bool sCap, bool lCap) override;
-
-  /// Set trim DAC based on col/row in histogram
-  void setTrimDAC(unsigned col, unsigned row, int value);
-
-  /// Get trim DAC based on col/row in histogram
-  int getTrimDAC(unsigned col, unsigned row) const;
 
   /// Save configuration to json
   void writeConfig(json &j) override;
@@ -179,14 +184,14 @@ class StarCfg : public FrontEndCfg {
   size_t numABCs() { return m_ABCchips.size(); }
 
   /// Return highest input channel? of connected ABCs (internal?)
-  int highestABC() { 
+  int highestABC() const {
       if (m_ABCchips.size() == 0)
           return -1;
       return m_ABCchips.rbegin()->first; 
   } 
 
   /// Return lowest input channel? of connected ABCs (internal?)
-  int lowestABC() { 
+  int lowestABC() const {
       if (m_ABCchips.size() == 0)
           return -1;
       return m_ABCchips.begin()->first; 
@@ -202,8 +207,11 @@ class StarCfg : public FrontEndCfg {
   /// Return HCC config
   HccCfg &hcc() { return m_hcc; }
 
+  /// Return HCC config
+  const HccCfg &hcc() const { return m_hcc; }
+
   /// Return HCC input channel for ABC communications ID
-  int hccChannelForABCchipID(unsigned int chipID);
+  int hccChannelForABCchipID(unsigned int chipID) const;
 
   StarConversionTools &getStarConversion() {return m_ct;}
 
@@ -233,23 +241,25 @@ class StarCfg : public FrontEndCfg {
 
   std::map<unsigned, AbcCfg> m_ABCchips;
 
-  bool abcAtIndex(int chipIndex) const {
-    assert(chipIndex > 0);
-    return (m_ABCchips.count(chipIndex-1) > 0);
-  }
-
+  /// Return ABC via 1-based index into array (not for external use)
   AbcCfg &abcFromIndex(int chipIndex) {
-    assert(abcAtIndex(chipIndex));
+    assert(isAbcForInputChannel(chipIndex-1));
     return m_ABCchips.at(chipIndex-1);
   }
 
+  /// Return ABC via 1-based index into array (not for external use)
   const AbcCfg &abcFromIndex(int chipIndex) const {
     assert(chipIndex > 0);
-    assert(abcAtIndex(chipIndex));
+    assert(isAbcForInputChannel(chipIndex-1));
     return m_ABCchips.at(chipIndex-1);
   }
 
+  int inputChannelForHistoChip(unsigned histo_chip) const;
+
   StarConversionTools m_ct;
+
+  /// By default don't run checkCom
+  bool m_run_check_com{};
 };
 
 #endif

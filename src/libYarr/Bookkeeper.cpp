@@ -6,25 +6,33 @@
 // # Comment: Global container for data
 // ################################
 
+#include <cstdio>
 #include <set>
 
 #include "Bookkeeper.h"
 #include "AllChips.h"
+#include "FrontEndCfg.h"
+#include "FrontEndClipBoards.h"
 
 #include "logging.h"
+#include "ProgressBar.h"
 
 namespace {
     auto blog = logging::make_log("Bookkeeper");
 }
 
-Bookkeeper::Bookkeeper(TxCore *arg_tx, RxCore *arg_rx) {
+Bookkeeper::Bookkeeper(TxCore *arg_tx, RxCore *arg_rx) : clipboardMonitorRefreshTime(0), runClipboardMonitor(false) {
     tx = arg_tx;
     rx = arg_rx;
     g_fe.reset();
     target_tot = 10;
     target_charge = 16000;
     target_threshold = 3000;
+    loop_histograms = std::make_unique<ClipBoard<HistogramBase>>();
 }
+
+// Here instead of header so things like unique_ptr work with only fwd declarations
+Bookkeeper::~Bookkeeper() = default;
 
 void Bookkeeper::initGlobalFe(const std::string& chipType) {
     std::unique_ptr<FrontEnd> fe_tmp = StdDict::getFrontEnd(chipType);
@@ -37,7 +45,7 @@ void Bookkeeper::initGlobalFe(const std::string& chipType) {
     g_fe->connectBookkeeper(this);
 }
 
-void Bookkeeper::addFe(std::unique_ptr<FrontEnd> fe, const FrontEndConnectivity& cfg) {
+unsigned Bookkeeper::addFe(std::unique_ptr<FrontEnd> fe, const FrontEndConnectivity& cfg) {
     // Create new entry
     bookEntries.emplace_back();
     bookEntries.back().fe = std::move(fe);
@@ -46,6 +54,7 @@ void Bookkeeper::addFe(std::unique_ptr<FrontEnd> fe, const FrontEndConnectivity&
     bookEntries.back().active = true;
     bookEntries.back().txChannel = cfg.getTxChannel();
     bookEntries.back().rxChannel = cfg.getRxChannel();
+    bookEntries.back().regRxChannel = cfg.getRegRxChannel();
 
     auto fe_cfg = dynamic_cast<FrontEndCfg*>(fe.get());
     if(fe_cfg) fe_cfg->setChannel(cfg);
@@ -53,11 +62,13 @@ void Bookkeeper::addFe(std::unique_ptr<FrontEnd> fe, const FrontEndConnectivity&
     rxToIdMap[cfg.getRxChannel()].emplace_back(uid);
 
     // Using macro includes file/line info
-    SPDLOG_LOGGER_INFO(blog, "Added FE: Tx({}), Rx({}) under ID {}", cfg.getTxChannel(), cfg.getRxChannel(), uid);
+    SPDLOG_LOGGER_INFO(blog, "Added FE: Tx({}), Rx({}), RegRx({}) under ID {}", cfg.getTxChannel(), cfg.getRxChannel(), cfg.getRegRxChannel(), uid);
+
+    return uid;
 }
 
-void Bookkeeper::addFe(std::unique_ptr<FrontEnd> fe, unsigned channel) {
-    this->addFe(std::move(fe), FrontEndConnectivity(channel,channel));
+unsigned Bookkeeper::addFe(std::unique_ptr<FrontEnd> fe, unsigned channel) {
+    return this->addFe(std::move(fe), FrontEndConnectivity(channel,channel));
 }
 
 void Bookkeeper::delFe(unsigned id) {
@@ -97,9 +108,6 @@ FrontEndCfg* Bookkeeper::getFeCfg(unsigned id) {
     }
 }
 
-FrontEnd* Bookkeeper::getLastFe() {
-    return bookEntries.back().fe.get();
-}
 
 std::vector<uint32_t> Bookkeeper::getTxMask() {
     std::vector<uint32_t> activeChannels;
@@ -113,8 +121,11 @@ std::vector<uint32_t> Bookkeeper::getTxMask() {
 std::vector<uint32_t> Bookkeeper::getRxMask() {
     std::vector<uint32_t> activeChannels;
     for (BookEntry &entry : bookEntries) {
-        if (entry.active)
+      if (entry.active){
             activeChannels.push_back(entry.rxChannel);
+	    if (entry.regRxChannel)
+	      activeChannels.push_back(entry.regRxChannel);
+      }
     }
     return activeChannels;
 }
@@ -136,6 +147,8 @@ std::vector<uint32_t> Bookkeeper::getRxMaskUnique() {
     for (BookEntry &entry : bookEntries) {
         if (entry.active) {
             uniqueChannels.insert(entry.rxChannel);
+            if (entry.regRxChannel)
+                uniqueChannels.insert(entry.regRxChannel);
         }
     }
 
@@ -148,7 +161,7 @@ unsigned Bookkeeper::getId(FrontEnd *fe) {
     if (idMap.find(fe) != idMap.end()) {
         return idMap[fe];
     } else {
-        SPDLOG_LOGGER_ERROR(blog, "Could not find Id for FrontEnd at 0x{:x}", fmt::ptr(fe));
+        SPDLOG_LOGGER_ERROR(blog, "Could not find Id for FrontEnd at 0x{:p}", fmt::ptr(fe));
     }
     return 0;
 }
@@ -170,7 +183,7 @@ void Bookkeeper::startFeClipboardMonitor() {
 
     // start clipboard monitoring thread
     runClipboardMonitor = true;
-    clipboardMonitorThread_ptr.reset(new std::thread(&Bookkeeper::feClipboardMonitor, this));
+    clipboardMonitorThread_ptr = std::make_unique<std::thread>(&Bookkeeper::feClipboardMonitor, this);
 }
 
 void Bookkeeper::setFeClipboardMonitorRefreshTime(unsigned arg_clipboardMonitorRefreshTime) {
@@ -182,9 +195,22 @@ void Bookkeeper::joinFeClipboardMonitor() {
     clipboardMonitorThread_ptr->join();
 }
 
-void Bookkeeper::addFeClipboardMonitor(unsigned arg_id, std::string arg_name) {
+void Bookkeeper::addFeClipboardMonitor(unsigned arg_id, const std::string& arg_name) {
     clipboardMonitorFeIDs.push_back(arg_id);
     clipboardMonitorFeNames.push_back(arg_name);
+}
+
+namespace {
+    /// Format a single "Stage: in N out N (backlog N)" fragment for one clipboard.
+    template <typename T>
+    std::string clipboardStat(const std::string &stage, const ClipBoard<T> &cp) {
+        long long in = cp.getNumDataIn();
+        long long out = cp.getNumDataOut();
+        char buf[96];
+        std::snprintf(buf, sizeof(buf), "%s: in %lld out %lld (backlog %d)",
+                      stage.c_str(), in, out, cp.size());
+        return std::string(buf);
+    }
 }
 
 void Bookkeeper::feClipboardMonitor() {
@@ -193,37 +219,52 @@ void Bookkeeper::feClipboardMonitor() {
     for(unsigned i = 0; i < clipboardMonitorFeIDs.size(); i++)
         SPDLOG_LOGGER_INFO(blog, "[ ClipboardMonitor : {:^8} [{}] : Info ] Started clipboard monitor thread",  clipboardMonitorFeNames[i], clipboardMonitorFeIDs[i]);
     while(runClipboardMonitor) {
+        std::vector<std::string> lines;
         for(unsigned i = 0; i < clipboardMonitorFeIDs.size(); i++) {
-            SPDLOG_LOGGER_INFO(
-                blog, "[ ClipboardMonitor : {:^8} [{}] : RawData  ] InCount:{:<8} OutCount:{:<8} QueueSize:{:<8}", 
+            auto &cp = bookEntries[clipboardMonitorFeIDs[i]].fe->clipboards();
+            SPDLOG_LOGGER_TRACE(
+                blog, "[ ClipboardMonitor : {:^8} [{}] : RawData  ] InCount:{:<8} OutCount:{:<8} QueueSize:{:<8}",
                 clipboardMonitorFeNames[i], clipboardMonitorFeIDs[i],
-                bookEntries[clipboardMonitorFeIDs[i]].fe->clipRawData.getNumDataIn(),
-                bookEntries[clipboardMonitorFeIDs[i]].fe->clipRawData.getNumDataOut(),
-                bookEntries[clipboardMonitorFeIDs[i]].fe->clipRawData.size()
+                cp.clipRawData.getNumDataIn(),
+                cp.clipRawData.getNumDataOut(),
+                cp.clipRawData.size()
             );
-            SPDLOG_LOGGER_INFO(
-                blog, "[ ClipboardMonitor : {:^8} [{}] : ProcData ] InCount:{:<8} OutCount:{:<8} QueueSize:{:<8}", 
+            SPDLOG_LOGGER_TRACE(
+                blog, "[ ClipboardMonitor : {:^8} [{}] : ProcData ] InCount:{:<8} OutCount:{:<8} QueueSize:{:<8}",
                 clipboardMonitorFeNames[i], clipboardMonitorFeIDs[i],
-                bookEntries[clipboardMonitorFeIDs[i]].fe->clipData.getNumDataIn(),
-                bookEntries[clipboardMonitorFeIDs[i]].fe->clipData.getNumDataOut(),
-                bookEntries[clipboardMonitorFeIDs[i]].fe->clipData.size()
+                cp.clipData.getNumDataIn(),
+                cp.clipData.getNumDataOut(),
+                cp.clipData.size()
             );
-            SPDLOG_LOGGER_INFO(
-                blog, "[ ClipboardMonitor : {:^8} [{}] : HistData ] InCount:{:<8} OutCount:{:<8} QueueSize:{:<8}", 
+            SPDLOG_LOGGER_TRACE(
+                blog, "[ ClipboardMonitor : {:^8} [{}] : HistData ] InCount:{:<8} OutCount:{:<8} QueueSize:{:<8}",
                 clipboardMonitorFeNames[i], clipboardMonitorFeIDs[i],
-                bookEntries[clipboardMonitorFeIDs[i]].fe->clipHisto.getNumDataIn(),
-                bookEntries[clipboardMonitorFeIDs[i]].fe->clipHisto.getNumDataOut(),
-                bookEntries[clipboardMonitorFeIDs[i]].fe->clipHisto.size()
+                cp.clipHisto.getNumDataIn(),
+                cp.clipHisto.getNumDataOut(),
+                cp.clipHisto.size()
             );
-            SPDLOG_LOGGER_INFO(
-                blog, "[ ClipboardMonitor : {:^8} [{}] : Feedback ] InCount:{:<8} OutCount:{:<8} QueueSize:{:<8}", 
+            SPDLOG_LOGGER_TRACE(
+                blog, "[ ClipboardMonitor : {:^8} [{}] : Feedback ] InCount:{:<8} OutCount:{:<8} QueueSize:{:<8}",
                 clipboardMonitorFeNames[i], clipboardMonitorFeIDs[i],
-                bookEntries[clipboardMonitorFeIDs[i]].fe->clipProcFeedback.getNumDataIn(),
-                bookEntries[clipboardMonitorFeIDs[i]].fe->clipProcFeedback.getNumDataOut(),
-                bookEntries[clipboardMonitorFeIDs[i]].fe->clipProcFeedback.size()
+                cp.clipProcFeedback.getNumDataIn(),
+                cp.clipProcFeedback.getNumDataOut(),
+                cp.clipProcFeedback.size()
+            );
+
+            lines.push_back(
+                clipboardMonitorFeNames[i] + "  " +
+                clipboardStat("Raw", cp.clipRawData) + "  " +
+                clipboardStat("Evt", cp.clipData) + "  " +
+                clipboardStat("Hist", cp.clipHisto)
             );
         }
-        std::this_thread::sleep_for(std::chrono::microseconds(clipboardMonitorRefreshTime)); // microseconds  
+        ProgressBar::instance().setSection("clipboards", lines);
+        std::this_thread::sleep_for(std::chrono::microseconds(clipboardMonitorRefreshTime)); // microseconds
     }
     SPDLOG_LOGGER_INFO(blog, "Joined clipboard monitor thread");
+}
+
+ClipBoard<HistogramBase> &Bookkeeper::getLoopHistograms()
+{
+    return *loop_histograms;
 }

@@ -7,16 +7,17 @@
 #ifndef ENGINETBASE_H
 #define ENGINETBASE_H
 
-#include <memory>
-using std::shared_ptr;
-
-#include <vector>
-
+/**
+ * Base class providing helpers for LoopEngine.
+ */
 template <typename LT>
 class EngineTBase {
 	public: 
+		/** Record template argument */
 		typedef LT loop_list_type;
+		/** Extract type of list elements */
 		typedef typename LT::value_type element_value_type;
+		/** Connect loop actions together and execute them */
 		static void execute( LT &task_list ) {
 			typename loop_list_type::iterator it = task_list.begin();
 			while(task_list.end() != it) {
@@ -29,6 +30,8 @@ class EngineTBase {
 			if(task_list.end() != it) 
 				(*it)->execute();
 		}
+
+		/** Add LoopAction to list */
 		static void addItem( loop_list_type& list, element_value_type el ) {
 			list.push_back(el);
 		}

@@ -8,6 +8,8 @@
 
 #include "Rd53bParameterLoop.h"
 
+#include "Bookkeeper.h"
+
 #include "logging.h"
 
 namespace {
@@ -62,7 +64,7 @@ void Rd53bParameterLoop::end() {
 
 void Rd53bParameterLoop::writePar() {
     keeper->globalFe<Rd53b>()->writeRegister(parPtr, m_cur);
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 

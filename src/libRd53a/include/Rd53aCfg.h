@@ -11,7 +11,7 @@
 
 #include <iostream>
 
-#include "FrontEnd.h"
+#include "FrontEndCfg.h"
 #include "Rd53aGlobalCfg.h"
 #include "Rd53aPixelCfg.h"
 #include "Constants.h"
@@ -23,12 +23,14 @@ class Rd53aCfg : public FrontEndCfg, public Rd53aGlobalCfg, public Rd53aPixelCfg
     public:
         Rd53aCfg();
 
-        void maskPixel(unsigned col, unsigned row) override {
+        void maskPixel(unsigned col, unsigned row, bool doAltMask = false) override {
             this->setEn(col, row, 0);
             this->setHitbus(col, row, 0);
         }
 
-        unsigned getPixelEn(unsigned col, unsigned row) override {
+        unsigned getPixelEn(unsigned col, unsigned row, bool doAltMask = false) override {
+            if(doAltMask)
+                return this->getHitbus(col, row);
             return this->getEn(col, row);
         }
 

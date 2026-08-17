@@ -1,5 +1,8 @@
 #include "Itkpixv2ReadRegLoop.h"
 
+#include "Bookkeeper.h"
+#include "HwController.h"
+
 #include "logging.h"
 
 namespace
@@ -18,7 +21,7 @@ Itkpixv2ReadRegLoop::Itkpixv2ReadRegLoop() : LoopActionBase(LOOP_STYLE_NOP)
 
 //Configures the ADC, reads the register returns the first recieved register.
 uint16_t Itkpixv2ReadRegLoop::ReadADC(unsigned short Reg, bool doCur, Itkpixv2 *fe) {
-    if (fe == NULL)
+    if (fe == nullptr)
         return 0;
 
     fe->confAdc(Reg, doCur);
@@ -32,7 +35,7 @@ uint16_t Itkpixv2ReadRegLoop::ReadADC(unsigned short Reg, bool doCur, Itkpixv2 *
 
 float Itkpixv2ReadRegLoop::ReadNTCTemp(Itkpixv2 *fe, bool in_kelvin) {
     //Sensor Config
-    if (fe == NULL)
+    if (fe == nullptr)
         return 0;
 
     float voltage = fe->adcToV(this->ReadADC(2, false, fe));
@@ -43,7 +46,7 @@ float Itkpixv2ReadRegLoop::ReadNTCTemp(Itkpixv2 *fe, bool in_kelvin) {
 
 float Itkpixv2ReadRegLoop::ReadResistTemp(Itkpixv2 *fe, bool in_kelvin) {
     //Sensor Config
-    if (fe == NULL)
+    if (fe == nullptr)
         return 0;
     
     // Read current
@@ -52,7 +55,7 @@ float Itkpixv2ReadRegLoop::ReadResistTemp(Itkpixv2 *fe, bool in_kelvin) {
     // Read top sensor: toggle Vref to top
     fe->writeRegister(&Itkpixv2::VrefRsensTop, 1);
     fe->writeRegister(&Itkpixv2::VrefRsensBot, 0);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float voltageTop = fe->adcToV(this->ReadADC(5, false, fe));
@@ -60,7 +63,7 @@ float Itkpixv2ReadRegLoop::ReadResistTemp(Itkpixv2 *fe, bool in_kelvin) {
     // Read bottom sensor: toggle Vref to bottom
     fe->writeRegister(&Itkpixv2::VrefRsensTop, 0);
     fe->writeRegister(&Itkpixv2::VrefRsensBot, 1);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float voltageBot = fe->adcToV(this->ReadADC(6, false, fe));
@@ -68,7 +71,7 @@ float Itkpixv2ReadRegLoop::ReadResistTemp(Itkpixv2 *fe, bool in_kelvin) {
     // Reset the Vref configuration
     fe->writeRegister(&Itkpixv2::VrefRsensTop, 0);
     fe->writeRegister(&Itkpixv2::VrefRsensBot, 0);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     logger->info("Polyresistor Temp Sensor: Bot({} V) Top ({} V) [Iref({} A)]", voltageTop, voltageBot, current);
@@ -83,13 +86,13 @@ float Itkpixv2ReadRegLoop::ReadResistTemp(Itkpixv2 *fe, bool in_kelvin) {
 float Itkpixv2ReadRegLoop::ReadTransSensor(Itkpixv2 *fe, TransSensorLocation loc, TransSensorType type, Itkpixv2Cfg::TransSensor sensor, bool in_kelvin)
 {
     //Sensor Config
-    if (fe == NULL)
+    if (fe == nullptr)
         return 0;
 
     // enable sensor, and switch off bias
     fe->writeRegister(TransSensorCfg[loc][0], 1);
     fe->writeRegister(TransSensorCfg[loc][2], 0);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float VD = 0;
@@ -97,7 +100,7 @@ float Itkpixv2ReadRegLoop::ReadTransSensor(Itkpixv2 *fe, TransSensorLocation loc
     for (unsigned dem = 0; dem < 16; dem++)
     {
         fe->writeRegister(TransSensorCfg[loc][1], dem);
-        while (!g_tx->isCmdEmpty()){;}
+        g_tx->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         // Readout VMUX
         VD += fe->adcToV(this->ReadADC(TransSensorVMUX[loc][type], false, fe));
@@ -105,7 +108,7 @@ float Itkpixv2ReadRegLoop::ReadTransSensor(Itkpixv2 *fe, TransSensorLocation loc
 
     // switch on bias and loop again
     fe->writeRegister(TransSensorCfg[loc][2], 1);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float VDR = 0;
@@ -113,7 +116,7 @@ float Itkpixv2ReadRegLoop::ReadTransSensor(Itkpixv2 *fe, TransSensorLocation loc
     for (unsigned dem = 0; dem < 16; dem++)
     {
         fe->writeRegister(TransSensorCfg[loc][1], dem);
-        while (!g_tx->isCmdEmpty()){;}
+        g_tx->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         // Readout VMUX
         VDR += fe->adcToV(this->ReadADC(TransSensorVMUX[loc][type], false, fe));
@@ -122,7 +125,7 @@ float Itkpixv2ReadRegLoop::ReadTransSensor(Itkpixv2 *fe, TransSensorLocation loc
     // Switch off sensor and bias
     fe->writeRegister(TransSensorCfg[loc][0], 0);
     fe->writeRegister(TransSensorCfg[loc][2], 0);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float deltaV = (VDR - VD) / 16.;
@@ -160,7 +163,7 @@ void Itkpixv2ReadRegLoop::execPart1()
             std::string feName = dynamic_cast<FrontEndCfg *>(fe)->getName();
             Itkpixv2 *feItkpixv2 = dynamic_cast<Itkpixv2 *>(fe);
 
-            logger->info("Measuring for FE {} on Rx {}", feName, id);
+            logger->info("Measuring for FE {} on Rx {}", feName, dynamic_cast<FrontEndCfg*>(fe)->getRegRxChannel());
 
             // Reading Standard Registers
             for (auto Reg : m_STDReg) {
@@ -181,13 +184,13 @@ void Itkpixv2ReadRegLoop::execPart1()
             }
 
             // Reading Voltage  ADC
-            for (auto Reg : m_VoltMux) {
+            for (const auto& Reg : m_VoltMux) {
                 uint16_t ADCVal = ReadADC(Reg, false, feItkpixv2);
                 logger->info("[{}][{}] MON MUX_V: {}, Value: {} => {} V", id, feName, Reg, ADCVal, dynamic_cast<Itkpixv2 *>(fe)->adcToV(ADCVal));
             }
 
             // Reading Temperature sensors from the ADC
-            for (auto Reg : m_TempSensors) {
+            for (const auto& Reg : m_TempSensors) {
                 if (Reg == "NTC") {
                     float TempVal = ReadNTCTemp(feItkpixv2, false);
                     logger->info("[{}][{}] MON NTC: {} C", id, feName, TempVal);
@@ -202,7 +205,7 @@ void Itkpixv2ReadRegLoop::execPart1()
                 }
             }
 
-            for (auto Reg : m_RadSensors) {
+            for (const auto& Reg : m_RadSensors) {
                 if (Reg == "BJT") {
                     float RadValDSLDO = ReadTransSensor(feItkpixv2, DSLDO, BJT, Itkpixv2Cfg::Other);
                     float RadValASLDO = ReadTransSensor(feItkpixv2, ASLDO, BJT, Itkpixv2Cfg::Other);
@@ -212,7 +215,7 @@ void Itkpixv2ReadRegLoop::execPart1()
             }
 
             // Reading Current ADC
-            for (auto Reg : m_CurMux) {
+            for (const auto& Reg : m_CurMux) {
                 uint16_t ADCVal = ReadADC(Reg, true, feItkpixv2);
                 logger->info("[{}][{}] MON MUX_C: {} Value: {} => {} uA", id, feName, Reg, ADCVal, dynamic_cast<Itkpixv2 *>(fe)->adcToI(ADCVal)/1e-6);
             }
@@ -229,7 +232,7 @@ void Itkpixv2ReadRegLoop::execPart1()
             // In m_EnblRingOsc, [0:7] are for bank A, and [8:12] are for bank B
             feItkpixv2->writeRegister(&Itkpixv2::RingOscAEn, (m_EnblRingOscA & 0xff));
 
-            while (!g_tx->isCmdEmpty()){;}
+            g_tx->waitCmdEmpty();
             std::this_thread::sleep_for(std::chrono::microseconds(100));
 
             for (unsigned i = 0; i < m_RingOscRep; i++)
@@ -243,7 +246,7 @@ void Itkpixv2ReadRegLoop::execPart1()
                     // Reset bank A counters
                     feItkpixv2->writeRegister(&Itkpixv2::RingOscAClear, 1);
                     feItkpixv2->writeRegister(&Itkpixv2::RingOscAClear, 0);
-                    while (!g_tx->isCmdEmpty()){;}
+                    g_tx->waitCmdEmpty();
                     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                     // Run oscillators for some time
@@ -293,7 +296,7 @@ void Itkpixv2ReadRegLoop::execPart1()
                     feItkpixv2->writeRegister(RingOscBEn[tmpCount], 1);
                 }
             }
-            while (!g_tx->isCmdEmpty()){;}
+            g_tx->waitCmdEmpty();
             std::this_thread::sleep_for(std::chrono::microseconds(100));
             
             for (unsigned i = 0; i < m_RingOscRep; i++)
@@ -306,7 +309,7 @@ void Itkpixv2ReadRegLoop::execPart1()
                     // Reset bank B counters
                     feItkpixv2->writeRegister(&Itkpixv2::RingOscBClear, 1);
                     feItkpixv2->writeRegister(&Itkpixv2::RingOscBClear, 0);
-                    while (!g_tx->isCmdEmpty()){;}
+                    g_tx->waitCmdEmpty();
                     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                     // Run oscillators for some time
@@ -381,15 +384,15 @@ void Itkpixv2ReadRegLoop::loadConfig(const json &config)
         m_RingOscDur = config["RingOscDur"];
 
     if (config.contains("VoltMux"))
-        for (auto Reg : config["VoltMux"])
+        for (const auto& Reg : config["VoltMux"])
             m_VoltMux.push_back(Reg);
 
     if (config.contains("CurMux"))
-        for (auto Reg : config["CurMux"])
+        for (const auto& Reg : config["CurMux"])
             m_CurMux.push_back(Reg);
 
     if (config.contains("Registers"))
-        for (auto Reg : config["Registers"])
+        for (const auto& Reg : config["Registers"])
         {
             m_STDReg.push_back(Reg);
 
@@ -408,10 +411,10 @@ void Itkpixv2ReadRegLoop::loadConfig(const json &config)
         }
     
     if (config.contains("TempSensors"))
-        for (auto Reg : config["TempSensors"])
+        for (const auto& Reg : config["TempSensors"])
             m_TempSensors.push_back(Reg);
 
     if (config.contains("RadSensors"))
-        for (auto Reg : config["RadSensors"])
+        for (const auto& Reg : config["RadSensors"])
             m_RadSensors.push_back(Reg);                
 }

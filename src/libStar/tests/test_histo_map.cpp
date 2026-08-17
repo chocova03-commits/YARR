@@ -4,7 +4,7 @@
 
 TEST_CASE("CheckBuildHistoMap", "[star][histo_map]") {
   int hcc_version = 0;
-  std::array<uint8_t, 11> expected_chip_map;
+  std::array<uint8_t, Star::MaxABCsPerHCC> expected_chip_map;
   int hcc_input_enables = 0;
 
   SECTION("Empty") {
@@ -38,7 +38,7 @@ TEST_CASE("CheckBuildHistoMap", "[star][histo_map]") {
   CAPTURE (hcc_version, hcc_input_enables);
 
   HccCfg hcc(hcc_version);
-  hcc.setSubRegisterValue("ICENABLE", hcc_input_enables);
+  hcc.setSubRegisterValue(HCCStarSubRegister::ICENABLE, hcc_input_enables);
 
   auto chip_map = hcc.histoChipMap();
 

@@ -14,6 +14,7 @@
 
 #include "ScanHelper.h"
 #include "Bookkeeper.h"
+#include "HwController.h"
 
 #include "Rd53b.h"
 #include "Rd53bPixelCfg.h"
@@ -107,7 +108,7 @@ std::vector<uint16_t> readData(RawData *data)
 void decodePix(std::vector<RawData> dataList, Rd53b &rd53b, std::vector<std::pair<uint16_t, uint16_t>> &address)
 {
     std::vector<uint16_t> result;
-    for (auto data : dataList)
+    for (auto& data : dataList)
     {
         std::vector<uint16_t> tmp = readData(&data);
         result.insert(result.end(), tmp.begin(), tmp.end());
@@ -151,7 +152,7 @@ void decodePix(std::vector<RawData> dataList, Rd53b &rd53b, std::vector<std::pai
         // std::cout << dc << " " << row << " " << pix1.s.en << " " << pix1.s.hitbus << " " << pix1.s.injen << " " << pix1.s.tdac * (pix1.s.sign == 0 ? +1 : -1) << std::endl;
         // std::cout << dc << " " << row << " " << pix2.s.en << " " << pix2.s.hitbus << " " << pix2.s.injen << " " << pix2.s.tdac * (pix2.s.sign == 0 ? +1 : -1) << std::endl;
         // getchar();
-        Rd53bPixelCfg::pixelBits pix1, pix2;
+        Rd53bPixelCfg::pixelBits pix1 = {}, pix2 = {};
         pix1.u8 = (val & 0xFF);
         pix2.u8 = (val >> 8) & 0xFF;
         rd53b.setReg(dc * 2, row, pix1.s.en, pix1.s.injen, pix1.s.hitbus, pix1.s.tdac * (pix1.s.sign == 0 ? +1 : -1));
@@ -165,7 +166,7 @@ void decodePix(std::vector<RawData> dataList, Rd53b &rd53b, std::vector<std::pai
 uint16_t decodeGlob(std::vector<RawData> dataList, int address)
 {
     std::vector<uint16_t> result;
-    for (auto data : dataList)
+    for (auto& data : dataList)
     {
         std::vector<uint16_t> tmp = readData(&data);
         result.insert(result.end(), tmp.begin(), tmp.end());
@@ -183,12 +184,12 @@ uint16_t decodeGlob(std::vector<RawData> dataList, int address)
     return result[0];
 }
 
-void saveCfgFile(Rd53b &rd53b, std::string cfgFilePath, json globSEU)
+void saveCfgFile(Rd53b &rd53b, const std::string& cfgFilePath, json globSEU)
 {
     std::ofstream newCfgFile(cfgFilePath.c_str());
     json cfg;
     rd53b.writeConfig(cfg);
-    cfg["GlobalSEU"] = globSEU;
+    cfg["GlobalSEU"] = std::move(globSEU);
     newCfgFile << std::setw(4) << cfg;
     newCfgFile.close();
     logger->info("Output file {} saved.", cfgFilePath.c_str());
@@ -197,13 +198,7 @@ void saveCfgFile(Rd53b &rd53b, std::string cfgFilePath, json globSEU)
 int main(int argc, char *argv[])
 {
     // Setup logger with some defaults
-    std::string defaultLogPattern = "[%T:%e]%^[%=8l][%=15n]:%$ %v";
-    spdlog::set_pattern(defaultLogPattern);
-    json j; // empty
-    j["pattern"] = defaultLogPattern;
-    j["log_config"][0]["name"] = "all";
-    j["log_config"][0]["level"] = "info";
-    logging::setupLoggers(j);
+    logging::setupLoggers(logging::defaultConfig());
 
     logger->info("\033[1;31m#################################\033[0m");
     logger->info("\033[1;31m# RD53B Test Tool: SEE register #\033[0m");
@@ -322,8 +317,7 @@ int main(int argc, char *argv[])
     }
 
     hwCtrl->setCmdEnable(0);
-    while (!hwCtrl->isCmdEmpty())
-        ;
+    hwCtrl->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(10));
 
     if (initialize)
@@ -331,7 +325,7 @@ int main(int argc, char *argv[])
         rd53b.configureInit();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        while (!hwCtrl->isCmdEmpty());
+        hwCtrl->waitCmdEmpty();
 
         rd53b.configureGlobal();
         /* Put global threshold to high value to avoid large current */
@@ -341,7 +335,7 @@ int main(int argc, char *argv[])
         rd53b.writeRegister(&Rd53b::DiffVff, 200);
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        while (!hwCtrl->isCmdEmpty());
+        hwCtrl->waitCmdEmpty();
 
         if (randomize)
         {
@@ -370,23 +364,20 @@ int main(int argc, char *argv[])
                 std::uniform_int_distribution<> regVal(0, 0xFFFF);
                 j_glob_seu[regName] = regVal(generator);
                 rd53b.sendWrReg(rd53b.getChipId(), addr, j_glob_seu[regName]);
-                while (!hwCtrl->isCmdEmpty())
-                    ;
+                hwCtrl->waitCmdEmpty();
             }
 
             /* Save the config file */
             saveCfgFile(rd53b, outputPrefix + "_rndm" + std::to_string(seed) + ".json", j_glob_seu);
         }
         rd53b.configurePixels();
-        while (!hwCtrl->isCmdEmpty())
-            ;
+        hwCtrl->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     hwCtrl->setRxEnable(0);
-    while (!hwCtrl->isCmdEmpty())
-        ;
+    hwCtrl->waitCmdEmpty();
     hwCtrl->flushBuffer();
 
     /* Read back pixel registers */
@@ -398,9 +389,9 @@ int main(int argc, char *argv[])
         for (unsigned idx = 0; idx < nRead; idx++)
         {
             /* Start files documenting bad pixels and raw data */
-            rawdata.reset(new std::ofstream(outputPrefix_stage + "_rawdata" + std::to_string(idx) + ".txt", std::ofstream::binary));
-            badpix.reset(new std::ofstream(outputPrefix_stage + "_badpix" + std::to_string(idx) + ".txt"));
-            badglob.reset(new std::ofstream(outputPrefix_stage + "_badglob" + std::to_string(idx) + ".txt"));
+            rawdata = std::make_unique<std::ofstream>(outputPrefix_stage + "_rawdata" + std::to_string(idx) + ".txt", std::ofstream::binary);
+            badpix = std::make_unique<std::ofstream>(outputPrefix_stage + "_badpix" + std::to_string(idx) + ".txt");
+            badglob = std::make_unique<std::ofstream>(outputPrefix_stage + "_badglob" + std::to_string(idx) + ".txt");
             /* Read back pixel registers */
             unsigned counter = 0;
             std::vector<std::pair<uint16_t, uint16_t>> address;
@@ -414,14 +405,11 @@ int main(int argc, char *argv[])
                     rd53b.writeRegister(&Rd53b::PixRegionCol, dc);
                     rd53b.writeRegister(&Rd53b::PixRegionRow, row);
                     rd53b.sendRdReg(rd53b.getChipId(), rd53b.PixPortal.addr());
-                    while (!hwCtrl->isCmdEmpty())
-                        ;
+                    hwCtrl->waitCmdEmpty();
                     rd53b.sendRdReg(rd53b.getChipId(), rd53b.PixRegionCol.addr());
-                    while (!hwCtrl->isCmdEmpty())
-                        ;
+                    hwCtrl->waitCmdEmpty();
                     rd53b.sendRdReg(rd53b.getChipId(), rd53b.PixRegionRow.addr());
-                    while (!hwCtrl->isCmdEmpty())
-                        ;
+                    hwCtrl->waitCmdEmpty();
 
                     address.push_back(std::make_pair(dc, row));
                     counter++;
@@ -448,8 +436,7 @@ int main(int argc, char *argv[])
             for (unsigned addr = 0; addr < 138; addr++)
             {
                 rd53b.sendRdReg(rd53b.getChipId(), addr);
-                while (!hwCtrl->isCmdEmpty())
-                    ;
+                hwCtrl->waitCmdEmpty();
                 std::vector<RawData> dataList = processDataPackets(hwCtrl.get());
                 rd53b_readback[stage][idx][addr] = decodeGlob(dataList, addr);
             }
@@ -459,8 +446,7 @@ int main(int argc, char *argv[])
             {
                 std::string regName = addr < 202 ? ("SEU" + std::to_string(addr - 138) + "_notmr") : ("SEU" + std::to_string(addr - 202));
                 rd53b.sendRdReg(rd53b.getChipId(), addr);
-                while (!hwCtrl->isCmdEmpty())
-                    ;
+                hwCtrl->waitCmdEmpty();
                 std::vector<RawData> dataList = processDataPackets(hwCtrl.get());
                 j_glob_seu[regName] = decodeGlob(dataList, addr);
             }
@@ -484,8 +470,7 @@ int main(int argc, char *argv[])
     rd53b.writeRegister(&Rd53b::PixRegionRow, 0xffff); /* 16 bit */
     rd53b.writeRegister(&Rd53b::PixAutoRow, 0x0); /* 1 bit */
     rd53b.writeRegister(&Rd53b::AiRegionRow, 0x1ff); /* 9 bit */
-    while (!hwCtrl->isCmdEmpty())
-        ;
+    hwCtrl->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     std::ofstream ftime(outputPrefix + "_time.txt");

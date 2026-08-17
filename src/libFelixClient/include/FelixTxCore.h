@@ -3,8 +3,14 @@
 
 #include "TxCore.h"
 #include "FelixTools.h"
+#include "OptoUtils.h"
 
+#ifdef YARR_CONFIG_FELIX_PROXY
+#include "felix_proxy/ClientThread.h"
+using FelixClientThread = felix_proxy::ClientThread;
+#else
 #include "felix/felix_client_thread.hpp"
+#endif
 #include "storage.hpp"
 
 #include <cstdint>
@@ -12,22 +18,6 @@
 #include <thread>
 #include <atomic>
 
-
-//Enum for declaring various FELIX firmware flavors as defined in section 2.1 of https://edms.cern.ch/ui/file/2681548/1/FELIX_Phase2_firmware_specs.pdf
-//Firmware flavor determined by "FIRMWARE_MODE" FELIX register
-enum FELIX_FW_MODE {
-  GBT_mode = 0,
-  FULL_mode = 1,
-  LTDB_mode = 2,
-  FEI4_mode = 3,
-  ITK_Pixel = 4,
-  ITK_Strip = 5,
-  FELIG = 6,
-  FULL_mode_emulator = 7,
-  FELIX_MROD_mode = 8,
-  lpGBT_mode = 9,
-  Interlaken_25G = 10
-};
 
 class FelixTxCore : virtual public TxCore {
 
@@ -54,6 +44,7 @@ public:
   void setTrigCnt(uint32_t count) override; 	// set the number of desired triggers
   void setTrigTime(double time) override; 	// set the trigger time in seconds
   void setTrigWordLength(uint32_t length) override; 	// set Trigger Word Length
+  int getMaxTrigWordLength() override; // return the maximum Trigger Word Length (16 x 32bit commands for FELIX)
   void setTrigWord(uint32_t *words, uint32_t size) override; 	// set the trigger words
   void toggleTrigAbort() override; 	// abort the trigger sequence
   void setTriggerLogicMask(uint32_t mask) override; 	// set the trigger logic
@@ -61,14 +52,23 @@ public:
   void resetTriggerLogic() override; 	// reset the trigger logic
   uint32_t getTrigInCount() override; 	// get the number of triggers in
 
-  bool readFelixRegister(const std::string&, uint64_t&);
-  bool writeFelixRegister(const std::string&, const std::string&);
+  bool readFwRegister(const std::string&, uint64_t&) override;
+  bool writeFwRegister(const std::string&, const uint64_t&) override;
 
+  void loadFWMode(); // retrieve firmware mode from the FELIX register
+  FelixTools::FELIX_FW_MODE fwMode(); // get the FELIX firmware mode
+
+  FelixTools::FelixID_t fid_from_channel(uint32_t chn); // covert channel number to fid
+  FelixTools::FelixID_t ic_fid_from_channel(uint32_t chn); // get the ic fid from the channel number
+
+  
 protected:
 
   void loadConfig(const json &j); 		     // read configuration from json
   void writeConfig(json& j); 		         // write configuration to json
-  void setClient(std::shared_ptr<FelixClientThread> client); // set Felix client
+  void setClient(const FelixClientThread::ConfigV2& fcConfig); // set Felix client
+
+  void setSkipRegFlag(bool skip_flx_reg_in);
 
   using FelixID_t = FelixTools::FelixID_t;
 
@@ -76,6 +76,14 @@ protected:
   void enableChannel(FelixID_t fid);
   void disableChannel(FelixID_t fid);
   bool checkChannel(FelixID_t fid);
+  bool channelIsEnabled(FelixID_t fid) { return m_enables[fid]; }
+
+  //Used to enable configuraring encoding/decoding for every tx channel in enableChannel()
+  bool m_configureEncoding {false};
+  uint16_t m_encodingBandWidth {0};
+  uint8_t m_encodingPattern {0};
+  // Function to be set by FelixController to configure encoding/decoding for every tx channel
+  virtual bool configureChannel(FelixTools::FelixID_t fid, uint16_t bandwidth, uint8_t pattern, bool enable) = 0;
 
   void fillFifo(std::vector<uint8_t>& fifo, uint32_t value);
   void prepareFifo(std::vector<uint8_t>& fifo);
@@ -103,18 +111,22 @@ protected:
   enum TRIG_CONF_VALUE m_trigCfg;          // trigger config
   std::vector<uint32_t> m_trigWords;       // the trigger words
   std::atomic<bool> m_trigEnabled {false}; // trigger is enabled
+  std::atomic<bool> m_fwTrigActive {false};// FW is autonomously managing triggers
   uint32_t m_trigCnt {0};                  // number of triggers
   uint32_t m_trigTime {0};                 // trigger time
   uint32_t m_trigFreq {1};                 // trigger frequency
+  double   m_trigFreq_FW {0};              // Actual FW trigger frequency
   uint32_t m_trigWordLength {4};           // number of trigger words
 
   bool m_flip {false};
   bool m_pixFwTrigger{false};
-  int m_bufferSize {0};
+  size_t m_bufferSize {0};
   bool m_broadcast {true};
   uint32_t m_numEnabledChns {0};
-  uint64_t m_regValue;
-  enum FELIX_FW_MODE m_fwMode;
+  enum FelixTools::FELIX_FW_MODE m_fwMode {FelixTools::FELIX_FW_MODE::Unknown};
+
+  /// Copy of skip_felix_reg from FelixController (don't access felix regs)
+  bool m_tx_skip_felix_reg{false};
 
   // GBT link and e-link number for broadcasting
   static constexpr unsigned BroadcastLink = 0x1f;
@@ -128,13 +140,17 @@ protected:
   std::vector<uint8_t> m_idleWords;
 
   // For Felix ID
-  FelixID_t fid_from_channel(uint32_t chn);
   uint8_t m_did {0};  // detector ID; 0x00 reserved for local IDs
   uint16_t m_cid {0}; // connector ID; 0x0000 reserved for local IDs
   uint8_t m_protocol {0}; // protocol ID
-  unsigned m_isCmdEmptyWaitTime {100}; // in milliseconds
+  unsigned m_isCmdEmptyWaitTime {0}; // in microseconds
 
-  std::shared_ptr<FelixClientThread> fclient;
+  std::unique_ptr<FelixClientThread> fclient;
+
+  /// @brief Send a command over an IC channel, useful for example in LpGBT register writing
+  /// @param fid The FIC of the IC channel (uint64_t)
+  /// @param data The dataframe to be sent (const std::vector<uint8_t>&)
+  void sendIC(uint64_t fid, const std::vector<uint8_t> dataframe);
 };
 
 #endif

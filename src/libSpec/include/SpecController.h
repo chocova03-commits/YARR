@@ -19,6 +19,10 @@
 
 class SpecController : public HwController, public SpecTxCore, public SpecRxCore {
     public:
+        SpecController() {
+            m_waitTime = std::chrono::microseconds(1000);
+            m_timeoutTime = std::chrono::microseconds(50000);
+        }
 
         const json getStatus() override {
             return this->SpecCom::getStatus();
@@ -41,6 +45,14 @@ class SpecController : public HwController, public SpecTxCore, public SpecRxCore
 
             if (j.contains("txPolarity")) {
                 this->setTxPolarity(j["txPolarity"]);
+            }
+
+            if (j.contains("rxWaitTime")) {
+                m_waitTime = std::chrono::microseconds(j["rxWaitTime"]);
+            }
+            
+            if (j.contains("rxTimeoutTime")) {
+                m_timeoutTime = std::chrono::microseconds(j["rxTimeoutTime"]);
             }
             
             // Configure trigger logic (disable trigger encoder by default)
@@ -67,18 +79,27 @@ class SpecController : public HwController, public SpecTxCore, public SpecRxCore
                 }
                 if(tc.contains("deadtime"))
                     this->setTriggerDeadtime(tc["deadtime"]);
-                if(tc.contains("triggerEncoderMultiplier")) {
+
+                if(tc.contains("triggerEncoderMultiplier"))
                     this->setTriggerEncoderMultiplier(tc["triggerEncoderMultiplier"]);
-                }
-                else {
+                else
                     this->setTriggerEncoderMultiplier(0);
-                }
-                if(tc.contains("triggerEncoderEnable")) {
+                    
+                if(tc.contains("triggerEncoderEnable"))
                     this->setTriggerEncoderEnable(tc["triggerEncoderEnable"]);
-                }
-                else {
+                else
                     this->setTriggerEncoderEnable(0);
-                }
+
+                // Configure trigger pulse extension (default 1BC, no extension)
+                if(tc.contains("triggerPulseExtension"))
+                    this->setTriggerPulseExtension(tc["triggerPulseExtension"]);
+                else
+                    this->setTriggerPulseExtension(1);
+
+                // configure eudet simple mode
+                if(tc.contains("eudetSimpleModeEnable"))
+                    this->setEudetSimpleMode(tc["eudetSimpleModeEnable"]);
+
             }
             else {
                 // Turn off trigger encoder by default
@@ -131,7 +152,8 @@ class SpecController : public HwController, public SpecTxCore, public SpecRxCore
                 this->setRxActiveLanes(j["rxActiveLanes"]);
                 SpecRxCore::m_rxActiveLanes = j["rxActiveLanes"];
             }
- 
+
+            // Configure RX delay
             SpecCom::writeSingle(RX_ADDR | RX_MANUAL_DELAY, 0xFFFF);    
             if (j.contains("delay")) {
                 SpecRxCore::m_delay.clear();
@@ -141,9 +163,25 @@ class SpecController : public HwController, public SpecTxCore, public SpecRxCore
                     SpecRxCore::setRxDelay(n, i);
                     n++;
                 }
-    	    }   
-            
+    	    }
 
+            // Configure BRAM busy enable (default on)
+            if(j.contains("BRAMBusyEnable"))
+                this->setBRAMBusyEnable(j["BRAMBusyEnable"]);
+            else
+                this->setBRAMBusyEnable(1);
+
+            // Configure BRAM full threshold (default 80% fill)
+            if(j.contains("BRAMFullThreshold"))
+                this->setBRAMFullThreshold(j["BRAMFullThreshold"]);
+            else
+                this->setBRAMFullThreshold((int)(2048*64*0.8));
+
+            // Configure BRAM empty threshold (default 40% fill)
+            if(j.contains("BRAMEmptyThreshold"))
+                this->setBRAMEmptyThreshold(j["BRAMEmptyThreshold"]);
+            else
+                this->setBRAMEmptyThreshold((int)(2048*64*0.4));
         }
 
         void setupMode() final{

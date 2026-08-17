@@ -8,6 +8,7 @@
 
 #include "Itkpixv2MaskLoop.h"
 
+#include "Bookkeeper.h"
 #include "logging.h"
 
 namespace {
@@ -70,7 +71,7 @@ Itkpixv2MaskLoop::Itkpixv2MaskLoop() : LoopActionBase(LOOP_STYLE_MASK) {
     //Even
     AllNeighboursCoordinates["25x100_downup"][0] ={{std::make_pair(1,1),std::make_pair(3,1),std::make_pair(2,0),std::make_pair(3,0),std::make_pair(1,0),std::make_pair(-1,0),std::make_pair(-2,0),std::make_pair(-1,1)}};
     //Odd
-    AllNeighboursCoordinates["25x100_downup"][0] ={{std::make_pair(-1,0),std::make_pair(1,0),std::make_pair(2,0),std::make_pair(1,-1),std::make_pair(-1,-1),std::make_pair(-3,-1),std::make_pair(-2,0),std::make_pair(-3,0)}};
+    AllNeighboursCoordinates["25x100_downup"][1] ={{std::make_pair(-1,0),std::make_pair(1,0),std::make_pair(2,0),std::make_pair(1,-1),std::make_pair(-1,-1),std::make_pair(-3,-1),std::make_pair(-2,0),std::make_pair(-3,0)}};
 
     //How many and which pixels to consider for cross-talk (1: consider, 0: ignore)
     m_mask_size = {{
@@ -112,7 +113,7 @@ void Itkpixv2MaskLoop::init() {
             }
         }
         itkpixv2->configurePixels();
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
     g_tx->setCmdEnable(keeper->getTxMask());
 }
@@ -209,7 +210,7 @@ void Itkpixv2MaskLoop::execPart1() {
         //for (auto n: modPixels)
         //  logger->info("{} {}",n.first,n.second);
         itkpixv2->configurePixels(modPixels);
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
 
     g_tx->setCmdEnable(keeper->getTxMask());
@@ -251,7 +252,7 @@ void Itkpixv2MaskLoop::execPart2() {
                 }
             }	
             itkpixv2->configurePixels(modPixels);
-            while(!g_tx->isCmdEmpty()) {}	
+            g_tx->waitCmdEmpty();	
         }
     }
 
@@ -361,7 +362,7 @@ bool Itkpixv2MaskLoop::getNeighboursMap(int col, int row,int sensorType, int mas
 }
 
 
-bool Itkpixv2MaskLoop::ignorePixel(int col, int row){
+bool Itkpixv2MaskLoop::ignorePixel(int col, int row) const {
 
     //if checking bump bonding connections for rectangular sensors, only use (0,0) pixel
     if ( m_includedPixels == only00CornerForBumpBonding){

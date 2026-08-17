@@ -9,6 +9,8 @@
 
 #include "Rd53aPixelFeedback.h"
 
+#include "Bookkeeper.h"
+
 #include "logging.h"
 
 namespace {
@@ -49,7 +51,7 @@ void Rd53aPixelFeedback::loadConfig(const json &j) {
         m_resetTdac = j["resetTdac"];
     if (j.contains("steps")) {
         m_steps.clear();
-        for(auto i: j["steps"])
+        for(const auto& i: j["steps"])
             m_steps.push_back(i);
         logger->debug("Got {} steps!", m_steps.size());
     }
@@ -85,7 +87,7 @@ void Rd53aPixelFeedback::feedback(unsigned id, std::unique_ptr<Histo2d> h) {
 void Rd53aPixelFeedback::writePixelCfg(Rd53a *fe) {
     g_tx->setCmdEnable(dynamic_cast<FrontEndCfg*>(fe)->getTxChannel());
     fe->configurePixels();
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     g_tx->setCmdEnable(keeper->getTxMask());
 }
 
@@ -99,10 +101,10 @@ void Rd53aPixelFeedback::init() {
     }
     if (m_resetTdac) {
         for(unsigned id=0; id<keeper->getNumOfEntries(); id++) {
-            auto fe = keeper->getFe(id);
+            const auto& fe = keeper->getFe(id);
             if (fe->getActive()) {
                 auto rd53a = dynamic_cast<Rd53a*>(fe);
-                m_fb[id] = NULL;
+                m_fb[id] = nullptr;
                 int linCnt = 0;
                 int diffCnt = 0;
                 for (unsigned col=1; col<=Rd53a::n_Col; col++) {

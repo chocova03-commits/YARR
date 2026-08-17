@@ -4,33 +4,47 @@
     "cfg": {
       "FelixClient": {
         "localIPorInterface": "lo",
-        "logLevel": "info",
         "busDir": "/tmp/bus",
-        "busGroupName": "FELIX",
-        "verboseBus": false,
-	"timeout": 1000,
-        "netioPages": 256,
-        "netioPagesize": 65536
+        "busGroupName": "FELIX"
       },
       "ToFLX": {
         "detectorID": 0,
         "connectorID": 0,
         "protocol": 0,
         "flip": false,
-        "broadcast": true,
-	"idleWords": [0],
-	"isCmdEmptyWaitTime": 500
+        "broadcast": false,
+        "idleWords": [120, 85, 120, 85],
+        "isCmdEmptyWaitTime": 0
       },
       "ToHost": {
         "detectorID": 0,
         "connectorID": 0,
         "protocol": 0,
-        "flushWaitTime": 50,
+        "flushWaitTime": 0,
         "enableMonitor": true,
         "monitorInterval": 1000,
         "queueLimitMB": 4000,
         "waitTime": 10000
-      }
+      },
+      "OptoDevices": [
+        {
+          "version": 1,
+          "devAddr": 113,
+          "devPrimaryAddr": 113,
+          "type": "lpgbt",
+          "txFid": "0x1000000001558000",
+          "rxFid": "0x10000000015d0000"
+        },
+        {
+          "version": 1,
+          "i2cAddr": 2,
+          "devAddr": 112,
+          "devPrimaryAddr": 113,
+          "type": "lpgbt",
+          "txFid": "0x1000000001558000",
+          "rxFid": "0x10000000019d0000"
+        }
+      ]
     }
   }
 }

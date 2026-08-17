@@ -16,7 +16,13 @@ void EmuTxCore<StarChips>::doTrigger() {
         }
     }
 
-    while(not EmuTxCore<StarChips>::isCmdEmpty());
+    EmuTxCore<StarChips>::waitCmdEmpty();
     trigProcRunning = false;
     //std::cout << __PRETTY_FUNCTION__ << ": doTrigger() is done." << std::endl;
+}
+
+// Don't add padding
+template<>
+void EmuTxCore<StarChips>::releaseFifo() {
+  writeFifo((LCB::IDLE << 16) + LCB::IDLE);
 }

@@ -13,24 +13,40 @@
 
 #include "LoopStatus.h"
 
+/**
+ * Base class for analysis results?
+ */
 class ResultBase {
     public:
-        ResultBase(std::string arg_name);
-        ResultBase(std::string arg_name, LoopStatus &stat);
+        /** Named result */
+        ResultBase(const std::string& arg_name);
+        /** Named result associated with point of scan */
+        ResultBase(const std::string& arg_name, LoopStatus &stat);
+        /** Destructor */
         virtual ~ResultBase();
 
+        /** Return name */
         std::string getName();
 
+        /** Save data in file */
         virtual void toFile(std::string basename, bool header=true) {}
+        /** Plot data in file */
         virtual void plot(std::string basename) {}
         
-        void setAxisTitle(std::string x, std::string y="y", std::string z="z");
-        void setXaxisTitle(std::string);
-        void setYaxisTitle(std::string);
-        void setZaxisTitle(std::string);
+        /** Set axes titles */
+        void setAxisTitle(const std::string& x, const std::string& y="y", const std::string& z="z");
+        /** Set X-axis title */
+        void setXaxisTitle(const std::string&);
+        /** Set Y-axis title */
+        void setYaxisTitle(const std::string&);
+        /** Set Z-axis title */
+        void setZaxisTitle(const std::string&);
 
+        /** Retrieve X-axis title */
         std::string getXaxisTitle();
+        /** Retrieve Y-axis title */
         std::string getYaxisTitle();
+        /** Retrieve Z-axis title */
         std::string getZaxisTitle();
 
     protected:

@@ -8,6 +8,8 @@
 
 #include "ScanBase.h"
 
+#include "Bookkeeper.h"
+
 ScanBase::ScanBase(Bookkeeper *k) : engine(k) {
     g_bk = k;
     g_tx = k->tx;
@@ -27,7 +29,7 @@ unsigned ScanBase::size() const {
     return loops.size();
 }
 
-void ScanBase::addLoop(std::shared_ptr<LoopActionBase> l) {
+void ScanBase::addLoop(const std::shared_ptr<LoopActionBase>& l) {
     loops.push_back(l);
     engine.addAction(l);
 }

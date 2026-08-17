@@ -8,6 +8,16 @@
 
 #include "FrontEnd.h"
 
+#include "FrontEndCfg.h"
+#include "FrontEndClipBoards.h"
+
+FrontEnd::FrontEnd()
+  : m_clipboards(std::make_unique<FrontEndClipBoards>())
+{
+}
+
+FrontEnd::~FrontEnd() = default;
+
 bool FrontEnd::isActive() const {
 	return active;
 }
@@ -20,6 +30,18 @@ void FrontEnd::setActive(bool arg_active) {
 	active = arg_active;
 }
 
+bool FrontEnd::isActiveLoop() const {
+	return activeLoop;
+}
+
+void FrontEnd::setActiveLoop(bool arg_activeLoop) {
+	activeLoop = arg_activeLoop;
+}
+
 std::tuple<json, std::vector<json>> FrontEndCfg::getPreset(const std::string& systemType) {
 	throw std::runtime_error("No presets defined");
+}
+
+std::unique_ptr<FrontEnd> FrontEnd::getGlobal() {
+        return nullptr;
 }

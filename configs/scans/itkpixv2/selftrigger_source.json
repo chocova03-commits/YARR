@@ -3,9 +3,9 @@
     "analysis": {
       "0": {
         "algorithm": "NoiseAnalysis",
-	  "config": {
+         "config": {
               "createMask": false
-	  }
+          }
       },
       "n_count": 1
     },
@@ -15,26 +15,30 @@
         "config": {}
       },
       "1": {
-        "algorithm": "DataArchiver",
-        "config": {}
-      },
-      "2": {
         "algorithm": "TotMap",
         "config": {}
       },
-      "3": {
+      "2": {
         "algorithm": "Tot2Map",
         "config": {}
       },
-      "4": {
+      "3": {
         "algorithm": "TagDist",
         "config": {}
       },
-      "5": {
+      "4": {
         "algorithm": "HitsPerEvent",
         "config": {}
       },
-      "n_count": 1
+      "5": {
+        "algorithm": "TotDist",
+        "config": {}
+      },
+      "6": {
+          "algorithm": "DataArchiver",
+          "config": {}
+      },
+      "n_count": 6
     },
     "loops": [
       {
@@ -62,7 +66,7 @@
 	"SelfTrigDigThrEn": 1,
 	"SelfTrigDigThr": 1,
 	"SelfTrigMulti": 4,
-	"SelfTrigDelay": 45
+	"SelfTrigDelay": 42
     }
   }
 }

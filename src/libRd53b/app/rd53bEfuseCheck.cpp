@@ -21,7 +21,7 @@ namespace fs = std::filesystem;
 
 // YARR
 #include "HwController.h"
-#include "FrontEnd.h"
+#include "FrontEndCfg.h"
 #include "AllChips.h"
 #include "ScanHelper.h" // openJson
 #include "LoggingConfig.h"
@@ -41,7 +41,7 @@ void print_usage(char* argv[]) {
 
 auto logger = logging::make_log("rd53bEfuseCheck");
 
-std::shared_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, std::string config, int fe_num) {
+std::shared_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, const std::string& config, int fe_num) {
     json jconn = ScanHelper::openJsonFile(config);
     std::string chip_type = jconn["chipType"];
     auto fe = StdDict::getFrontEnd(chip_type);
@@ -53,7 +53,10 @@ std::shared_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, std::string
         throw std::runtime_error(e.str());
     }
     auto chip_config = chip_configs[fe_num];
-    fe->init(&*hw, FrontEndConnectivity(chip_config["tx"], chip_config["rx"]));
+    unsigned regRx = chip_config["rx"]; 
+    if(chip_config.contains("regRx"))
+      regRx = chip_config["regRx"]; 
+    fe->init(&*hw, FrontEndConnectivity(chip_config["tx"], chip_config["rx"], regRx));
     auto chip_register_file_path = chip_config["config"];
     fs::path pconfig{chip_register_file_path};
     if(!fs::exists(pconfig)) {
@@ -68,12 +71,7 @@ std::shared_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, std::string
 
 int main(int argc, char* argv[]) {
     // Setup logger
-    json loggerConfig;
-    loggerConfig["pattern"] = "[%T:%e]%^[%=8l][%=15n][%t]:%$ %v";
-    loggerConfig["log_config"][0]["name"] = "all";
-    loggerConfig["log_config"][0]["level"] = "info";
-    loggerConfig["outputDir"] = "";
-    logging::setupLoggers(loggerConfig);
+    logging::setupLoggers(logging::defaultConfig());
 
     std::string hw_controller_filename = "";
     std::string connectivity_filename = "";
@@ -142,7 +140,7 @@ int main(int argc, char* argv[]) {
         
         auto feCfg = std::dynamic_pointer_cast<FrontEndCfg>(fe);
         hw->setCmdEnable(feCfg->getTxChannel());
-        hw->setRxEnable(feCfg->getRxChannel());
+        hw->setRxEnable(feCfg->getRegRxChannel());
         logger->info("Reading efuse of chip: {}", feCfg->getName()); 
 
         if (!fe->hasValidName()) {
@@ -156,8 +154,6 @@ int main(int argc, char* argv[]) {
     } else {
         logger->error("There were errors reading back e-fuse IDs!");
     }
-
-    std::cerr << "Done." << std::endl;
 
     return errors;
 }

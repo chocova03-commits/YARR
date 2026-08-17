@@ -8,6 +8,8 @@
 
 #include "Rd53bGlobalFeedback.h"
 
+#include "Bookkeeper.h"
+
 #include "logging.h"
 
 namespace {
@@ -124,7 +126,7 @@ void Rd53bGlobalFeedback::writePar() {
             g_tx->setCmdEnable(feCfg->getTxChannel());
             // Write parameter
             dynamic_cast<Rd53b*>(fe)->writeRegister(parPtr, m_values[id]);
-            while(!g_tx->isCmdEmpty()){}
+            g_tx->waitCmdEmpty();
         }
     }
     // Reset CMD mask
@@ -161,7 +163,7 @@ void Rd53bGlobalFeedback::init() {
                 }
                 rd53b->configurePixels();
             }
-            while(!g_tx->isCmdEmpty()){}
+            g_tx->waitCmdEmpty();
         }
     }
     g_tx->setCmdEnable(keeper->getTxMask());

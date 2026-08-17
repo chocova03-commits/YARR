@@ -9,6 +9,7 @@
 #include "HistogramAlgorithm.h"
 
 #include "EventData.h"
+#include "HistogramProcessor.h"
 
 #include "logging.h"
 
@@ -16,7 +17,7 @@ namespace {
     auto alog = logging::make_log("HistogramAlgorithm");
 }
 
-HistogrammerProcessor::HistogrammerProcessor() = default;
+HistogrammerProcessor::HistogrammerProcessor() : input(nullptr), output(nullptr) {}
 
 HistogrammerProcessor::~HistogrammerProcessor() = default;
 

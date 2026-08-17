@@ -267,26 +267,29 @@ void Histo2d::toJson(json &j) const{
     for (unsigned i=0; i<lStat.size(); i++)
         j["loopStatus"][i] = (lStat.get(i));
 
-    for (unsigned int y=0; y<ybins; y++) {
-        for (unsigned int x=0; x<xbins; x++) {
-            j["Data"][x][y] = data[x+(y*xbins)] ;
+    if(xbins) {
+        j["Data"] = std::vector<json>(xbins);
+    }
+    for (unsigned int x=0; x<xbins; x++) {
+        std::vector<float> line(ybins);
+        for (unsigned int y=0; y<ybins; y++) {
+          line[y] = data[x+(y*xbins)];
         }
+        j["Data"][x] = line;
     }
 }
 
 void Histo2d::toFile(const std::string &prefix, const std::string &dir, bool jsonType) const{
-    std::string filename = dir + prefix + "_" + HistogramBase::name;
-    json j;
-    for (unsigned i=0; i<lStat.size(); i++)
-        filename += "_" + std::to_string(lStat.get(i));
-
-    if (jsonType) {
-        filename += ".json";
-    } else {
-        filename += ".dat";
-    }
+    std::string ext = "";
+    if (jsonType) 
+        ext = "json";
+    else
+        ext = "dat";
+    std::string filename = createFilename(prefix, dir, ext);
     std::fstream file(filename, std::fstream::out | std::fstream::trunc);
+
     // jsonType
+    json j;
     if (jsonType) {
        toJson(j);
        file << std::setw(4) << j;
@@ -364,7 +367,7 @@ bool Histo2d::fromJson(const json &j) {
         for (unsigned int y=0; y<ybins; y++) {
             for (unsigned int x=0; x<xbins; x++) {
                 auto index = x+(y*xbins);
-                double d = j["Data"][x][y];;
+                double d = j["Data"][x][y];
                 data[index] = d;
                 if(d > 0.0) {
                     m_isFilled[index] = true;
@@ -379,15 +382,18 @@ bool Histo2d::fromJson(const json &j) {
 void Histo2d::plot(const std::string &prefix, const std::string &dir) const{
     hlog->info("Plotting {}", HistogramBase::name);
 
-    std::string output = dir + prefix + "_" + HistogramBase::name;
-    for (unsigned i=0; i<lStat.size(); i++)
-        output += "_" + std::to_string(lStat.get(i));
-    output += ".png";
+    auto check_terminal = getenv("YARR_GNUPLOT_TERMINAL");
+    std::string term_name = "png";
+    if(check_terminal != nullptr) {
+      term_name = check_terminal;
+    }
+
+    std::string output = createFilename(prefix, dir, term_name);
 
     // Open gnuplot as file and pipe commands
     std::string input;
 
-    input+="\"set terminal png size 1280, 1024;";
+    input+="\"set terminal " + term_name + " size 1280, 1024;";
     input+="set palette negative defined ( 0 '#D53E4F', 1 '#F46D43', 2 '#FDAE61', 3 '#FEE08B', 4 '#E6F598', 5 '#ABDDA4', 6 '#66C2A5', 7 '#3288BD');";
     input+="unset key;";
     input+="set title '"  +HistogramBase::name+"';";
@@ -405,8 +411,10 @@ void Histo2d::plot(const std::string &prefix, const std::string &dir) const{
 
     std::string cmd="gnuplot  -e "+input+" > "+output+"\n";
     FILE *gnu = popen(cmd.c_str(), "w");
-    fwrite(&data[0], sizeof(float), data.size(), gnu); 
-    pclose(gnu);
+    if (fwrite(data.data(), sizeof(float), data.size(), gnu) != data.size())
+        hlog->warn("Failed to write histogram data to gnuplot");
+    if (pclose(gnu) != 0)
+        hlog->warn("gnuplot exited with error while plotting {}", name);
 }
 
 std::unique_ptr<Histo1d> Histo2d::profileY() const {
@@ -415,9 +423,9 @@ std::unique_ptr<Histo1d> Histo2d::profileY() const {
   outH->setXaxisTitle(getYaxisTitle());
  
   // Fill the profile histogram
-  for (int ybin = 0; ybin < getYbins(); ybin++) {
+  for (size_t ybin = 0; ybin < getYbins(); ybin++) {
     double bin_y = getYlow() + ybin * getYbinWidth();
-    for (int xbin = 0; xbin < getXbins(); xbin++) {
+    for (size_t xbin = 0; xbin < getXbins(); xbin++) {
       auto bin = xbin+(ybin*xbins);
       double cxy = getBin(bin);
       if (cxy)

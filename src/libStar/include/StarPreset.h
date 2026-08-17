@@ -99,7 +99,7 @@ namespace StarPreset {
     // Connectivity config
     systemCfg["chipType"] = chipName;
 
-    for (int i=0; i<modules.size(); i++) {
+    for (unsigned int i=0; i<modules.size(); i++) {
       std::string mName(chipName+"_"+modules[i].name);
       systemCfg["chips"][i]["config"] = mName+".json";
       systemCfg["chips"][i]["tx"] = modules[i].tx;
@@ -138,7 +138,7 @@ namespace StarPreset {
       }
 
       // Set HCC's IC_Enable accordingly
-      feCfg.hcc().setSubRegisterValue("ICENABLE", maskHccIn);
+      feCfg.hcc().setSubRegisterValue(HCCStarSubRegister::ICENABLE, maskHccIn);
 
       json chipCfg;
       feCfg.writeConfig(chipCfg);
@@ -158,7 +158,7 @@ namespace StarPreset {
     feCfg.clearABCchipIDs();
     feCfg.addABCchipID(0, 0);
     // And set HCC's IC_Enable accordingly
-    feCfg.hcc().setSubRegisterValue("ICENABLE", 0x1);
+    feCfg.hcc().setSubRegisterValue(HCCStarSubRegister::ICENABLE, 0x1);
 
     // Config for one HCCStar + one ABCStar
     json cfg;

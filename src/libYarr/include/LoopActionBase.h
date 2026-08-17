@@ -13,60 +13,104 @@
 #include <string>
 #include <array>
 
-#include "TxCore.h"
-#include "RxCore.h"
-#include "LoopStatus.h"
-#include "Bookkeeper.h"
 #include "LoopActionBaseInfo.h"
 
 #include "storage.hpp"
 
-using std::shared_ptr;
+class Bookkeeper;
+class FrontEnd;
+template<typename T>
+class ClipBoard;
+class HistogramBase;
+class LoopStatusMaster;
+class RxCore;
+class TxCore;
 
+/**
+ * Implementation of a layer of a nested loop.
+ *
+ * LoopEngine effectively executes:
+ *
+ * init()
+ * for v in values:
+ *  execPart1()
+ *  run inner loop
+ *  execPart2()
+ * end()
+ * 
+ */
 class LoopActionBase : public LoopActionBaseInfo {
     public:
         explicit LoopActionBase(LoopStyle s);
         virtual ~LoopActionBase() = default;
 
+        /**
+         * Attach to information about scan engine.
+         *
+         * @param stat Stores the current loop position.
+         * @param k Reference to bookkeeper.
+         */
         void setup(LoopStatusMaster *stat, Bookkeeper *k);
-        void setNext(shared_ptr<LoopActionBase>& ptr);
+        
+        /**
+         * Executed once after all loops have finished.
+         */
+        virtual void closeOut() {}
+
+        /// Set the inner loop
+        void setNext(std::shared_ptr<LoopActionBase>& ptr);
+
+        /// Run this loop
         void execute();
 
+        /// Type of class implementing the loop
         std::type_index type() {
             return loopType;
         }
 
+        /// Set minimum value
         void setMin(unsigned v);
+        /// Set maximum value
         void setMax(unsigned v);
+        /// Set step value
         void setStep(unsigned v);
 
+        /// Configure this loop.
         virtual void loadConfig(const json &config) {}
+        /// Dump configuration of this loop.
         virtual void writeConfig(json &config) {}
-		
+
     protected:
+        /// Do at start of the loop
         virtual void init() {}
+        /// Do at end of the loop
         virtual void end() {}
+        /// Do at start of each step
         virtual void execPart1() {}
+        /// Do at end of each step
         virtual void execPart2() {}
+        /// Is loop complete
         virtual bool done();
 
-        bool m_done;
+        bool m_done = false;
 
-        double progress;
+        double progress = 0.0;
 
-        LoopStatusMaster *g_stat;
-        FrontEnd *g_fe;
-        TxCore *g_tx;
-        RxCore *g_rx;
-		Bookkeeper *keeper;
+        LoopStatusMaster *g_stat = nullptr;
+        FrontEnd *g_fe = nullptr;
+        TxCore *g_tx = nullptr;
+        RxCore *g_rx = nullptr;
+		Bookkeeper *keeper = nullptr;
 
         std::type_index loopType;
+
+        ClipBoard<HistogramBase> *loopHistos = nullptr;
 
     private:
         void execStep();
         void run();
 
-        shared_ptr<LoopActionBase> m_inner;
+        std::shared_ptr<LoopActionBase> m_inner;
 };
 
 #endif

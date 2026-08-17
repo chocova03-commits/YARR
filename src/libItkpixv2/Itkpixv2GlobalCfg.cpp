@@ -65,7 +65,7 @@ void Itkpixv2GlobalCfg::init() {
     }
 
     //0
-    PixPortal.init          (  0, &m_cfg[  0], 0, 16, 0); regMap["PixPortal"] = &Itkpixv2GlobalCfg::PixPortal;
+    PixPortal.init          (  0, m_cfg.data(), 0, 16, 0); regMap["PixPortal"] = &Itkpixv2GlobalCfg::PixPortal;
     //1
     PixRegionCol.init       (  1, &m_cfg[  1], 0, 16, 0); regMap["PixRegionCol"] = &Itkpixv2GlobalCfg::PixRegionCol;
     //2
@@ -309,7 +309,7 @@ void Itkpixv2GlobalCfg::init() {
     AuroraCBWait0.init      ( 94, &m_cfg[ 94], 4, 12, 4095); regMap["AuroraCBWait0"] = &Itkpixv2GlobalCfg::AuroraCBWait0;
     AuroraCBSend.init       ( 94, &m_cfg[ 94], 0,  4, 0); regMap["AuroraCBSend"] = &Itkpixv2GlobalCfg::AuroraCBSend;
     //95
-    AuroraInitWait.init     ( 95, &m_cfg[ 95], 0, 11, 32); regMap["AuroraInitWait"] = &Itkpixv2GlobalCfg::AuroraInitWait;
+    AuroraInitWait.init     ( 95, &m_cfg[ 95], 0, 11, 0); regMap["AuroraInitWait"] = &Itkpixv2GlobalCfg::AuroraInitWait;
     //96-97
     AuroraAltOutput1.init   ( 96, &m_cfg[ 96], 0, 4, 0); regMap["AuroraAltOutput1"] = &Itkpixv2GlobalCfg::AuroraAltOutput1;
     AuroraAltOutput0.init   ( 97, &m_cfg[ 97], 0, 16, 0); regMap["AuroraAltOutput0"] = &Itkpixv2GlobalCfg::AuroraAltOutput0;
@@ -345,7 +345,7 @@ void Itkpixv2GlobalCfg::init() {
     //108
     SerInvTap.init          ( 108, &m_cfg[ 108], 6,  2, 1); regMap["SerInvTap"] = &Itkpixv2GlobalCfg::SerInvTap;
     SerEnTap.init           ( 108, &m_cfg[ 108], 4,  2, 1); regMap["SerEnTap"] = &Itkpixv2GlobalCfg::SerEnTap;
-    SerEnLane.init          ( 108, &m_cfg[ 108], 0,  4, 8); regMap["SerEnLane"] = &Itkpixv2GlobalCfg::SerEnLane;
+    SerEnLane.init          ( 108, &m_cfg[ 108], 0,  4, 15); regMap["SerEnLane"] = &Itkpixv2GlobalCfg::SerEnLane;
     //109
     CmlBias2.init           ( 109, &m_cfg[ 109], 0, 10, 0); regMap["CmlBias2"] = &Itkpixv2GlobalCfg::CmlBias2;
     //110
@@ -446,10 +446,10 @@ void Itkpixv2GlobalCfg::init() {
 }
 
 void Itkpixv2GlobalCfg::writeConfig(json &j) {
-    for(auto it : regMap) {
+    for(const auto& it : regMap) {
         logger->debug("Writing reg: {}", it.first);
         j["ITKPIXV2"]["GlobalConfig"][it.first] = (this->*it.second).read();
-    }    
+    }
 }
 
 void Itkpixv2GlobalCfg::loadConfig(json const &j) {
@@ -458,7 +458,7 @@ void Itkpixv2GlobalCfg::loadConfig(json const &j) {
         return;
     }
     auto &jconfig = j["ITKPIXV2"]["GlobalConfig"];
-    for (auto it : regMap) {
+    for (const auto& it : regMap) {
         if (jconfig.contains(it.first)) {
             (this->*it.second).write(jconfig[it.first]);
         } else {

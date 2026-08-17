@@ -51,9 +51,9 @@ Histo3dT<DataT>::Histo3dT(const std::string &arg_name, unsigned arg_xbins, doubl
 }
 
 template<typename DataT>
-Histo3dT<DataT>::Histo3dT(std::string arg_name, unsigned arg_xbins, double arg_xlow, double arg_xhigh, 
-        unsigned arg_ybins, double arg_ylow, double arg_yhigh, 
-        unsigned arg_zbins, double arg_zlow, double arg_zhigh, 
+Histo3dT<DataT>::Histo3dT(const std::string& arg_name, unsigned arg_xbins, double arg_xlow, double arg_xhigh,
+        unsigned arg_ybins, double arg_ylow, double arg_yhigh,
+        unsigned arg_zbins, double arg_zlow, double arg_zhigh,
         const LoopStatus &stat)
   : HistogramBase(arg_name, stat)
 {
@@ -301,25 +301,34 @@ void Histo3dT<DataT>::toJson(json &j) const {
     for (unsigned i=0; i<lStat.size(); i++)
         j["loopStatus"][i] = (lStat.get(i));
 
-    for (unsigned int z=0; z<zbins; z++) {
-	for (unsigned int y=0; y<ybins; y++) {
-        	for (unsigned int x=0; x<xbins; x++) {
-            		j["Data"][x][y][z] = data[ (y+(x*ybins))*zbins + z ];
-        	}
+    if(xbins) {
+        j["Data"] = std::vector<json>(xbins);
+    }
+    for (unsigned int x=0; x<xbins; x++) {
+        if(ybins) {
+            j["Data"][x] = std::vector<json>(ybins);
+        }
+        for (unsigned int y=0; y<ybins; y++) {
+            if(zbins) {
+                j["Data"][x][y] = std::vector<json>(zbins);
+            }
+            for (unsigned int z=0; z<zbins; z++) {
+                j["Data"][x][y][z] = data[ (y+(x*ybins))*zbins + z ];
+            }
         }
     }
 }
 
 template<typename DataT>
 void Histo3dT<DataT>::toFile(const std::string &prefix, const std::string &dir, bool jsonType) const {
-    std::string filename = dir + prefix + "_" + name + ".dat";
+    std::string ext = "";
+    if (jsonType) 
+        ext = "json";
+    else
+        ext = "dat";
+    std::string filename = createFilename(prefix, dir, ext);
     std::fstream file(filename, std::fstream::out | std::fstream::trunc);
 
-    if (jsonType) {
-        filename += ".json";
-    } else {
-        filename += ".dat";
-    }
     json j;
     // jsonType
     if (jsonType) {
@@ -352,12 +361,31 @@ void Histo3dT<DataT>::toFile(const std::string &prefix, const std::string &dir, 
 
 template<typename DataT>
 bool Histo3dT<DataT>::fromFile(const std::string &filename) {
+    {
+        std::fstream jfile(filename, std::fstream::in);
+        if (!jfile.is_open()) {
+            hlog->error("Could not open file {}", filename);
+            return false;
+        }
+
+        try {
+            json j = json::parse(jfile);
+            if(fromJson(j)) {
+                return true;
+            }
+        } catch (json::parse_error &e) {
+            hlog->warn("Could not parse json file {}", filename);
+            // Drop through to read as normal file
+        }
+        jfile.close();
+    }
+
     std::fstream file(filename, std::fstream::in);
     // Check for header
     std::string line;
     std::getline(file, line);
     if (line.find("Histo3d") == std::string::npos) {
-        std::cerr << "ERROR: Tried loading 3d Histogram from file " << filename << ", but file has non or incorrect header" << std::endl;
+        hlog->error("ERROR: Tried loading 3d Histogram from file {}, but file has non or incorrect header", filename);
         file.close();
         return false;
     } else {
@@ -386,19 +414,28 @@ bool Histo3dT<DataT>::fromFile(const std::string &filename) {
 
 template<typename DataT>
 void Histo3dT<DataT>::plot(const std::string &prefix, const std::string &dir) const {
+    if(true) {
+        // It's difficult to know how to plot 3d data
+        hlog->info("Skip plotting 3d data in {}", HistogramBase::name);
+        return;
+    }
+
     hlog->info("Plotting {}", HistogramBase::name);
     // Put raw histo data in tmp file
     std::string tmp_name = std::string(getenv("USER")) + "/tmp_yarr_histo2d_" + prefix;
-    std::string output = dir + prefix + "_" + HistogramBase::name;
-    for (unsigned i=0; i<lStat.size(); i++)
-        output += "_" + std::to_string(lStat.get(i));
-    output += ".png";
+    auto check_terminal = getenv("YARR_GNUPLOT_TERMINAL");
+    std::string term_name = "png";
+    if(check_terminal != nullptr) {
+      term_name = check_terminal;
+    }
+
+    std::string output = createFilename(prefix, dir, term_name);
 
     // Open gnuplot as file and pipe commands
 
     std::string input;
 
-    input+="\"set terminal png size 1280, 1024;";
+    input+="\"set terminal " + term_name + " size 1280, 1024;";
     input+="set palette negative defined ( 0 '#D53E4F', 1 '#F46D43', 2 '#FDAE61', 3 '#FEE08B', 4 '#E6F598', 5 '#ABDDA4', 6 '#66C2A5', 7 '#3288BD');";
     input+="unset key;";
     input+="set title '"  +HistogramBase::name+"';";
@@ -418,8 +455,10 @@ void Histo3dT<DataT>::plot(const std::string &prefix, const std::string &dir) co
     FILE *gnu = popen(cmd.c_str(), "w");
     std::stringstream ss;
     toStream(ss);
-    fprintf(gnu,"%s",ss.str().c_str());
-    pclose(gnu);
+    if (fprintf(gnu,"%s",ss.str().c_str()) < 0)
+        hlog->warn("Failed to write histogram data to gnuplot");
+    if (pclose(gnu) != 0)
+        hlog->warn("gnuplot exited with error while plotting {}", name);
 }
 
 template<typename DataT>

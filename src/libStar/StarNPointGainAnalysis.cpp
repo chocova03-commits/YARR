@@ -5,26 +5,19 @@
 // # Description: Star N-Point Gain Analysis
 // ################################
 
-// #include <numeric>
 #include <map>
 #include <memory>
 #include <string>
-#include <tuple>
-#include <utility>
 #include <vector>
-#include <unistd.h> // needed to fix linker errors
  
 #include "AllAnalyses.h"
-#include "Histo1d.h"
-#include "Histo2d.h"
-#include "Histo3d.h"
 #include "ScanLoopInfo.h"
-#include "StarChips.h"
+#include "StarChips.h" // IWYU pragma: keep
+#include "StarConstants.h"
 #include "StarConversionTools.h"
 #include "StarNPointGainAnalysis.h"
 #include "StdAnalysis.h"
 
-#include "lmcurve.h"
 #include "logging.h"
 
 namespace {
@@ -55,6 +48,10 @@ double StarNPointGainAnalysis::convertThresholdUnit(double thr) {
     return m_convertBVTtomV ? m_conversionTool->convertBVTtomV(thr) : thr;
 }
 
+double StarNPointGainAnalysis::convertInputNoiseUnit(double noise) {
+    return m_conversionTool->convertfCtoENC(noise);
+}
+
 void StarNPointGainAnalysis::loadConfig(const json &j) {
     NPointGain::loadConfig(j);
 
@@ -67,19 +64,22 @@ void StarNPointGainAnalysis::loadConfig(const json &j) {
 
 std::vector<std::vector<double>> StarNPointGainAnalysis::createAverageResponseCurves() {
 
-    unsigned nChips = nCol / s_stripsPerRow;
-    std::vector<std::vector<double>> averages(nChips, std::vector<double>(m_injections.size()));
-    std::vector<std::vector<unsigned>> sizes(nChips, std::vector<unsigned>(m_injections.size()));
+    unsigned nChips = nCol / Star::StripsPerABCRow;
+    unsigned nInj = m_injections.size();
+    std::vector<std::vector<double>> averages(nChips, std::vector<double>(nInj));
 
-    for (const auto& inj : m_injections) {
-        for (unsigned col = 0; col < nCol; col++) {
-            unsigned chip = col / s_stripsPerRow;
+    for (unsigned injIdx = 0; injIdx < nInj; injIdx++) {
+        double inj = m_injections[injIdx];
+        for (unsigned chip = 0; chip < nChips; chip++) {
+            double sum = 0.;
             for (unsigned row = 0; row < nRow; row++) {
-                auto thr = m_thresholdMap[inj][col][row];
-                auto size = sizes[chip][inj];
-                averages[chip][inj] += (size * averages[chip][inj] * thr) / (size + 1);
-                sizes[chip][inj]++;
+                for (unsigned strip = 0; strip < Star::StripsPerABCRow; strip++) {
+                    unsigned col = (chip * Star::StripsPerABCRow) + strip;
+                    sum += m_thresholdMap[inj][col][row];
+                }
             }
+
+            averages[chip][injIdx] = sum / (nRow*Star::StripsPerABCRow);
         }
     }
 
@@ -91,9 +91,9 @@ void StarNPointGainAnalysis::end() {
     NPointGain::end();
 
     auto respCurvesByChip = createAverageResponseCurves();
-    for (unsigned chip = 0; chip < (nCol/s_stripsPerRow); chip++) {
+    for (unsigned chip = 0; chip < (nCol/Star::StripsPerABCRow); chip++) {
         // fit chip-avg response curve and fill output configuration
-        auto thresholds = respCurvesByChip[chip];
+        const auto& thresholds = respCurvesByChip[chip];
         std::vector<double> fitParams = guessInitialFitParams(thresholds);
         fitResponseCurve(thresholds, fitParams);
         m_conversionTool->setResponseParameters(fitParams, chip);

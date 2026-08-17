@@ -6,7 +6,10 @@
 
 #include "LoopActionBase.h"
 
+#include "Bookkeeper.h"
+
 #include "logging.h"
+#include "ScanProgress.h"
 
 namespace {
     auto llog = logging::make_log("LoopActionBase");
@@ -30,9 +33,10 @@ void LoopActionBase::setup(LoopStatusMaster *stat, Bookkeeper *k) {
     g_tx = k->tx;
     g_rx = k->rx;
 	keeper = k;
+    loopHistos = &k->getLoopHistograms();
 }
 
-void LoopActionBase::setNext(shared_ptr<LoopActionBase>& ptr) {
+void LoopActionBase::setNext(std::shared_ptr<LoopActionBase>& ptr) {
     m_inner = ptr;
 }
 
@@ -46,9 +50,15 @@ bool LoopActionBase::done() {
 
 void LoopActionBase::execStep() {
     this->execPart1();
-    
+
+    // Only mask/parameter loop levels drive the progress display; trigger/data
+    // loops iterate far too fast to recompute this on every step.
+    if (isMaskLoop() || isParameterLoop()) {
+        ScanProgress::instance().update(g_stat->record());
+    }
+
     if (m_inner) m_inner->execute();
-    
+
     this->execPart2();
 }
 

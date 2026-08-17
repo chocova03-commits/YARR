@@ -1,5 +1,8 @@
 #include "catch.hpp"
+#include <iostream>
 #include <sstream>
+
+#include "StarConstants.h"
 
 // Only one test needs std::filesystem
 #if defined(__clang__) || __GNUC__ > 7
@@ -10,6 +13,7 @@ namespace fs = std::filesystem;
 #endif
 
 #include "AllChips.h"
+#include "FrontEndCfg.h"
 #include "ScanHelper.h"
 
 void bounce_check(json &j, std::string fe_name) {
@@ -74,6 +78,9 @@ TEST_CASE("StarJsonDefault", "[star][json]") {
   json output;
     fecfg->writeConfig(output);
 
+  // Default config is for barrel
+  CHECK(output["ABCs"]["IDs"].size() == 10);
+
   // debugging
   // output.dump(4);
 
@@ -109,6 +116,8 @@ TEST_CASE("StarJsonMinimal", "[star][json]") {
   json output;
     fecfg->writeConfig(output);
 
+  CHECK(!output["ABCs"].contains("IDs"));
+
   REQUIRE(output["name"] == cfg["name"]);
 
   REQUIRE(output["HCC"]["ID"] == cfg["HCC"]["ID"]);
@@ -141,6 +150,8 @@ TEST_CASE("StarJsonMinimalABC", "[star][json]") {
 
   cfg["name"] = "testname";
   cfg["HCC"]["ID"] = 12;
+  // Doesn't matter as long as 2 bits are set
+  cfg["HCC"]["subregs"]["ICENABLE"] = 10;
 
   for(int i=0; i<2; i++) {
     cfg["ABCs"]["IDs"][i] = i+3;
@@ -157,6 +168,8 @@ TEST_CASE("StarJsonMinimalABC", "[star][json]") {
   REQUIRE(output["name"] == cfg["name"]);
 
   REQUIRE(output["HCC"]["ID"] == cfg["HCC"]["ID"]);
+
+  CHECK(output["ABCs"]["IDs"].size() == 2);
 
   for(int i=0; i<2; i++) {
     CAPTURE(i);
@@ -223,9 +236,9 @@ TEST_CASE("StarJsonHccRegs", "[star][json]") {
   // debugging
   // output.dump(4);
 
-  // REQUIRE(fecfg->numABCs() == 0);
-
   REQUIRE(output["name"] == cfg["name"]);
+
+  CHECK(!output["ABCs"].contains("IDs"));
 
   REQUIRE(output["HCC"]["ID"] == cfg["HCC"]["ID"]);
   REQUIRE(output["HCC"]["regs"]["Delay1"] == "12345678");
@@ -260,6 +273,8 @@ TEST_CASE("StarJsonAbcRegs", "[star][json]") {
   cfg["name"] = "testname";
 
   cfg["HCC"]["ID"] = 12;
+  // Doesn't matter as long as 2 bits are set
+  cfg["HCC"]["subregs"]["ICENABLE"] = 12;
 
   cfg["ABCs"]["IDs"][0] = 4;
   cfg["ABCs"]["IDs"][1] = 6;
@@ -279,6 +294,8 @@ TEST_CASE("StarJsonAbcRegs", "[star][json]") {
   // output.dump(4);
 
   REQUIRE(output["name"] == cfg["name"]);
+
+  CHECK(output["ABCs"]["IDs"].size() == 2);
 
   // Output is simply all registers in hex
   std::string outVal = output["ABCs"]["regs"][0]["ADCS1"];
@@ -307,6 +324,8 @@ TEST_CASE("StarJsonAbcMasks", "[star][json]") {
   cfg["name"] = "testname";
 
   cfg["HCC"]["ID"] = 12;
+  // Doesn't matter as long as 2 bits are set
+  cfg["HCC"]["subregs"]["ICENABLE"] = 12;
 
   cfg["ABCs"]["IDs"][0] = 4;
   cfg["ABCs"]["IDs"][1] = 6;
@@ -333,6 +352,8 @@ TEST_CASE("StarJsonAbcMasks", "[star][json]") {
   // output.dump(4);
 
   REQUIRE(output["name"] == cfg["name"]);
+
+  CHECK(output["ABCs"]["IDs"].size() == 2);
 
   REQUIRE(output["ABCs"]["masked"] == cfg["ABCs"]["masked"]);
 
@@ -366,6 +387,8 @@ TEST_CASE("StarJsonAbcSubRegs", "[star][json]") {
   cfg["name"] = "testname";
 
   cfg["HCC"]["ID"] = 12;
+  // Doesn't matter as long as 2 bits are set
+  cfg["HCC"]["subregs"]["ICENABLE"] = 12;
 
   cfg["ABCs"]["IDs"][0] = 4;
   cfg["ABCs"]["IDs"][1] = 6;
@@ -385,6 +408,8 @@ TEST_CASE("StarJsonAbcSubRegs", "[star][json]") {
   // output.dump(4);
 
   REQUIRE(output["name"] == cfg["name"]);
+
+  CHECK(output["ABCs"]["IDs"].size() == 2);
 
   // Output is simply all registers in hex
   std::string outVal = output["ABCs"]["regs"][0][lcb_thr_reg];
@@ -414,12 +439,14 @@ TEST_CASE("StarJsonAbcTrim", "[star][json]") {
   cfg["name"] = "testname";
 
   cfg["HCC"]["ID"] = 12;
+  // Doesn't matter as long as 2 bits are set
+  cfg["HCC"]["subregs"]["ICENABLE"] = 12;
 
   cfg["ABCs"]["IDs"][0] = 4;
   cfg["ABCs"]["IDs"][1] = 6;
 
   cfg["ABCs"]["trims"][0] = 13;
-  for(int i=0; i<256; i++) {
+  for(int i=0; i<Star::StripsPerABC; i++) {
     cfg["ABCs"]["trims"][1][i] = (i*13)%32;
   }
 
@@ -437,6 +464,8 @@ TEST_CASE("StarJsonAbcTrim", "[star][json]") {
   // output.dump(4);
 
   REQUIRE(output["name"] == cfg["name"]);
+
+  CHECK(output["ABCs"]["IDs"].size() == 2);
 
   REQUIRE(output["ABCs"]["trims"] == cfg["ABCs"]["trims"]);
 
@@ -460,6 +489,8 @@ TEST_CASE("StarJsonAbcCommon", "[star][json]") {
   cfg["name"] = "testname";
 
   cfg["HCC"]["ID"] = 12;
+  // Doesn't matter as long as 3 bits are set
+  cfg["HCC"]["subregs"]["ICENABLE"] = 13;
 
   cfg["ABCs"]["IDs"][0] = 4;
   cfg["ABCs"]["IDs"][1] = 6;
@@ -483,6 +514,8 @@ TEST_CASE("StarJsonAbcCommon", "[star][json]") {
   //output.dump(4);
 
   REQUIRE(output["name"] == cfg["name"]);
+
+  CHECK(output["ABCs"]["IDs"].size() == 3);
 
   auto check = [&](int i, std::string val) {
     std::string out_val = output["ABCs"]["regs"][i]["ADCS2"];
@@ -514,6 +547,8 @@ TEST_CASE("StarJsonNullChan", "[star][json]") {
   cfg["name"] = "testname";
 
   cfg["HCC"]["ID"] = 12;
+  // Doesn't matter as long as 4 bits are set
+  cfg["HCC"]["subregs"]["ICENABLE"] = 0x1e;
 
   cfg["ABCs"]["IDs"][0] = 4;
   cfg["ABCs"]["IDs"][1] = nullptr;
@@ -538,6 +573,8 @@ TEST_CASE("StarJsonNullChan", "[star][json]") {
   //output.dump(4);
 
   REQUIRE(output["name"] == cfg["name"]);
+
+  CHECK(output["ABCs"]["IDs"].size() == 4);
 
   auto check = [&](int i, std::string val, int abcID, bool is_null) {
     std::string out_val = "none";

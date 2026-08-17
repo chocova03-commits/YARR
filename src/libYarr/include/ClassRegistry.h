@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <map>
+#include <stdexcept>
 #include <string>
 
 template <typename T, typename... A>
@@ -17,7 +18,7 @@ class ClassRegistry {
 
     bool registerClass(std::string name,
                        FunctionType func) {
-        registry[name] = func;
+        registry[std::move(name)] = std::move(func);
         return true;
     }
 

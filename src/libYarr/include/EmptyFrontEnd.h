@@ -7,6 +7,9 @@
 // ################################
 
 #include "FrontEnd.h"
+#include "FrontEndCfg.h"
+
+#include "HwController.h"
 
 class EmptyFrontEndCfg : public FrontEndCfg {
     public:
@@ -19,8 +22,8 @@ class EmptyFrontEndCfg : public FrontEndCfg {
         void writeConfig(json &) override {}
         void loadConfig(const json &) override {}
 
-        unsigned getPixelEn(unsigned col, unsigned row) override { return 0; }
-        void maskPixel(unsigned col, unsigned row) override {}
+        unsigned getPixelEn(unsigned col, unsigned row, bool doAltMask = false) override { return 0; }
+        void maskPixel(unsigned col, unsigned row, bool doAltMask = false) override {}
         void enableAll() override {}
 };
 

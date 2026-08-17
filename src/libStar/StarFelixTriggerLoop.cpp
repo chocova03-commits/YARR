@@ -1,4 +1,6 @@
 #include "StarFelixTriggerLoop.h"
+
+#include "Bookkeeper.h"
 #include "LCBUtils.h"
 #include "LCBFwUtils.h"
 #include "AbcCfg.h"
@@ -15,8 +17,8 @@ namespace {
 
 StarFelixTriggerLoop::StarFelixTriggerLoop()
   : LoopActionBase(LOOP_STYLE_TRIGGER),
-    m_nTrigsTrickle(0),
-    m_trigWord{}
+    m_trigWord{},
+    m_nTrigsTrickle(0)
 {
   setTrigCnt(50); // Maximum number of triggers to send
   min = 0;
@@ -28,6 +30,9 @@ StarFelixTriggerLoop::StarFelixTriggerLoop()
 void StarFelixTriggerLoop::init() {
   m_done = false;
   logger->debug("init");
+
+  // Check the size of memory for the trigger sequence
+  checkSequenceMemSize();
 
   // Get the list of enabled channels for sending LCB commands
   std::vector<uint32_t> lcb_elinks = keeper->getTxMaskUnique();
@@ -79,7 +84,7 @@ void StarFelixTriggerLoop::init() {
   // Enable the LCB configuration elinks for setting TRICKLE_TRIGGER_PULSE
   g_tx->setCmdEnable(config_elinks);
 
-  while(!g_tx->isCmdEmpty());
+  g_tx->waitCmdEmpty();
 }
 
 void StarFelixTriggerLoop::execPart1() {
@@ -103,7 +108,7 @@ void StarFelixTriggerLoop::end() {
   // Go back to general state of FE, do something here (if needed)
   g_tx->setCmdEnable(keeper->getTxMask());
 
-  while(!g_tx->isCmdEmpty());
+  g_tx->waitCmdEmpty();
 }
 
 void StarFelixTriggerLoop::setTrigWord() {
@@ -123,6 +128,7 @@ void StarFelixTriggerLoop::writeConfig(json &config) {
   config["useHitCount"] = m_useHitCount;
   config["trickle_frequency"] = m_trickleFreq;
   config["fpath_sequence"] = m_fpathSeq;
+  config["sequence_address_width"] = m_seqMemAddrWidth;
 }
 
 void StarFelixTriggerLoop::loadConfig(const json &config) {
@@ -157,6 +163,9 @@ void StarFelixTriggerLoop::loadConfig(const json &config) {
       m_seqGen.load(m_fpathSeq);
     }
   }
+
+  if (config.contains("sequence_address_width"))
+    m_seqMemAddrWidth = config["sequence_address_width"];
 
   // make trickle sequence
   if (not m_seqGen.empty()) {
@@ -327,7 +336,8 @@ std::vector<uint8_t> StarFelixTriggerLoop::getHitCounterSegment() {
   // configuration registers on FELIX could be set accordingly.
 
   // Loop over hit counter registers
-  for (unsigned addr = ABCStarRegister::HitCountREG0; addr <= ABCStarRegister::HitCountREG63; addr++) {
+  for (auto reg = ABCStarRegister::HitCountREG0; reg <= ABCStarRegister::HitCountREG63; ++reg) {
+    unsigned addr = (unsigned)reg;
     auto rr = LCB_FELIX::read_abc_register(addr);
     readHitCounts.insert(readHitCounts.end(), rr.begin(), rr.end());
 
@@ -362,6 +372,9 @@ Also computed or modified are:
 */
 void StarFelixTriggerLoop::makeTrickleSequence() {
 
+  // depth of the sequence memory
+  const unsigned TRICKLE_MEM_SIZE = (1<<m_seqMemAddrWidth);
+
   m_trickleSeq.clear();
 
   //////
@@ -370,7 +383,7 @@ void StarFelixTriggerLoop::makeTrickleSequence() {
 
   // Add some register commands as pre-buffering for the command decoder
   // Read HCC OPmode register
-  auto hccRR = LCB_FELIX::read_hcc_register(HCCStarRegister::OPmode);
+  auto hccRR = LCB_FELIX::read_hcc_register((int)HCCStarRegister::OPmode);
   trickleSeq_pre.insert(trickleSeq_pre.end(), hccRR.begin(), hccRR.end());
 
   // Stop hit counters
@@ -424,7 +437,7 @@ void StarFelixTriggerLoop::makeTrickleSequence() {
 
   // The number of trigger segments per burst is also constrained by the trickle
   // memory size
-  unsigned bytes_available = LCB_FELIX::TRICKLE_MEM_SIZE - trickleSeq_pre.size() - trickleSeq_post.size() - hitcount_seg.size();
+  unsigned bytes_available = TRICKLE_MEM_SIZE - trickleSeq_pre.size() - trickleSeq_post.size() - hitcount_seg.size();
   unsigned nMaxSeg_by_size = bytes_available / trigger_seg.size();
 
   if (nMaxSeg_by_size == 0) {
@@ -478,17 +491,17 @@ void StarFelixTriggerLoop::makeTrickleSequence() {
 
   // The trigger burst can be repeated to fill up the trickle memory
   // Max number of repetitions allowed by size
-  int nBurstMax = (LCB_FELIX::TRICKLE_MEM_SIZE - trickleSeq_pre.size() - trickleSeq_post.size()) / trickleSeq_burst.size();
+  unsigned int nBurstMax = (TRICKLE_MEM_SIZE - trickleSeq_pre.size() - trickleSeq_post.size()) / trickleSeq_burst.size();
 
   if (nBurstMax < 1) {
     logger->error("No triggers are written to the trickle memory!");
   }
 
   // Number of trickleSeq_burst needed to send the required number of triggers
-  int nBurstNeed = std::ceil(static_cast<float>(getTrigCnt()) / ntrig_per_burst);
+  unsigned int nBurstNeed = std::ceil(static_cast<float>(getTrigCnt()) / ntrig_per_burst);
 
   // The actual number of times to repeat trickleSeq_burst in the trickle memory
-  int nBurst = std::min(nBurstNeed, nBurstMax);
+  unsigned int nBurst = std::min(nBurstNeed, nBurstMax);
 
   logger->debug("nBurstNeed = {}", nBurstNeed);
   logger->debug("nBurstMax = {}", nBurstMax);
@@ -551,4 +564,23 @@ void StarFelixTriggerLoop::makeTrickleSequenceFromFile() {
   // Update the expected number of triggers for analysis
   unsigned nTotalTrigs = m_nPulse * m_nTrigsTrickle;
   setTrigCnt(nTotalTrigs);
+}
+
+bool StarFelixTriggerLoop::checkSequenceMemSize() {
+  logger->debug("Check the size of the trickle memory");
+
+  uint64_t SEQRAM_ADDR_WIDTH = 0;
+  bool success = g_tx->readFwRegister("STRIPS_ENCODING_CFG_SEQRAM_ADDR_WIDTH", SEQRAM_ADDR_WIDTH);
+
+  if (not success) {
+    logger->warn("Fail to read register STRIPS_ENCODING_CFG_SEQRAM_ADDR_WIDTH");
+  }
+
+  if (SEQRAM_ADDR_WIDTH==m_seqMemAddrWidth) {
+    logger->debug("STRIPS_ENCODING_CFG_SEQRAM_ADDR_WIDTH = {}", SEQRAM_ADDR_WIDTH);
+    return true;
+  } else {
+    logger->error("The depth of sequence memory in the firmware (STRIPS_ENCODING_CFG_SEQRAM_ADDR_WIDTH = {}) does not match the configured value (\"sequence_address_width\" = {})! Triggers are likely to be lost!", SEQRAM_ADDR_WIDTH, m_seqMemAddrWidth);
+    return false;
+  }
 }

@@ -14,9 +14,12 @@
 
 #include "LoopStatus.h"
 
-
+/**
+ * A block of raw data.
+ */
 class RawData {
     public:
+        /** Associate data with channel */
         RawData(uint32_t arg_adr, unsigned arg_words) {
             adr = arg_adr;
             buf.resize(arg_words, 0);    
@@ -45,7 +48,15 @@ class RawData {
             return adr;
         }
 
+        virtual inline uint32_t getAdr() const {
+            return adr;
+        }
+
         virtual inline uint32_t* getBuf() {
+            return buf.data();
+        }
+
+        virtual inline const uint32_t* getBuf() const {
             return buf.data();
         }
 
@@ -62,27 +73,36 @@ class RawData {
         }
         
     protected:
+        /// The buffer
         std::vector<uint32_t> buf;
+        /// Address of rx channel
         uint32_t adr;
 };
 
 using RawDataPtr = std::shared_ptr<RawData>;
 
+/**
+ * Array of RawData's. LoopStatus is common.
+ */
 class RawDataContainer {
     public:
-        RawDataContainer(LoopStatus &&s) : stat(s) {}
+        /** Create empty container */
+        RawDataContainer(const LoopStatus &s) : stat(s) {}
         
+        /** Destroy attached RawData. */
         ~RawDataContainer()=default;
 
-        inline void add(std::shared_ptr<RawData> arg_data) {
+        /** Add data to collection */
+        inline void add(RawDataPtr arg_data) {
             data.push_back(arg_data);
         }
 
+        /** Return size of collection */
         inline unsigned size() const {
             return data.size();
         }
 
-        std::vector<std::shared_ptr<RawData>> data;
+        std::vector<RawDataPtr> data;
         LoopStatus stat;
 };
 

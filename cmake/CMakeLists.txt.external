@@ -1,138 +1,265 @@
 # Plotting tools
 include(ExternalProject)
 include(FetchContent)
-function(YARR_ADD_PLOTTING)
-    ExternalProject_Add (
-        plotting_tools
-        GIT_REPOSITORY https://gitlab.cern.ch/YARR/utilities/plotting-tools.git
-        GIT_TAG master
-        CMAKE_ARGS "-DTARGET_INSTALL_AREA=${TARGET_INSTALL_AREA}"
-        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/external"
-	INSTALL_COMMAND make install
-        )
-endfunction()
 
-# TBB
-function(YARR_ADD_TBB)
-    if (TARGET tbb_2020)
-        return()
-    endif()
+include(cmake/SupportFunctionsLibrary.cmake)
 
-    ExternalProject_Add (
-        tbb_2020
-        GIT_REPOSITORY https://github.com/intel/tbb.git
-        GIT_TAG 2020_U2
-        UPDATE_COMMAND ""
-        INSTALL_COMMAND ${PROJECT_SOURCE_DIR}/scripts/install_tbb.sh ${CMAKE_CURRENT_BINARY_DIR}  ${CMAKE_CURRENT_BINARY_DIR}
-        BUILD_COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/external/src/tbb_2020 &&  make -j4 ${TBB_COMP} ${TBB_ARCH} extra_inc=big_iron.inc
-        CONFIGURE_COMMAND ""
-        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/external"
-        )
-    link_directories(${CMAKE_CURRENT_BINARY_DIR}/lib)
-    include_directories(${CMAKE_CURRENT_BINARY_DIR}/external/src/tbb_2020/include)
-endfunction()
+if(YARR_FELIX_BACKEND)
+    # It has been already included previously.
+    return()
+endif()
 
-function(YARR_ADD_NETIO)
-    if (TARGET netio4)
-        return()
-    endif()
-
-    # NetIO
-    ExternalProject_Add (
-        netio4
-        GIT_REPOSITORY https://:@gitlab.cern.ch:8443/atlas-tdaq-felix/netio.git
-        GIT_TAG netio-11-01-00
-        UPDATE_COMMAND ""
-        PATCH_COMMAND cp ${PROJECT_SOURCE_DIR}/cmake/CMakeLists.txt.netio ${CMAKE_CURRENT_BINARY_DIR}/external/src/netio4/CMakeLists.txt
-        INSTALL_COMMAND ""
-        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/external"
-        CMAKE_ARGS "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}" -DCMAKE_CXX_FLAGS=-fPIC
-        DEPENDS tbb_2020
-        )
-
-    include_directories(${CMAKE_CURRENT_BINARY_DIR}/external/src/netio4)
-    link_directories(${CMAKE_CURRENT_BINARY_DIR}/external/src/netio4-build)
-endfunction()
-
-function(YARR_ADD_FELIX)
-    if (TARGET felixbase4)
-        return()
-    endif()
-
-    # FELIX
-    ExternalProject_Add (
-        felixbase4
-        GIT_REPOSITORY https://:@gitlab.cern.ch:8443/atlas-tdaq-felix/felixbase.git
-        GIT_TAG felix-4.0.x
-        UPDATE_COMMAND ""
-        PATCH_COMMAND ""
-        INSTALL_COMMAND ""
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND ""
-        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/external"
-        DEPENDS netio4
-        )
-
-    include_directories(${CMAKE_CURRENT_BINARY_DIR}/external/src/felixbase4)
-endfunction()
+set(USE_SYSTEM_FELIX OFF)
+set(Felix_ROOT "" CACHE PATH "Path to pre-compiled FELIX")
+if (NOT "${Felix_ROOT}" STREQUAL "")
+    set(USE_SYSTEM_FELIX ON)
+    set(YARR_FELIX_BACKEND "NONE")
+endif()
 
 function(YARR_ADD_FELIX_CLIENT)
-    # FELIX Client Thread
-    ExternalProject_Add (
-        felix_client_thread
-        GIT_REPOSITORY https://gitlab.cern.ch/atlas-tdaq-felix/felix-client-thread.git
-        GIT_TAG master
-        UPDATE_COMMAND ""
-        PATCH_COMMAND ""
-        INSTALL_COMMAND mkdir -p ${TARGET_INSTALL_AREA}/lib && cp ${CMAKE_CURRENT_BINARY_DIR}/external/src/felix_client_thread/libfelix-client-thread.so ${TARGET_INSTALL_AREA}/lib
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/external/src/felix_client_thread && ./build-standalone.sh
-        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/external"
-        )
+    set(YARR_FELIX_BACKEND "NONE" PARENT_SCOPE)
 
-    link_directories(${CMAKE_CURRENT_BINARY_DIR}/external/src/felix_client_thread)
-    include_directories(${CMAKE_CURRENT_BINARY_DIR}/external/src/felix_client_thread)
-    include_directories(${CMAKE_CURRENT_BINARY_DIR}/external/src/felix_client_thread/felix-interface)
+    if (USE_SYSTEM_FELIX)
+        message(STATUS "Using pre-compiled FELIX from ${Felix_ROOT}")
+        set(YARR_FELIX_COMPONENTS felix-client-thread felix-interface)
+        if(YARR_ENABLE_FELIX_CLIENT_BRIDGE)
+            list(APPEND YARR_FELIX_COMPONENTS felix-server)
+        endif()
+        find_package(Felix
+                     REQUIRED COMPONENTS ${YARR_FELIX_COMPONENTS}
+                     HINTS "${Felix_ROOT}")
+        if(TARGET felix::felix-io-client)
+            message(STATUS "Using felix-io-client target provided by Felix")
+        else()
+            message(STATUS "SYSTEM FELIX does not offer felix-io-client. Assuming <=05.02.00. Trying to find package directly.")
+            find_package(felix-io-client
+                     REQUIRED
+                     CONFIG
+                     HINTS "${Felix_ROOT}")
+        endif()
+        if(NOT (TARGET felix::felix-io-client OR TARGET felix-io-client::felix-io-client))
+            message(FATAL_ERROR
+                "Could not find required target felix-io-client, "
+                "neither via Felix nor via standalone felix-io-client package"
+            )
+        endif()        
+        set(YARR_FELIX_BACKEND "FELIX_CLIENT_SYSTEM" PARENT_SCOPE)
+        return()
+    endif()
+
+    if (TARGET tdaq::felix_proxy)
+        message(STATUS "TDAQ is available, using felix-proxy instead")
+
+        set(YARR_FELIX_BACKEND "FELIX_PROXY" PARENT_SCOPE)
+        # Just works, with tdaq_add_library tdaq::felix_proxy
+        return()
+    endif()
+
+   if((CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15.0) AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
+        message(STATUS "Cannot build FELIX with GCC version < 15.")
+   else()
+      # FELIX Def (provides felix_fid.h, felix_ports.h, felix_protocols.h, etc.)
+     FetchContent_Declare(
+         felixdef
+         GIT_REPOSITORY https://gitlab.cern.ch/atlas-tdaq-felix/felix-def.git
+         GIT_TAG master
+         UPDATE_COMMAND ""
+         PATCH_COMMAND
+              cp ${PROJECT_SOURCE_DIR}/cmake/felix-def-patches/CMakeLists.txt.felix-def CMakeLists.txt
+      )
+     FetchContent_MakeAvailable(felixdef)
+
+     # FELIX Interface
+     FetchContent_Declare (
+          felixinterface
+          GIT_REPOSITORY https://gitlab.cern.ch/atlas-tdaq-felix/felix-interface.git
+          GIT_TAG master
+          UPDATE_COMMAND ""
+          PATCH_COMMAND 
+               cp ${PROJECT_SOURCE_DIR}/cmake/felix-interface-patches/CMakeLists.txt.felix-interface CMakeLists.txt &&
+               cp ${PROJECT_SOURCE_DIR}/cmake/felix-interface-patches/felix-interfaceConfig.cmake.in felix-interfaceConfig.cmake.in
+          )
+      FetchContent_MakeAvailable(felixinterface)
+
+      # FELIX Client Thread    
+      FetchContent_Declare (
+          felixclientthread
+          GIT_REPOSITORY https://gitlab.cern.ch/atlas-tdaq-felix/felix-client-thread.git
+          GIT_TAG master
+          UPDATE_COMMAND ""
+          PATCH_COMMAND 
+               cp ${PROJECT_SOURCE_DIR}/cmake/felix-client-thread-patches/CMakeLists.txt.felix-client-thread CMakeLists.txt &&
+               cp ${PROJECT_SOURCE_DIR}/cmake/felix-client-thread-patches/felix-client-threadConfig.cmake.in felix-client-threadConfig.cmake.in
+          )
+      FetchContent_MakeAvailable(felixclientthread)
+
+      # nlohmann_json (required by felix-io-client)
+      if(NOT TARGET nlohmann_json::nlohmann_json)
+        FetchContent_Declare(
+            nlohmann_json
+            GIT_REPOSITORY https://github.com/nlohmann/json.git
+            GIT_TAG v3.11.3
+            UPDATE_COMMAND ""
+        )
+        FetchContent_MakeAvailable(nlohmann_json)
+      endif()
+
+      # FELIX IO Client
+      FetchContent_Declare (
+          felixioclient
+          GIT_REPOSITORY https://gitlab.cern.ch/atlas-tdaq-felix/felix-io-client.git
+          GIT_TAG master
+          UPDATE_COMMAND ""
+          PATCH_COMMAND
+               cp ${PROJECT_SOURCE_DIR}/cmake/felix-io-patches/CMakeLists.txt.felix-io-client CMakeLists.txt &&
+               cp ${PROJECT_SOURCE_DIR}/cmake/felix-io-patches/felix-io-clientConfig.cmake.in felix-io-clientConfig.cmake.in
+          )
+       FetchContent_MakeAvailable(felixioclient)
+
+       set(YARR_FELIX_BACKEND "FELIX_CLIENT_EMBEDDED" PARENT_SCOPE)
+       return()
+    endif()
+    
+    message(WARNING "Attempt to get any version of FELIX failed.")
 
 endfunction()
 
-function(YARR_ADD_EXTERNAL_DEPS)
-    # spdlog
-    FetchContent_Declare(
-        spdlog
-        GIT_REPOSITORY  https://gitlab.cern.ch/atlas-sw-misc/spdlog.git
-        GIT_TAG v1.9.2.x
-        SOURCE_SUBDIR  spdlog
-    )
-    FetchContent_MakeAvailable(spdlog)
-    include_directories(${CMAKE_CURRENT_BINARY_DIR}/../_deps/spdlog-src/include)
+include(CMakeDependentOption)
+option(YARR_USE_FETCHCONTENT_SPDLOG "Use FetchContent to get spdlog if not found" ON)
+cmake_dependent_option(YARR_FORCE_FETCHCONTENT_SPDLOG "Force FetchContent even if spdlog is found" OFF YARR_USE_FETCHCONTENT_SPDLOG OFF)
 
+# Consistency checks
+if(YARR_FORCE_FETCHCONTENT_SPDLOG AND NOT YARR_USE_FETCHCONTENT_SPDLOG)
+  message(FATAL_ERROR "YARR_FORCE_FETCHCONTENT_SPDLOG requires YARR_USE_FETCHCONTENT_SPDLOG to be ON.")
+endif()
+
+# Determine the mode as a string (for caching and comparison)
+if(YARR_FORCE_FETCHCONTENT_SPDLOG)
+  set(YARR_SPDLOG_BACKEND "FORCE_FETCHCONTENT")
+elseif(YARR_USE_FETCHCONTENT_SPDLOG)
+  set(YARR_SPDLOG_BACKEND "FETCH_IF_NOT_FOUND")
+else()
+  set(YARR_SPDLOG_BACKEND "FIND_PACKAGE")
+endif()
+
+# Save this mode to the cache
+set(YARR_SPDLOG_BACKEND ${YARR_SPDLOG_BACKEND} CACHE STRING "How spdlog was integrated in the build")
+
+# Compare against previous config if already defined
+if(DEFINED YARR_SPDLOG_BACKEND_PREV)
+    if(NOT YARR_SPDLOG_BACKEND STREQUAL YARR_SPDLOG_BACKEND_PREV)
+        message(WARNING "Changing spdlog backend integration mode from ${YARR_SPDLOG_BACKEND_PREV} to ${YARR_SPDLOG_BACKEND}. This may cause problems if the build directory is not cleaned. Consider removing your build dir or clearing the CMake cache.")
+    endif()
+endif()
+
+# Save the current mode for future comparisons
+set(YARR_SPDLOG_BACKEND_PREV ${YARR_SPDLOG_BACKEND} CACHE INTERNAL "Previous spdlog integration mode")
+
+
+function(YARR_ADD_SPDLOG)
+
+    # Skip everything if the target already exists as it was already added by the parent project (likely).
+    if(TARGET yarrspdlog)
+        message(STATUS "Using existing spdlog target: yarrspdlog is already defined which indicates that at some point the function YARR_ADD_EXTERNAL_DEPS gets called for a second time. Re-running cmake configure step?")
+        return()
+    endif()
+    
+    if(TARGET spdlog::spdlog)
+        message(STATUS "Using existing spdlog target (spdlog::spdlog already defined). Added by parent project?")
+        if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+            message(STATUS "Yes, seems like YARR is getting built by another project by using add_subdirectory() or FetchContent(). Strong indication that this is where we got spdlog.")
+        else()
+            message(STATUS "No, it has to be something else.")
+        endif()
+        
+        message(STATUS "In any case defining yarrspdlog using the existing spdlog::spdlog target.")
+        add_library(yarrspdlog INTERFACE)
+        target_link_libraries(yarrspdlog INTERFACE spdlog::spdlog)
+        target_compile_definitions(yarrspdlog INTERFACE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_${YARR_ACTIVE_LOGGER_LEVEL})
+        
+        
+        target_link_libraries(yarrspdlog INTERFACE
+            $<BUILD_INTERFACE:spdlog::spdlog>
+        )
+        
+        install(TARGETS yarrspdlog EXPORT YarrTargets)
+        
+        set(YARR_HAS_BUILTIN_SPDLOG FALSE CACHE INTERNAL "Whether Yarr provides its own spdlog")
+        return()
+    endif()
+    
+    if(NOT YARR_FORCE_FETCHCONTENT_SPDLOG)
+        message(STATUS "Trying to find system spdlog.")
+        cmake_policy(PUSH)
+        if(POLICY CMP0144)
+            cmake_policy(SET CMP0144 NEW)
+        else()
+            if(DEFINED ENV{spdlog_ROOT} AND NOT DEFINED ENV{SPDLOG_ROOT})
+                set(ENV{SPDLOG_ROOT} "$ENV{spdlog_ROOT}")
+            endif()
+        endif()
+        find_package(spdlog QUIET)
+        cmake_policy(POP)
+        if(spdlog_FOUND)
+            message(STATUS "Using system provided spdlog")
+
+            add_library(yarrspdlog INTERFACE)
+            target_link_libraries(yarrspdlog INTERFACE spdlog::spdlog_header_only)
+            target_compile_definitions(yarrspdlog INTERFACE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_${YARR_ACTIVE_LOGGER_LEVEL})
+            install(TARGETS yarrspdlog EXPORT YarrTargets)
+            
+            set(YARR_HAS_BUILTIN_SPDLOG FALSE CACHE INTERNAL "Whether Yarr provides its own spdlog")    
+            return()
+         else()
+             message(STATUS "No system spdlog found.")
+         endif()
+    endif()
+    
+    if(YARR_USE_FETCHCONTENT_SPDLOG)
+       message(STATUS "Downloading spdlog library.")
+       FetchContent_Declare(
+           spdlog
+           GIT_REPOSITORY  https://github.com/gabime/spdlog.git
+           GIT_TAG v1.15.3
+       )
+    
+       FetchContent_Populate(spdlog)
+
+       # Create a custom header-only target for spdlog as the export does not work properly in version 1.9.2.x To be re-visited if it gets updated.
+       add_library(yarrspdlog INTERFACE)
+
+       target_include_directories(yarrspdlog INTERFACE
+          "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+          "$<BUILD_INTERFACE:${spdlog_SOURCE_DIR}/include>"
+       )
+
+       # Dependencies of yarrspdlog
+       find_package(Threads)
+       target_link_libraries(yarrspdlog INTERFACE Threads::Threads)
+
+       # Level below which logger macros are not enabled
+       target_compile_definitions(yarrspdlog INTERFACE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_${YARR_ACTIVE_LOGGER_LEVEL})
+
+       # Export the target manually
+       install(TARGETS yarrspdlog EXPORT YarrTargets)
+
+       # Install the headers and the target
+
+       install(DIRECTORY ${spdlog_SOURCE_DIR}/include/
+          DESTINATION ${CMAKE_INSTALL_PREFIX}/include
+       )
+       set(YARR_HAS_BUILTIN_SPDLOG TRUE CACHE INTERNAL "Whether Yarr provides its own spdlog")
+       return()
+    endif()
+    message(FATAL_ERROR "spdlog not found and either failed no not allowed to fetch it (check YARR_USE_FETCHCONTENT_SPDLOG and YARR_FORCE_FETCHCONTENT_SPDLOG)")
 endfunction()
 
 function(YARR_ADD_PYBIND11)
    FetchContent_Declare(
        pybind11
        GIT_REPOSITORY https://github.com/pybind/pybind11.git
-       GIT_TAG v2.9.2
-       SOURCE_SUBDIR pybind11
+       GIT_TAG v2.13.6
+#       SOURCE_SUBDIR pybind11
    )
-   FetchContent_GetProperties(pybind11)
-   if(NOT pybind11_POPULATED)
-       FetchContent_Populate(pybind11)
-       add_subdirectory(${pybind11_SOURCE_DIR} ${pybind11_BINARY_DIR})
-   endif()
+   FetchContent_MakeAvailable(pybind11)
 endfunction()
-
-# Plotting Tools
-if (NOT DISABLE_PLOTTING_TOOLS)
-set(CMAKE_MESSAGE_LOG_LEVEL "ERROR")
-find_package(ROOT COMPONENTS Hist Graf)
-set(CMAKE_MESSAGE_LOG_LEVEL "STATUS")
-if (${ROOT_FOUND})
-    YARR_ADD_PLOTTING()
-    MESSAGE(STATUS "Compiling plotting tools!")
-    MESSAGE(STATUS "ROOT requires CXXFLAGS: ${ROOT_CXX_FLAGS}" )
-else (${ROOT_FOUND})
-    MESSAGE(STATUS "Could not locate ROOT. Will not compile plotting tools!")
-endif (${ROOT_FOUND})
-endif ()

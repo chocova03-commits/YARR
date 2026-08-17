@@ -5,6 +5,8 @@
 
 #include "LoopEngine.h"
 
+#include "LoopActionBase.h"
+
 // Our LoopEngine will take care of distributing the global Fe to each loop item
 LoopEngine::LoopEngine(Bookkeeper *k) {
     g_bk = k;
@@ -13,7 +15,7 @@ LoopEngine::LoopEngine(Bookkeeper *k) {
 LoopEngine::~LoopEngine() = default;
 
 // Add an item/loop to the engine
-void LoopEngine::addAction(Engine::element_value_type el){
+void LoopEngine::addAction(const Engine::element_value_type& el){
     m_list.push_back(el);
 }
 
@@ -25,7 +27,7 @@ void LoopEngine::init() {
     
     unsigned i = 0;
     while(m_list.end() != it) {
-        stat.addLoop(i, (*it).get(), (*it).get()->getStyle());
+        stat.addLoop(i, (*it).get(), (*it)->getStyle());
         i++;
         (*it)->setup(&stat, g_bk);
         ++it;
@@ -39,5 +41,16 @@ void LoopEngine::execute() {
 
 // What has to be done after execution
 void LoopEngine::end() {
+    Engine::loop_list_type::iterator it = m_list.begin();
+   
+    stat.init(m_list.size());
+    
+    unsigned i = 0;
+    while(m_list.end() != it) {
+        stat.addLoop(i, (*it).get(), (*it)->getStyle());
+        i++;
+        (*it)->closeOut();
+        ++it;
+    }
 
 }

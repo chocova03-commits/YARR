@@ -8,6 +8,8 @@
 
 #include "Itkpixv2ParameterLoop.h"
 
+#include "Bookkeeper.h"
+
 #include "logging.h"
 
 namespace {
@@ -19,7 +21,8 @@ Itkpixv2ParameterLoop::Itkpixv2ParameterLoop() : LoopActionBase(LOOP_STYLE_PARAM
     min = 0;
     max = 100;
     step = 1;
-
+    parPtr = nullptr;
+    m_cur = 0;
 }
 
 Itkpixv2ParameterLoop::Itkpixv2ParameterLoop(Itkpixv2RegDefault Itkpixv2GlobalCfg::*ref) : LoopActionBase(LOOP_STYLE_PARAMETER), parPtr(ref) {
@@ -27,6 +30,7 @@ Itkpixv2ParameterLoop::Itkpixv2ParameterLoop(Itkpixv2RegDefault Itkpixv2GlobalCf
     min = 0;
     max = 100;
     step = 1;
+    m_cur = 0;
     //TODO parName not set
 
 }
@@ -62,7 +66,7 @@ void Itkpixv2ParameterLoop::end() {
 
 void Itkpixv2ParameterLoop::writePar() {
     keeper->globalFe<Itkpixv2>()->writeRegister(parPtr, m_cur);
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 
