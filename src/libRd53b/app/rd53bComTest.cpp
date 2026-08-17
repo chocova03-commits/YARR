@@ -242,7 +242,7 @@ int main (int argc, char *argv[]) {
     std::ofstream trigOut((outputFolder + "/" + timestamp + "_trigger.bin"), std::ios::binary);
     
     rd53b.sendClear(16);
-    while(!hwCtrl->isCmdEmpty());
+    hwCtrl->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     hwCtrl->flushBuffer();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -256,7 +256,7 @@ int main (int argc, char *argv[]) {
         if (n%100==0) logger->info("Cycle {}/{}", n, total);
         // Send trigger
         hwCtrl->writeFifo(((uint32_t)Rd53b::genTrigger(0xF, (2*n)%50)[0] << 16) |  Rd53b::genTrigger(0xF, ((2*n)%50)+1)[0]);
-        while(!hwCtrl->isCmdEmpty());
+        hwCtrl->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
         std::vector<RawDataPtr> dataVec = hwCtrl->readData();

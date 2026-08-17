@@ -22,7 +22,7 @@ void EmuTxCore<Rd53a>::doTrigger() {
         }
     }
     EmuTxCore<Rd53a>::writeFifo(0x0);
-    while(not EmuTxCore<Rd53a>::isCmdEmpty());
+    EmuTxCore<Rd53a>::waitCmdEmpty();
     trigProcRunning = false;
     //std::cout << __PRETTY_FUNCTION__ << ": doTrigger() is done." << std::endl;
 }

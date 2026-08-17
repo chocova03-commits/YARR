@@ -52,7 +52,7 @@ void Rd53b::resetAllHard() {
         core->writeFifo(0x00000000);
     }
     core->releaseFifo();
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     
     // Wait for at least 1000us before chip is release from reset
     logger->debug(" ... waiting for CMD reset to be released");
@@ -63,7 +63,7 @@ void Rd53b::resetAllHard() {
     for(unsigned int i=0; i<32; i++)
         core->writeFifo(0x817E817E);
     core->releaseFifo();
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
 }
 
@@ -72,10 +72,10 @@ void Rd53b::resetAllSoft() {
 
     this->writeRegister(&Rd53b::GlobalPulseConf, 0x490);
     this->writeRegister(&Rd53b::GlobalPulseWidth, 10);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
     this->sendGlobalPulse(m_chipId);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
 }
@@ -93,15 +93,15 @@ void Rd53b::configureInit() {
     logger->debug(" ... set global register in writeable mode");
     this->writeRegister(&Rd53b::GcrDefaultConfig, 0xAC75);
     this->writeRegister(&Rd53b::GcrDefaultConfigB, 0x538A);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
     // Send a global pulse to reset multiple things
     logger->debug(" ... send resets via global pulse");
     this->writeRegister(&Rd53b::GlobalPulseConf, 0x0FFF);
     this->writeRegister(&Rd53b::GlobalPulseWidth, 10);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     this->sendGlobalPulse(m_chipId);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
     // Reset register
     this->writeRegister(&Rd53b::GlobalPulseConf, 0);
@@ -129,10 +129,10 @@ void Rd53b::configureInit() {
         this->writeRegister(&Rd53b::EnCoreCol1, 1<<i);
         this->writeRegister(&Rd53b::EnCoreCol2, 1<<i);
         this->writeRegister(&Rd53b::EnCoreCol3, 1<<i);
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         this->sendClear(m_chipId);
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
         
@@ -148,7 +148,7 @@ void Rd53b::configureInit() {
     // Send a clear cmd
     logger->debug(" ... sending clear command");
     this->sendClear(m_chipId);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     logger->debug("Chip initialisation done!");
@@ -165,7 +165,7 @@ void Rd53b::configureGlobal() {
     this->writeRegister(&Rd53b::DiffTh1R, 500);
     this->writeRegister(&Rd53b::DiffTh1M, 500);
     this->writeRegister(&Rd53b::DiffTh2, 0);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
     logger->debug("Configuring all registers ...");
     for (unsigned addr=0; addr<numRegs; addr++) {
@@ -173,21 +173,21 @@ void Rd53b::configureGlobal() {
         
         // Special handling of preamp register
         if (addr == 13) { // specifically wait after setting preamp bias
-            while(!core->isCmdEmpty()){;}
+            core->waitCmdEmpty();
             std::this_thread::sleep_for(std::chrono::microseconds(5000));
         }
 
         if (addr % 20 == 0) // Wait every 20 regs to not overflow a buffer
-            while(!core->isCmdEmpty()){;}
+            core->waitCmdEmpty();
     }
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     
     this->writeRegister(&Rd53b::DiffTh1L, tmpTh1L);
     this->writeRegister(&Rd53b::DiffTh1R, tmpTh1R);
     this->writeRegister(&Rd53b::DiffTh1M, tmpTh1M);
     this->writeRegister(&Rd53b::DiffTh2, tmpTh2);
     
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 }
 
 void Rd53b::configurePixels() {
@@ -202,9 +202,9 @@ void Rd53b::configurePixels() {
         for (unsigned row=0; row<n_Row; row++) {
             this->writeRegister(&Rd53b::PixPortal, pixRegs[dc][row]);
             if (row%32==0)
-                while(!core->isCmdEmpty()){;}
+                core->waitCmdEmpty();
         }
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
     }
 }
 
@@ -223,7 +223,7 @@ void Rd53b::configurePixelMaskParallel() {
             maskBits[row] = toTenBitMask(pixRegs[dc][row]);
         }
         this->sendPixRegBlock(m_chipId, maskBits);
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
     }
 
 }
@@ -244,11 +244,11 @@ void Rd53b::configurePixels(std::vector<std::pair<unsigned, unsigned>> &pixels) 
         this->writeRegister(&Rd53b::PixPortal, pixRegs[pixel.first>>1][pixel.second]);
         write_counter++;
         if (write_counter >= 20) {
-            while(!core->isCmdEmpty()){;}
+            core->waitCmdEmpty();
             write_counter = 0;
         }
     }
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 }
 
 yarrStatus Rd53b::writeRegister(Rd53bRegDefault Rd53bGlobalCfg::*ref, uint16_t value) {
@@ -263,7 +263,7 @@ yarrStatus Rd53b::readRegister(Rd53bRegDefault Rd53bGlobalCfg::*ref, uint16_t &v
     // send a read register command to the chip so that it
     // sends back the current value of the register
     this->sendRdReg(m_chipId, (this->*ref).addr());
-    while(!core->isCmdEmpty()) {}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     // go through the incoming data stream and get the register read data
@@ -311,7 +311,7 @@ yarrStatus Rd53b::readRegister(Rd53bRegDefault Rd53bGlobalCfg::*ref, uint16_t &v
                         logger->info("Sending another readRegister command.");
                         m_rxcore->flushBuffer();
                         this->sendRdReg(m_chipId, (this->*ref).addr());
-                        while(!core->isCmdEmpty()) {}
+                        core->waitCmdEmpty();
                         break;
                     }
                 }
@@ -358,7 +358,7 @@ yarrStatus Rd53b::writeNamedRegister(std::string name, const uint16_t value) {
     if(regMap.find(name) != regMap.end()) {
         logger->debug("Write named register {} -> {}", name, value);
         this->writeRegister(regMap[name], value);
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         return yarrSuccess;
     }
@@ -366,7 +366,7 @@ yarrStatus Rd53b::writeNamedRegister(std::string name, const uint16_t value) {
     if(virtRegMap.find(name) != virtRegMap.end()) {
         logger->debug("Write named virtual register {} -> {}", name, value);
         this->writeRegister(virtRegMap[name], value);
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         return yarrSuccess;
     } 
@@ -447,8 +447,8 @@ yarrStatus Rd53b::checkCom() {
   
     m_rxcore->flushBuffer();
     this->sendRdReg(m_chipId, regAddr);
-    while(!core->isCmdEmpty()){;} // Required by the rdRegister() above 
-                                  // (when relying on isCmdEmpty() to actually send commands).
+    core->waitCmdEmpty(); // Required by the rdRegister() above 
+                          // (when relying on isCmdEmpty() to actually send commands).
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     // TODO not happy about this, rx knowledge should not be here
@@ -578,7 +578,7 @@ itkpix_efuse_codec::EfuseData Rd53b::readEfuses() {
     // put E-fuse programmer circuit block into READ mode
     //
     this->writeRegister(&Rd53b::EfuseConfig, 0x0f0f);
-    while(!core->isCmdEmpty()) {}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));     
     
     //
@@ -586,7 +586,7 @@ itkpix_efuse_codec::EfuseData Rd53b::readEfuses() {
     //
     //this->writeRegister(&Rd53b::GlobalPulseConf, 0x100);
     //this->writeRegister(&Rd53b::GlobalPulseWidth, 200);
-    //while(!core->isCmdEmpty()) {}
+    //core->waitCmdEmpty();
     //this->sendGlobalPulse(m_chipId);
 
     //
@@ -618,7 +618,7 @@ uint32_t Rd53b::readEfusesRaw() {
     // put E-fuse programmer circuit block into READ mode
     //
     this->writeRegister(&Rd53b::EfuseConfig, 0x0f0f);
-    while(!core->isCmdEmpty()) {}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     //
@@ -626,7 +626,7 @@ uint32_t Rd53b::readEfusesRaw() {
     //
     //this->writeRegister(&Rd53b::GlobalPulseConf, 0x100);
     //this->writeRegister(&Rd53b::GlobalPulseWidth, 200);
-    //while(!core->isCmdEmpty()) {}
+    //core->waitCmdEmpty();
     //this->sendGlobalPulse(m_chipId);
 
     //
@@ -679,18 +679,18 @@ yarrStatus Rd53b::confAdc(uint16_t MONMUX, bool doCur) {
     }
 
     success = success && (this->writeRegister(&Rd53b::MonitorEnable, 1) == yarrSuccess); // Enabling monitoring
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
     success = success && (this->writeRegister(&Rd53b::GlobalPulseConf, 0x40) == yarrSuccess); // Reset ADC
     success = success && (this->writeRegister(&Rd53b::GlobalPulseWidth, 4) == yarrSuccess);   // Duration = 4 inherited from RD53A
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     this->sendGlobalPulse(m_chipId);
     std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Need to wait long enough for ADC to reset
 
     success = success && (this->writeRegister(&Rd53b::GlobalPulseConf, 0x1000) == yarrSuccess); //Trigger ADC Conversion
-    while (!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(1000));
 
     this->sendGlobalPulse(m_chipId);
@@ -701,7 +701,7 @@ yarrStatus Rd53b::confAdc(uint16_t MONMUX, bool doCur) {
     success = success && (this->writeRegister(&Rd53b::MonitorEnable, OriginalMonitorEnable) == yarrSuccess);
     success = success && (this->writeRegister(&Rd53b::MonitorV, OriginalMonitorV) == yarrSuccess);
     success = success && (this->writeRegister(&Rd53b::MonitorI, OriginalMonitorI) == yarrSuccess);
-    while (!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(1000));
 
     return (success ? yarrSuccess : yarrFailure);
@@ -712,7 +712,7 @@ void Rd53b::runRingOsc(uint16_t duration, bool isBankB) {
 
     this->writeRegister(&Rd53b::GlobalPulseConf, isBankB ? 0x4000 : 0x2000); //Ring Osc Enable Rout
     this->writeRegister(&Rd53b::GlobalPulseWidth, duration);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     this->sendGlobalPulse(m_chipId);
@@ -720,6 +720,6 @@ void Rd53b::runRingOsc(uint16_t duration, bool isBankB) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1)); //This is neccessary to clean. This might be controller dependent.
 
     this->writeRegister(&Rd53b::GlobalPulseConf, OriginalGlobalRT); // Recover the original routing
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 }

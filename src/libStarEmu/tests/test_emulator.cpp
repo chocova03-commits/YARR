@@ -112,8 +112,7 @@ TEST_CASE("StarEmulatorParsing", "[star][emulator]") {
 
   emu->releaseFifo();
 
-  while(!emu->isCmdEmpty())
-    ;
+  emu->waitCmdEmpty();
 
   checkData(emu.get(), expected);
 }
@@ -175,8 +174,7 @@ TEST_CASE("StarEmulatorID", "[star][emulator]") {
 
   emu->releaseFifo();
 
-  while(!emu->isCmdEmpty())
-    ;
+  emu->waitCmdEmpty();
 
   checkData(emu.get(), expected);
 }
@@ -501,8 +499,7 @@ TEST_CASE("StarEmulatorBytes", "[star][emulator]") {
 
   emu->releaseFifo();
 
-  while(!emu->isCmdEmpty())
-    ;
+  emu->waitCmdEmpty();
 
   checkData(emu.get(), expected, &mask_pattern);
 }
@@ -605,7 +602,7 @@ TEST_CASE("StarEmulatorHPR", "[star][emulator]") {
 
   emu->releaseFifo();
 
-  while(!emu->isCmdEmpty());
+  emu->waitCmdEmpty();
 
   checkData(emu.get(), expected);
 }
@@ -751,7 +748,7 @@ TEST_CASE("StarEmulatorMultiChip", "[star][emulator]") {
     expected[rx_fe1].push_back({rx_fe1, buildABCRegisterPacket(PacketTypes::ABCRegRd, 1, 0x17, 0xff7ff7ff, stat1)});
 
     emu->releaseFifo();
-    while(!emu->isCmdEmpty());
+    emu->waitCmdEmpty();
     checkData(emu.get(), expected);
 
     // Write 0xdeadbeef to MaskInput7 of ABC 7 on HCC 4
@@ -774,7 +771,7 @@ TEST_CASE("StarEmulatorMultiChip", "[star][emulator]") {
     expected[rx_fe3].push_back({rx_fe3, buildABCRegisterPacket(PacketTypes::ABCRegRd, id0, 0x17, 0xff7ff7ff, 0x7000)});
 
     emu->releaseFifo();
-    while(!emu->isCmdEmpty());
+    emu->waitCmdEmpty();
     checkData(emu.get(), expected);
 
     // Broadcast read of MaskInput 7 of all ABCs
@@ -846,7 +843,7 @@ TEST_CASE("StarEmulatorMultiChip", "[star][emulator]") {
   }
 
   emu->releaseFifo();
-  while(!emu->isCmdEmpty());
+  emu->waitCmdEmpty();
   checkData(emu.get(), expected);
 }
 
@@ -941,7 +938,7 @@ TEST_CASE("StarEmuLatorMultiChannel", "[star][emulator]") {
   }
 
   emu->releaseFifo();
-  while(!emu->isCmdEmpty());
+  emu->waitCmdEmpty();
   checkData(emu.get(), expected);
 
   //////////////////////////
@@ -960,7 +957,7 @@ TEST_CASE("StarEmuLatorMultiChannel", "[star][emulator]") {
     }
 
     emu->releaseFifo();
-    while(!emu->isCmdEmpty());
+    emu->waitCmdEmpty();
     checkData(emu.get(), expected);
   }
 
@@ -985,7 +982,7 @@ TEST_CASE("StarEmuLatorMultiChannel", "[star][emulator]") {
     expected[3].push_back({3, buildABCRegisterPacket(PacketTypes::ABCRegRd, 0, 0x17, 0xdeadbeef, 0xf000)});
 
     emu->releaseFifo();
-    while(!emu->isCmdEmpty());
+    emu->waitCmdEmpty();
     checkData(emu.get(), expected);
 
     // Now disable all rx channels except for rx channel 1
@@ -1004,7 +1001,7 @@ TEST_CASE("StarEmuLatorMultiChannel", "[star][emulator]") {
     expected[1].push_back({1, buildABCRegisterPacket(PacketTypes::ABCRegRd, 0, 0x16, 0xcafebabe, 0xf000)});
 
     emu->releaseFifo();
-    while(!emu->isCmdEmpty());
+    emu->waitCmdEmpty();
     checkData(emu.get(), expected);
   }
 
@@ -1040,7 +1037,7 @@ TEST_CASE("StarEmuLatorMultiChannel", "[star][emulator]") {
     }
 
     emu->releaseFifo();
-    while(!emu->isCmdEmpty());
+    emu->waitCmdEmpty();
     checkData(emu.get(), expected);
   }
 
@@ -1075,7 +1072,7 @@ TEST_CASE("StarEmuLatorMultiChannel", "[star][emulator]") {
     emu->disableCmd();
     emu->setCmdEnable({2, 4});
 
-    while(!emu->isCmdEmpty());
+    emu->waitCmdEmpty();
 
     // Start trigger
     emu->setTrigEnable(1);
@@ -1335,7 +1332,7 @@ TEST_CASE("StarEmulatorR3L1", "[star][emulator]") {
   staremu->writeFifo(2, (r3frame2 << 16) + l1frame);
 
   staremu->releaseFifo();
-  while(!staremu->isCmdEmpty());
+  staremu->waitCmdEmpty();
   checkData(staremu.get(), expected);
 }
 
@@ -1379,8 +1376,7 @@ TEST_CASE("StarEmulatorVersions", "[star][emulator]") {
 
   emu->releaseFifo();
 
-  while(!emu->isCmdEmpty())
-    ;
+  emu->waitCmdEmpty();
 
   checkData(emu.get(), expected);
 }

@@ -412,7 +412,7 @@ int main (int argc, char *argv[]) {
       
       
 
-      while(!hwCtrl->isCmdEmpty());
+      hwCtrl->waitCmdEmpty();
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       hwCtrl->flushBuffer();
 
@@ -499,7 +499,7 @@ int main (int argc, char *argv[]) {
 	        hwCtrl->writeFifo(trigger1 | trigger2);
 	        hwCtrl->releaseFifo();
 
-	        while(!hwCtrl->isCmdEmpty());
+	        hwCtrl->waitCmdEmpty();
 	        std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
 

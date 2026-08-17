@@ -118,7 +118,7 @@ void Itkpixv2GlobalFeedback::writePar() {
             g_tx->setCmdEnable(feCfg->getTxChannel());
             // Write parameter
             dynamic_cast<Itkpixv2*>(fe)->writeRegister(parPtr, m_values[id]);
-            while(!g_tx->isCmdEmpty()){}
+            g_tx->waitCmdEmpty();
         }
     }
     // Reset CMD mask
@@ -155,7 +155,7 @@ void Itkpixv2GlobalFeedback::init() {
                 }
                 itkpixv2->configurePixels();
             }
-            while(!g_tx->isCmdEmpty()){}
+            g_tx->waitCmdEmpty();
         }
     }
     g_tx->setCmdEnable(keeper->getTxMask());

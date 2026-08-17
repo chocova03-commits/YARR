@@ -272,7 +272,7 @@ int main(int argc, char *argv[]) {
         fe.writeRegister(&Rd53a::RingOsc6, 0);
         fe.writeRegister(&Rd53a::RingOsc7, 0);
 
-        while(!spec.isCmdEmpty()) {}
+        spec.waitCmdEmpty();
     }
 
 

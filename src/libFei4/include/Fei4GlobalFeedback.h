@@ -131,7 +131,7 @@ class Fei4GlobalFeedback : public LoopActionBase, public GlobalFeedbackReceiver 
                 
                 g_tx->setCmdEnable(tx_channel);
                 fe->writeRegister(parPtr, chanInfo[id].values);
-                while(!g_tx->isCmdEmpty());
+                g_tx->waitCmdEmpty();
             }
         }
         g_tx->setCmdEnable(keeper->getTxMask());
