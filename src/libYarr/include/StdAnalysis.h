@@ -343,8 +343,6 @@ class InjDelayTune : public AnalysisAlgorithm {
         std::map<unsigned, unsigned> innerCnt;
         unsigned injections;
         std::unique_ptr<GlobalFeedbackSender> fb;
-
-        bool m_done = false;
 };
 
 class GlobalPreampTune : public AnalysisAlgorithm {
