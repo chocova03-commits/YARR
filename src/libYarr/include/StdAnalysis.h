@@ -333,16 +333,16 @@ class InjDelayTune : public AnalysisAlgorithm {
         std::vector<unsigned> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
-	unsigned n_param_loop;
-	unsigned n_filled_bins;
-	unsigned param_loop_max;
-    unsigned step;
-    bool finishedFeedback;
+        unsigned n_param_loop;
+        unsigned n_filled_bins;
+        unsigned param_loop_max;
+        unsigned step;
+        bool finishedFeedback;
         std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
-	std::unique_ptr<Histo1d> delayDist;
+        std::unique_ptr<Histo1d> delayDist;
         std::map<unsigned, unsigned> innerCnt;
         unsigned injections;
-	std::unique_ptr<GlobalFeedbackSender> fb;
+        std::unique_ptr<GlobalFeedbackSender> fb;
 
         bool m_done = false;
 };

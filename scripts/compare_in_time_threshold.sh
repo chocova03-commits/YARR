@@ -68,7 +68,7 @@ echo "Using scan directory: ${SCAN_DIR}"
 
 # Run scans
 ./bin/scanConsole -r "${CONT_CONFIG}" -c "${CONN_CONFIG}" -s "configs/scans/${SCAN_DIR}/std_thresholdscan.json"
-./bin/scanConsole -r "${CONT_CONFIG}" -c "${CONN_CONFIG}" -s "configs/scans/${SCAN_DIR}/std_delay_scan.json"
+./bin/scanConsole -r "${CONT_CONFIG}" -c "${CONN_CONFIG}" -s "configs/scans/${SCAN_DIR}/std_tune_injdelay.json"
 ./bin/scanConsole -r "${CONT_CONFIG}" -c "${CONN_CONFIG}" -s "configs/scans/${SCAN_DIR}/std_thresholdscan_intime.json"
 
 echo "All scans completed successfully."

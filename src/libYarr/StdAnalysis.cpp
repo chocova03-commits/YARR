@@ -1609,19 +1609,19 @@ void InjDelayTune::init(const ScanLoopInfo *s) {
     param_loop_max = 1;
     n_filled_bins = 0;
     step = 1;
-    finishedFeedback= false;
+    finishedFeedback = false;
 
     for (unsigned n=0; n<s->size(); n++) {
         auto l = s->getLoop(n);
-	unsigned cnt = (l->getMax() - l->getMin())/l->getStep();
+        unsigned cnt = (l->getMax() - l->getMin())/l->getStep();
         if (!(l->isDataLoop() || l->isTriggerLoop() || l->isMaskLoop())) {
             loops.push_back(n);
             loopMax.push_back((unsigned)l->getMax());
-	    if (l->isParameterLoop() || l->isGlobalFeedbackLoop()){
-	      n_param_loop = n_param_loop * cnt;
-	      param_loop_max = l->getMax();
-          step = l->getStep();
-	    }
+            if (l->isParameterLoop() || l->isGlobalFeedbackLoop()) {
+                n_param_loop = n_param_loop * cnt;
+                param_loop_max = l->getMax();
+                step = l->getStep();
+            }
         } else {
             if (cnt == 0)
                 cnt = 1;
@@ -1640,8 +1640,6 @@ void InjDelayTune::init(const ScanLoopInfo *s) {
             fb.reset(new GlobalFeedbackSender(feedback));
         }
     }
-
-    
 }
 
 void InjDelayTune::processHistogram(HistogramBase *h) {
@@ -1661,20 +1659,20 @@ void InjDelayTune::processHistogram(HistogramBase *h) {
         name += "-" + std::to_string(h->getStat().get(loops[n]));
     }
 
-    if (delayDist == nullptr){
-      Histo1d *hhh = new Histo1d("OccVsDelay", param_loop_max, 0.5, param_loop_max + 0.5);
-      hhh->setXaxisTitle("InjFineDelay");
-      hhh->setYaxisTitle("Occupancy");
-      delayDist.reset(hhh);
+    if (delayDist == nullptr) {
+        Histo1d *hhh = new Histo1d("OccVsDelay", param_loop_max, 0.5, param_loop_max + 0.5);
+        hhh->setXaxisTitle("InjFineDelay");
+        hhh->setYaxisTitle("Occupancy");
+        delayDist.reset(hhh);
     }
 
     // Check if Histogram exists
     if (occMaps[ident] == nullptr) {
-      Histo2d *hh = new Histo2d(name, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5);
-      hh->setXaxisTitle("Column");
-      hh->setYaxisTitle("Row");
-      hh->setZaxisTitle("Hits");
-      occMaps[ident].reset(hh);
+        Histo2d *hh = new Histo2d(name, nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5);
+        hh->setXaxisTitle("Column");
+        hh->setYaxisTitle("Row");
+        hh->setZaxisTitle("Hits");
+        occMaps[ident].reset(hh);
     }
 
     // Add up Histograms
@@ -1683,9 +1681,8 @@ void InjDelayTune::processHistogram(HistogramBase *h) {
 
     // Got all data, finish up Analysis
     if (innerCnt[ident] == n_count) {
-
-        double sum =0;
-        for( unsigned int ibin =0; ibin < ( nCol * nRow); ++ibin){
+        double sum = 0;
+        for (unsigned int ibin = 0; ibin < (nCol * nRow); ++ibin) {
             sum += occMaps[ident]->getBin(ibin);
         }
         sum = sum / (nCol * nRow * injections);
@@ -1694,9 +1691,9 @@ void InjDelayTune::processHistogram(HistogramBase *h) {
         innerCnt[ident] = 0;
         occMaps[ident] = nullptr;
 
-        if (!finishedFeedback){
+        if (!finishedFeedback) {
             fb->feedbackStep(this->id, step, false);
-            if(n_filled_bins>n_param_loop){
+            if (n_filled_bins > n_param_loop) {
                 double mean = delayDist->getMean();
                 double stdv = delayDist->getStdDev();
 
@@ -1710,16 +1707,14 @@ void InjDelayTune::processHistogram(HistogramBase *h) {
                 output->pushData(std::move(delayDist));
                 fb->feedbackFinal(this->id, delay_to_set, true);
                 finishedFeedback = true;
-                delayDist=nullptr;
+                delayDist = nullptr;
             }
-
         }
         n_filled_bins++;
     }
 }
 
 void InjDelayTune::end() {
-    
 }
 
 // TODO exclude every loop
