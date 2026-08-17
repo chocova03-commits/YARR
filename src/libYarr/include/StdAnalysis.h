@@ -320,6 +320,31 @@ class OccGlobalThresholdTune : public AnalysisAlgorithm {
         double m_oldEntries = -1;
 };
 
+class InjDelayTune : public AnalysisAlgorithm {
+    public:
+        InjDelayTune() : AnalysisAlgorithm()  {}
+        ~InjDelayTune() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override;
+        void loadConfig(const json &config) override{}
+    private:
+        std::vector<unsigned> loops;
+        std::vector<unsigned> loopMax;
+        unsigned n_count = 0;
+        unsigned n_param_loop = 0;
+        unsigned n_filled_bins = 0;
+        unsigned param_loop_max = 0;
+        unsigned step = 0;
+        bool finishedFeedback = false;
+        std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
+        std::unique_ptr<Histo1d> delayDist;
+        std::map<unsigned, unsigned> innerCnt;
+        unsigned injections = 0;
+        std::unique_ptr<GlobalFeedbackSender> fb;
+};
+
 class GlobalPreampTune : public AnalysisAlgorithm {
     public:
         GlobalPreampTune() : AnalysisAlgorithm()  {}

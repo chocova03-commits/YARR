@@ -64,6 +64,14 @@ void Rd53bGlobalFeedback::loadConfig(const json &j) {
     }
 }
 
+void Rd53bGlobalFeedback::feedbackFinal(unsigned channel, double value, bool last) {
+  m_values[channel] = value;
+  if (last) {
+    fbDoneMap[channel] = true;
+  }
+}
+
+
 void Rd53bGlobalFeedback::feedback(unsigned channel, double sign, bool last) {
     // Calculate new step and val
     logger->debug("[{}] Received feedback {} (old: {})", channel, sign, m_oldSign[channel]);

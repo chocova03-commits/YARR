@@ -34,6 +34,7 @@ struct TriggerFeedbackParams {
 struct FeedbackParams {
     bool step;
     bool binary;
+    bool final;
 
     using Variant = std::variant<GlobalFeedbackParams, PixelFeedbackParams, TriggerFeedbackParams>;
 
@@ -51,8 +52,8 @@ struct FeedbackParams {
 
     Variant data;
 
-    FeedbackParams(bool step, bool binary, Variant &&data)
-      : step(step), binary(binary), data(std::move(data)) {}
+    FeedbackParams(bool step, bool binary, bool final, Variant &&data)
+      : step(step), binary(binary), final(final), data(std::move(data)) {}
 };
 
 // Make it shared so controller can still observe
@@ -68,6 +69,7 @@ class GlobalFeedbackBase {
         /** Used to implement binary search */
         virtual void feedbackBinary(unsigned channel, double sign, bool last) = 0; // TODO Algorithm should be selected in scan
         virtual void feedbackStep(unsigned channel, double sign, bool last) {}
+	    virtual void feedbackFinal(unsigned channel, double value, bool last) {}
 };
 
 class GlobalFeedbackReceiver : public GlobalFeedbackBase {
@@ -97,6 +99,7 @@ class GlobalFeedbackSender : public GlobalFeedbackBase {
         void feedback(unsigned channel, double sign, bool last) override;
         void feedbackBinary(unsigned channel, double sign, bool last) override;
         void feedbackStep(unsigned channel, double sign, bool last) override;
+	    void feedbackFinal(unsigned channel, double value, bool last) override;
 
     private:
         FeedbackClipboard *clip;

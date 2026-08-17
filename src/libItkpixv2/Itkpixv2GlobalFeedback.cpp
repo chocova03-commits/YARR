@@ -64,6 +64,13 @@ void Itkpixv2GlobalFeedback::loadConfig(const json &j) {
     }
 }
 
+void Itkpixv2GlobalFeedback::feedbackFinal(unsigned channel, double value, bool last) {
+  m_values[channel] = value;
+  if (last) {
+    fbDoneMap[channel] = true;
+  }
+}
+
 void Itkpixv2GlobalFeedback::feedback(unsigned channel, double sign, bool last) {
     // Calculate new step and val
     logger->debug("[{}] Received feedback {} (old: {})", channel, sign, m_oldSign[channel]);
