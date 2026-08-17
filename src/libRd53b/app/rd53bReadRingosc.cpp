@@ -185,7 +185,7 @@ int main(int argc, char* argv[]) {
 
         // Enable RingOscA
         feRd53b.writeRegister(&Rd53b::RingOscAEn, 0xff);
-        while (!hw->isCmdEmpty()){;}
+        hw->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
 
         // Repeat measurements
@@ -198,7 +198,7 @@ int main(int argc, char* argv[]) {
                 // Reset bank A counters
                 feRd53b.writeRegister(&Rd53b::RingOscAClear, 1);
                 feRd53b.writeRegister(&Rd53b::RingOscAClear, 0);
-                while (!hw->isCmdEmpty()){;}
+                hw->waitCmdEmpty();
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                 // Run oscillators for some time
@@ -226,7 +226,7 @@ int main(int argc, char* argv[]) {
 	    feRd53b.writeRegister(&Rd53b::RingOscBEnFf,1);
 	    feRd53b.writeRegister(&Rd53b::RingOscBEnLvt,1);
 
-        while (!hw->isCmdEmpty()){;}
+        hw->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         for (unsigned i = 0; i < RingOscRep; i++)
         {
@@ -236,7 +236,7 @@ int main(int argc, char* argv[]) {
                 // Reset bank B counters
                 feRd53b.writeRegister(&Rd53b::RingOscBClear, 1);
                 feRd53b.writeRegister(&Rd53b::RingOscBClear, 0);
-                while (!hw->isCmdEmpty()){;}
+                hw->waitCmdEmpty();
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                 // Run oscillators for some time

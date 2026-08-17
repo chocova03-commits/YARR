@@ -55,7 +55,7 @@ float Itkpixv2ReadRegLoop::ReadResistTemp(Itkpixv2 *fe, bool in_kelvin) {
     // Read top sensor: toggle Vref to top
     fe->writeRegister(&Itkpixv2::VrefRsensTop, 1);
     fe->writeRegister(&Itkpixv2::VrefRsensBot, 0);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float voltageTop = fe->adcToV(this->ReadADC(5, false, fe));
@@ -63,7 +63,7 @@ float Itkpixv2ReadRegLoop::ReadResistTemp(Itkpixv2 *fe, bool in_kelvin) {
     // Read bottom sensor: toggle Vref to bottom
     fe->writeRegister(&Itkpixv2::VrefRsensTop, 0);
     fe->writeRegister(&Itkpixv2::VrefRsensBot, 1);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float voltageBot = fe->adcToV(this->ReadADC(6, false, fe));
@@ -71,7 +71,7 @@ float Itkpixv2ReadRegLoop::ReadResistTemp(Itkpixv2 *fe, bool in_kelvin) {
     // Reset the Vref configuration
     fe->writeRegister(&Itkpixv2::VrefRsensTop, 0);
     fe->writeRegister(&Itkpixv2::VrefRsensBot, 0);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     logger->info("Polyresistor Temp Sensor: Bot({} V) Top ({} V) [Iref({} A)]", voltageTop, voltageBot, current);
@@ -92,7 +92,7 @@ float Itkpixv2ReadRegLoop::ReadTransSensor(Itkpixv2 *fe, TransSensorLocation loc
     // enable sensor, and switch off bias
     fe->writeRegister(TransSensorCfg[loc][0], 1);
     fe->writeRegister(TransSensorCfg[loc][2], 0);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float VD = 0;
@@ -100,7 +100,7 @@ float Itkpixv2ReadRegLoop::ReadTransSensor(Itkpixv2 *fe, TransSensorLocation loc
     for (unsigned dem = 0; dem < 16; dem++)
     {
         fe->writeRegister(TransSensorCfg[loc][1], dem);
-        while (!g_tx->isCmdEmpty()){;}
+        g_tx->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         // Readout VMUX
         VD += fe->adcToV(this->ReadADC(TransSensorVMUX[loc][type], false, fe));
@@ -108,7 +108,7 @@ float Itkpixv2ReadRegLoop::ReadTransSensor(Itkpixv2 *fe, TransSensorLocation loc
 
     // switch on bias and loop again
     fe->writeRegister(TransSensorCfg[loc][2], 1);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float VDR = 0;
@@ -116,7 +116,7 @@ float Itkpixv2ReadRegLoop::ReadTransSensor(Itkpixv2 *fe, TransSensorLocation loc
     for (unsigned dem = 0; dem < 16; dem++)
     {
         fe->writeRegister(TransSensorCfg[loc][1], dem);
-        while (!g_tx->isCmdEmpty()){;}
+        g_tx->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         // Readout VMUX
         VDR += fe->adcToV(this->ReadADC(TransSensorVMUX[loc][type], false, fe));
@@ -125,7 +125,7 @@ float Itkpixv2ReadRegLoop::ReadTransSensor(Itkpixv2 *fe, TransSensorLocation loc
     // Switch off sensor and bias
     fe->writeRegister(TransSensorCfg[loc][0], 0);
     fe->writeRegister(TransSensorCfg[loc][2], 0);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float deltaV = (VDR - VD) / 16.;
@@ -232,7 +232,7 @@ void Itkpixv2ReadRegLoop::execPart1()
             // In m_EnblRingOsc, [0:7] are for bank A, and [8:12] are for bank B
             feItkpixv2->writeRegister(&Itkpixv2::RingOscAEn, (m_EnblRingOscA & 0xff));
 
-            while (!g_tx->isCmdEmpty()){;}
+            g_tx->waitCmdEmpty();
             std::this_thread::sleep_for(std::chrono::microseconds(100));
 
             for (unsigned i = 0; i < m_RingOscRep; i++)
@@ -246,7 +246,7 @@ void Itkpixv2ReadRegLoop::execPart1()
                     // Reset bank A counters
                     feItkpixv2->writeRegister(&Itkpixv2::RingOscAClear, 1);
                     feItkpixv2->writeRegister(&Itkpixv2::RingOscAClear, 0);
-                    while (!g_tx->isCmdEmpty()){;}
+                    g_tx->waitCmdEmpty();
                     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                     // Run oscillators for some time
@@ -296,7 +296,7 @@ void Itkpixv2ReadRegLoop::execPart1()
                     feItkpixv2->writeRegister(RingOscBEn[tmpCount], 1);
                 }
             }
-            while (!g_tx->isCmdEmpty()){;}
+            g_tx->waitCmdEmpty();
             std::this_thread::sleep_for(std::chrono::microseconds(100));
             
             for (unsigned i = 0; i < m_RingOscRep; i++)
@@ -309,7 +309,7 @@ void Itkpixv2ReadRegLoop::execPart1()
                     // Reset bank B counters
                     feItkpixv2->writeRegister(&Itkpixv2::RingOscBClear, 1);
                     feItkpixv2->writeRegister(&Itkpixv2::RingOscBClear, 0);
-                    while (!g_tx->isCmdEmpty()){;}
+                    g_tx->waitCmdEmpty();
                     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                     // Run oscillators for some time

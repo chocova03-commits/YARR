@@ -111,7 +111,7 @@ void Rd53aMaskLoop::init() {
         }
         // TODO make configrue for subset
         rd53a->configurePixels();
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
     // Reset CMD mask
     g_tx->setCmdEnable(keeper->getTxMask());
@@ -190,7 +190,7 @@ void Rd53aMaskLoop::execPart1() {
             }//end row
         }//end column
         rd53a->configurePixels(modPixels);
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
     // Reset CMD mask
     g_tx->setCmdEnable(keeper->getTxMask());
@@ -229,7 +229,7 @@ void Rd53aMaskLoop::execPart2() {
                 }
             }	
             rd53a->configurePixels(modPixels);
-            while(!g_tx->isCmdEmpty()) {}	
+            g_tx->waitCmdEmpty();
         }
     }
 

@@ -215,7 +215,7 @@ void Rd53a2TriggerLoop::init(){
     g_tx->setTrigTime(m_trigTime);
 
     g_tx->setCmdEnable(keeper->getTxMask());
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     //std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
@@ -229,7 +229,7 @@ void Rd53a2TriggerLoop::execPart1() {
     dynamic_cast<Rd53a*>(g_fe)->idle();
     std::this_thread::sleep_for(std::chrono::microseconds(200));
     g_rx->flushBuffer();
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     g_tx->setTrigEnable(0x1);
 
 }

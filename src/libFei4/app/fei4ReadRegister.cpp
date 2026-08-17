@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
   fe.setRunMode(false);
   if(doCfg) {
     fe.configure();
-    while(!mySpec.isCmdEmpty()) {}
+    mySpec.waitCmdEmpty();
   }
   mySpec.setRxEnable(0x1);
 
@@ -94,13 +94,13 @@ int main(int argc, char *argv[]) {
           std::cout << "Reading reg: " << i << std::endl;
       fe.readRegister(i);
       usleep(1000);
-      while(!mySpec.isCmdEmpty()) {}
+      mySpec.waitCmdEmpty();
       dummy.cfg[i] = 0xDEAD;
       std::vector<RawDataPtr> dataVec = mySpec.readData();
       RawDataPtr data;
       if (dataVec.size() > 0)
           data = dataVec[0];
-      while(!mySpec.isCmdEmpty()) {}
+      mySpec.waitCmdEmpty();
       while (data != nullptr) {
           if (data != nullptr) {
               uint32_t greg = 99;
@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
               data = nullptr;
           }
 
-          while(!mySpec.isCmdEmpty()) {}
+          mySpec.waitCmdEmpty();
       }
   }
   dummy.writeConfig(replica);
@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
 
       fe.readPixelRegister(dc, (0b1 << latch));
       usleep(1000);
-      while(!mySpec.isCmdEmpty()) {}
+      mySpec.waitCmdEmpty();
 
       int column = -1;
       int row = -1;
@@ -166,7 +166,7 @@ int main(int argc, char *argv[]) {
       RawDataPtr data;
       if (dataVec.size() > 0)
           data = dataVec[0];
-      while(!mySpec.isCmdEmpty()) {}
+      mySpec.waitCmdEmpty();
       while (data != nullptr) {
 	if (data != nullptr) {
 	  for (unsigned j=0; j<data->getSize();j++) {
@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
       } else {
           data = nullptr;
       }
-	while(!mySpec.isCmdEmpty()) {}
+        mySpec.waitCmdEmpty();
       }
 
     }
@@ -250,7 +250,7 @@ int main(int argc, char *argv[]) {
   //----------------------------------------------------------------
   // config again to avoid changing global registers
   fe.dummyCmd();
-  while(!mySpec.isCmdEmpty()) {}
+  mySpec.waitCmdEmpty();
 
 
   //----------------------------------------------------------------

@@ -116,7 +116,7 @@ void Rd53bCoreColLoop::end() {
             }
         }
         iChannel++;
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
     g_tx->setCmdEnable(keeper->getTxMask());
 }
@@ -169,7 +169,7 @@ void Rd53bCoreColLoop::setCores() {
         rd53b->writeRegister(&Rd53b::EnCoreCol1, m_coreCols[1]);
         rd53b->writeRegister(&Rd53b::EnCoreCol2, m_coreCols[2]);
         rd53b->writeRegister(&Rd53b::EnCoreCol3, m_coreCols[3]);
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
 
     // Turn off columns that were originally off in chip config
@@ -190,7 +190,7 @@ void Rd53bCoreColLoop::setCores() {
                 fe->writeNamedRegister(registerName,toSet);
             }
             iChannel++;
-            while(!g_tx->isCmdEmpty()) {}
+            g_tx->waitCmdEmpty();
         }
     }
 
@@ -200,19 +200,19 @@ void Rd53bCoreColLoop::setCores() {
     //rd53b->writeRegister(&Rd53b::RstCoreCol1, m_coreCols[1]);
     //rd53b->writeRegister(&Rd53b::RstCoreCol2, m_coreCols[2]);
     //rd53b->writeRegister(&Rd53b::RstCoreCol3, m_coreCols[3]);
-    //while(!g_tx->isCmdEmpty()) {}
+    //g_tx->waitCmdEmpty();
     // Enable injection to core
     rd53b->writeRegister(&Rd53b::EnCoreColCal0, m_coreCols[0]);
     rd53b->writeRegister(&Rd53b::EnCoreColCal1, m_coreCols[1]);
     rd53b->writeRegister(&Rd53b::EnCoreColCal2, m_coreCols[2]);
     rd53b->writeRegister(&Rd53b::EnCoreColCal3, m_coreCols[3]);
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
 	// Enable hitORs
     rd53b->writeRegister(&Rd53b::HitOrMask0, ~m_coreCols[0]);
     rd53b->writeRegister(&Rd53b::HitOrMask1, ~m_coreCols[1]);
     rd53b->writeRegister(&Rd53b::HitOrMask2, ~m_coreCols[2]);
     rd53b->writeRegister(&Rd53b::HitOrMask3, ~m_coreCols[3]);	
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
     // Turn on PToT if needed
     if (m_usePToT) {
         rd53b->writeRegister(&Rd53b::PtotCoreColEn0, m_coreCols[0]);
@@ -220,6 +220,6 @@ void Rd53bCoreColLoop::setCores() {
         rd53b->writeRegister(&Rd53b::PtotCoreColEn2, m_coreCols[2]);
         rd53b->writeRegister(&Rd53b::PtotCoreColEn3, m_coreCols[3]);
     }
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
 }
 

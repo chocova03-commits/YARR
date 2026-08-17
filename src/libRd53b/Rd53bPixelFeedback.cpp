@@ -78,7 +78,7 @@ void Rd53bPixelFeedback::feedback(unsigned id, std::unique_ptr<Histo2d> h) {
 void Rd53bPixelFeedback::writePixelCfg(Rd53b *fe) {
     g_tx->setCmdEnable(dynamic_cast<FrontEndCfg*>(fe)->getTxChannel());
     fe->configurePixels();
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     g_tx->setCmdEnable(keeper->getTxMask());
 }
 

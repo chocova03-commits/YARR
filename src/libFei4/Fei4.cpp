@@ -75,7 +75,7 @@ void Fei4::configurePixels(unsigned lsb, unsigned msb) {
         for (unsigned bit=lsb; bit<msb; bit++) {
             wrFrontEnd(chipId, getCfg(bit, dc));
             loadIntoPixel(1 << bit);
-            while(core->isCmdEmpty() == 0);
+            core->waitCmdEmpty();
         }
     }
     // Set actual threshold
@@ -174,7 +174,7 @@ void Fei4::dummyCmd() {
     writeRegister(&Fei4::Colpr_Addr, Fei4PixelCfg::n_DC-1);
     uint32_t bitstream[21] = {0};
     wrFrontEnd(chipId, bitstream);
-    while(core->isCmdEmpty() == 0);
+    core->waitCmdEmpty();
 }
 
 void Fei4::shiftByOne() {

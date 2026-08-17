@@ -64,7 +64,7 @@ void Rd53aParameterLoop::end() {
 
 void Rd53aParameterLoop::writePar() {
     keeper->globalFe<Rd53a>()->writeRegister(parPtr, m_cur);
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     //std::this_thread::sleep_for(std::chrono::milliseconds(20));
 }
 
