@@ -772,8 +772,9 @@ void StarChipsetEmu::resetHCCPLL() {
 void StarChipsetEmu::doHPR(LCB::Frame frame) {
   doHPR_HCC(frame);
 
-  for (unsigned ichip = 1; ichip <= m_starCfg->numABCs(); ++ichip) {
-    if(!m_starCfg->isAbcForInputChannel(ichip-1)) {
+  for (unsigned channel = 0; channel < Star::MaxABCsPerHCC; ++channel) {
+    int ichip = channel + 1;
+    if(!m_starCfg->isAbcForInputChannel(channel)) {
       continue;
     }
     doHPR_ABC(frame, ichip);

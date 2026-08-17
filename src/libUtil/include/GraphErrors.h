@@ -20,6 +20,7 @@ public:
   void plot(const std::string &filename, const std::string &dir="") const override;
   void toStream(std::ostream &out) const override;
   void toJson(json &j) const override;
+  bool fromJson(const json &j);
 
 private:
   unsigned data_npoints;

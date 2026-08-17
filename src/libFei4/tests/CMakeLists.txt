@@ -1,5 +1,6 @@
 add_executable(testFei4
         test_feedback.cpp
+        test_config_json.cpp
 )
 target_link_libraries(testFei4 PUBLIC Yarr)
 target_link_libraries(testFei4 PRIVATE mainTest)

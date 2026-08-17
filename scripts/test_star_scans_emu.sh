@@ -37,3 +37,15 @@ SCAN_CFG=configs/scans/star/std_latencyScan.json
 
 runScan
 
+# Run simple check of checkCom (currently disabled by default)
+
+FRONT_END_IN=configs/defaults/default_star_ppb.json
+FRONT_END=configs/defaults/default_star_ppb_patch.json
+jq '.RunCheckCom = true' ${FRONT_END_IN} > ${FRONT_END}
+
+# Point connectivity to patched front end
+CONNECTIVITY_IN=${CONNECTIVITY}
+CONNECTIVITY=configs/connectivity/example_star_setup_ppb_patch.json
+jq --arg fe "${FRONT_END}" '.chips[0].config = $fe' ${CONNECTIVITY_IN} > ${CONNECTIVITY}
+
+runScan

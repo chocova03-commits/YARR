@@ -17,6 +17,7 @@ enum class ReadRegSM {
   FOUND_DATA,
   READ_COMPLETE,
 
+  EXCEPTION,
   TIMEOUT,
 };
 
@@ -53,7 +54,7 @@ struct ReadRegStateCommon {
   virtual ~ReadRegStateCommon() = default;
 
   /// Set exception on promise
-  virtual void notifyTimeout() = 0;
+  virtual void notifyException(std::exception_ptr ep) = 0;
 
   /// Use call back and set promise
   virtual void processData(RawData &) = 0;
@@ -72,6 +73,7 @@ struct ReadRegStateCommon {
     case ReadRegSM::FOUND_DATA: return "FOUND_DATA";
     case ReadRegSM::READ_COMPLETE: return "READ_COMPLETE";
     case ReadRegSM::TIMEOUT: return "TIMEOUT";
+    case ReadRegSM::EXCEPTION: return "EXCEPTION";
     default: return "UNEXPECTED";
     }
   }
@@ -83,12 +85,18 @@ struct ReadRegStateCommon {
        && (clk::now() - last_state_change) > ms_timeout) {
       logger->trace("Async read reg timeout from {}", stateName());
       newState(ReadRegSM::TIMEOUT);
-      return notifyTimeout();
+      return notifyException(std::make_exception_ptr(std::runtime_error("Timeout exception")));
     }
 
     switch(*state) {
     case ReadRegSM::INIT:
-      send_cb(tx);
+      try {
+        send_cb(tx);
+      } catch(...) {
+        notifyException(std::current_exception());
+        newState(ReadRegSM::EXCEPTION);
+        break;
+      }
       newState(ReadRegSM::READY_FOR_DATA);
       break;
     default:
@@ -97,6 +105,7 @@ struct ReadRegStateCommon {
     }
   }
 
+  /// Check data, return true if data has been used
   bool checkData(RawData &rawData) {
     // logger->trace("Async read reg check data");
     if(*state != ReadRegSM::READY_FOR_DATA) {
@@ -104,10 +113,23 @@ struct ReadRegStateCommon {
       // logger->trace("Async read received data in wrong state {}", stateName());
       return false;
     }
-    if(filter_cb(rawData)) {
+    bool run_process_data = false;
+    try {
+      run_process_data = filter_cb(rawData);
+    } catch(...) {
+      notifyException(std::current_exception());
+      newState(ReadRegSM::EXCEPTION);
+      return false;
+    }
+    if(run_process_data) {
       newState(ReadRegSM::FOUND_DATA);
-      processData(rawData);
-      newState(ReadRegSM::READ_COMPLETE);
+      try {
+        processData(rawData);
+        newState(ReadRegSM::READ_COMPLETE);
+      } catch(...) {
+        notifyException(std::current_exception());
+        newState(ReadRegSM::EXCEPTION);
+      }
       return true;
     }
     return false;
@@ -138,9 +160,9 @@ struct ReadRegState : ReadRegStateCommon {
   ReadRegState &operator=(const ReadRegState &) = delete;
   ReadRegState &operator=(ReadRegState &&rhs) = default;
 
-  void notifyTimeout() override {
+  void notifyException(std::exception_ptr e) override {
     try {
-      throw std::runtime_error("Timeout exception");
+      std::rethrow_exception(e);
     } catch(...) {
       promise.set_exception(std::current_exception());
       return;
@@ -148,6 +170,11 @@ struct ReadRegState : ReadRegStateCommon {
   }
 
   void processData(RawData &rawData) override {
+    if(*state == ReadRegSM::EXCEPTION) {
+      logger->error("Async read already set exception in processData!");
+      // Don't call set_value if already have exception
+      return;
+    }
     if constexpr (std::is_void_v<RegType>) {
       process_cb(rawData);
       promise.set_value();
@@ -243,7 +270,7 @@ void AsyncAccess::detail::AsyncContextImpl::run(std::atomic<bool> &running_flag)
       for(size_t i=0; i<allSMs.size(); i++) {
         auto &sm = *allSMs[i];
         if((*sm.state == ReadRegSM::READ_COMPLETE)
-           || (*sm.state == ReadRegSM::READ_COMPLETE)) {
+           || (*sm.state == ReadRegSM::EXCEPTION)) {
           allSMs.erase(allSMs.begin() + i);
           // // Only do one at a time
           // break;

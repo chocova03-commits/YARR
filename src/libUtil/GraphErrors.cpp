@@ -143,6 +143,7 @@ bool GraphErrors::fromFile(const std::string &filename) {
     }
     try {
       j = json::parse(file);
+      file.close();
     } catch (json::parse_error &e) {
       throw std::runtime_error(e.what());
     }
@@ -151,47 +152,52 @@ bool GraphErrors::fromFile(const std::string &filename) {
     return false;
   }
 
+  return fromJson(j);
+}
+
+bool GraphErrors::fromJson(const json &j) {
   // Check for type
   if (!j.contains("Type")) {
-    gelog->error("Tried loading GraphErrors from file {}, but file has no header", filename);
+    gelog->error("Tried loading GraphErrors from json, but missing Type");
     return false;
-  } else {
-    if (j["Type"] != "GraphErrors") {
-      gelog->error("Tried loading GraphErrors from file {}, but file has incorrect header: {}", filename, std::string(j["Type"]));
-      return false;
-    }
+  }
 
-    name = j["Name"];
-    xAxisTitle = j["x"]["AxisTitle"];
-    yAxisTitle = j["y"]["AxisTitle"];
-    zAxisTitle = j["z"]["AxisTitle"];
+  std::string read_type = j["Type"];
+  if (read_type != "GraphErrors") {
+    gelog->error("Tried loading GraphErrors from json, but incorrect Type: {}", read_type);
+    return false;
+  }
 
-    data_npoints = j["Data"]["npoints"];
+  name = j["Name"];
+  xAxisTitle = j["x"]["AxisTitle"];
+  yAxisTitle = j["y"]["AxisTitle"];
+  zAxisTitle = j["z"]["AxisTitle"];
 
-    data_x.clear();
-    data_y.clear();
-    data_xerr.clear();
-    data_yerr.clear();
-    data_x.reserve(data_npoints);
-    data_y.reserve(data_npoints);
-    if (j.contains("Data")) {
-      auto &jdata = j["Data"];
-      if(jdata.contains("xerr"))
-        data_xerr.reserve(data_npoints);
+  data_npoints = j["Data"]["npoints"];
+
+  data_x.clear();
+  data_y.clear();
+  data_xerr.clear();
+  data_yerr.clear();
+  data_x.reserve(data_npoints);
+  data_y.reserve(data_npoints);
+  if (j.contains("Data")) {
+    auto &jdata = j["Data"];
+    if(jdata.contains("xerr"))
+      data_xerr.reserve(data_npoints);
+    if (jdata.contains("yerr"))
+      data_yerr.reserve(data_npoints);
+
+    for (unsigned i=0; i<data_npoints; i++) {
+      data_x.push_back(jdata["x"][i]);
+      data_y.push_back(jdata["y"][i]);
+      if (jdata.contains("xerr"))
+        data_xerr.push_back(jdata["xerr"][i]);
       if (jdata.contains("yerr"))
-        data_yerr.reserve(data_npoints);
-
-      for (unsigned i=0; i<data_npoints; i++) {
-        data_x.push_back(jdata["x"][i]);
-        data_y.push_back(jdata["y"][i]);
-        if (jdata.contains("xerr"))
-          data_xerr.push_back(jdata["xerr"][i]);
-        if (jdata.contains("yerr"))
-          data_yerr.push_back(jdata["yerr"][i]);
-      }
+        data_yerr.push_back(jdata["yerr"][i]);
     }
   }
-  file.close();
+
   return true;
 }
 
