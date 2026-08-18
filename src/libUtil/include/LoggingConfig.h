@@ -53,6 +53,11 @@ json defaultConfig();
 /// Setup loggers according to configuration in json file
 void setupLoggers(const json &j, const std::string &path="");
 
+/// Add a stdout.log file sink to every logger, using the same level and
+/// pattern as the terminal sink, writing into outputDir (must already
+/// exist and end in '/'). Effectively a file copy of the terminal log.
+void addOutputFileSink(const std::string &outputDir);
+
 /// List loggers to std::cout, with details of sinks and levels
 void listLoggers(bool print_details = false);
 
