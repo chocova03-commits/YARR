@@ -104,6 +104,34 @@ TEST_CASE("ProcessPackets", "[itsdaqFW]") {
              0x403ce0f578500790, 0x7fdc000000000000})},
        {RawData(0x12, {htonl(0xe0f57850), htonl(0x07900000)})}
      },
+     // Two packets
+     TestSetup{
+       {build_data_packet({
+             // Timestamp
+             0xff80350000000000,
+             // HPR from HCC
+             0x403ce0f578500790, 0x7fdc000000000000,
+             // Timestamp
+             0xff80360000000000,
+             // HPR from HCC
+             0x403ce0f578500790, 0x7fdc000000000000,
+           })},
+       {RawData(0x12, {htonl(0xe0f57850), htonl(0x07900000)}),
+        RawData(0x12, {htonl(0xe0f57850), htonl(0x07900000)})}
+     },
+     // Two packets without TS between
+     TestSetup{
+       {build_data_packet({
+             // Timestamp
+             0xff80350000000000,
+             // HPR from HCC
+             0x403ce0f578500790, 0x7fdc000000000000,
+             // HPR from HCC
+             0x403ce0f578500790, 0x7fdc000000000000,
+           })},
+       {RawData(0x12, {htonl(0xe0f57850), htonl(0x07900000)}),
+        RawData(0x12, {htonl(0xe0f57850), htonl(0x07900000)})}
+     },
      // Test sys status too
      TestSetup{
        {build_status_packet(0xf9)},
