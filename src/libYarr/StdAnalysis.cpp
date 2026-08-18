@@ -734,6 +734,10 @@ void ScurveFitter::init(const ScanLoopInfo *s) {
     for (unsigned i=vcalMin; i<=vcalMax; i+=vcalStep) {
         x.push_back(i);
     }
+    // Match the last value StdParameterLoop actually injects, which can be
+    // < vcalMax when the range isn't an exact multiple of vcalStep.
+    vcalMax = x.back();
+    vcalBins = x.size() - 1;
     cnt = 0;
     n_failedfit =0;
 }
@@ -920,12 +924,12 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                     //     lmcurve(n_par, par, vcalBins, &x[0], histos[{uid, bin}]->getData(), reverseScurveFct, &control, &status);
                     // } else {
                     //     lmcurve(n_par, par, vcalBins, &x[0], histos[{uid, bin}]->getData(), scurveFct, &control, &status);                        
-                        scurvegauss(par, vcalBins, x.data(), histos[{uid, bin}]->getData());
+                        scurvegauss(par, x.size(), x.data(), histos[{uid, bin}]->getData());
                     }
                     else if (reverse) {
-                        lmcurve(n_par, par, vcalBins, x.data(), histos[{uid, bin}]->getData(), reverseScurveFct, &control, &status);
+                        lmcurve(n_par, par, x.size(), x.data(), histos[{uid, bin}]->getData(), reverseScurveFct, &control, &status);
                     } else {
-                        lmcurve(n_par, par, vcalBins, x.data(), histos[{uid, bin}]->getData(), scurveFct, &control, &status);
+                        lmcurve(n_par, par, x.size(), x.data(), histos[{uid, bin}]->getData(), scurveFct, &control, &status);
                     }
 
                     end = std::chrono::high_resolution_clock::now();
@@ -934,7 +938,7 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                         createFitResultHistograms(uid, loopStatus);
                     }
 
-                    double chi2= status.fnorm/(double)(vcalBins - n_par);
+                    double chi2= status.fnorm/(double)(x.size() - n_par);
 
                     //override the following chi2 check if using scurvegauss (no fit involved)
                     if (use_scurvegauss) chi2 = 1.;
