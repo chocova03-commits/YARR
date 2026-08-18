@@ -323,7 +323,7 @@ void ItsdaqPrivate::ProcessPacket(const std::array<char, 1500> &buffer,
     if(opcode == 0x19) {
       std::vector<uint16_t> status_regs;
 
-      for(int i=0; i<(output_bytes/2)-7; i++) {
+      for(int i=0; i<(output_bytes/2)-8; i++) {
         status_regs.push_back(buf16[i+7]);
       }
 
@@ -332,7 +332,7 @@ void ItsdaqPrivate::ProcessPacket(const std::array<char, 1500> &buffer,
     if(opcode == 0xf9) {
       std::vector<uint16_t> status_regs;
 
-      for(int i=0; i<(output_bytes/2)-7; i++) {
+      for(int i=0; i<(output_bytes/2)-8; i++) {
         status_regs.push_back(buf16[i+7]);
       }
 
