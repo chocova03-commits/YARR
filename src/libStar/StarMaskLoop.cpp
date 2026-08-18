@@ -93,12 +93,12 @@ void StarMaskLoop::init() {
       initMasks();
     }
 
-    while(g_tx->isCmdEmpty() == 0);
+    g_tx->waitCmdEmpty();
 }
 
 void StarMaskLoop::end() {
     SPDLOG_LOGGER_DEBUG(logger, "End");
-    while(g_tx->isCmdEmpty() == 0);
+    g_tx->waitCmdEmpty();
 }
 
 void StarMaskLoop::execPart1() {
@@ -128,10 +128,8 @@ void StarMaskLoop::execPart1() {
     applyMask(static_cast<StarChips*>(fe), masks, enables);
   }
 
-  while(g_tx->isCmdEmpty() == 0) {
-    // This might no longer be useful
-    logger->trace("Waiting for cmd to empty");
-  }
+  g_tx->waitCmdEmpty();
+  logger->trace("Complete waiting for cmd to empty");
 }
 
 void StarMaskLoop::printMask(MaskType chans, std::ostream &os) const {

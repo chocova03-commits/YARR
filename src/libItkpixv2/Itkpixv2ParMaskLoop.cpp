@@ -45,7 +45,7 @@ void Itkpixv2ParMaskLoop::init() {
     }
     
     itkpix->configurePixelMaskParallel();
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
 }
 
 void Itkpixv2ParMaskLoop::execPart1() {
@@ -74,7 +74,7 @@ void Itkpixv2ParMaskLoop::execPart1() {
         
     }
     itkpix->configurePixelMaskParallel();
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
     
     g_tx->setCmdEnable(keeper->getTxMask());
     g_stat->set(this, m_cur);

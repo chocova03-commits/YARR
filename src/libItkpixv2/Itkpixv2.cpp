@@ -51,7 +51,7 @@ void Itkpixv2::resetAllHard() {
         core->writeFifo(0x00000000);
     }
     core->releaseFifo();
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     
     // Wait for at least 1000us before chip is release from reset
     logger->debug(" ... waiting for CMD reset to be released");
@@ -62,7 +62,7 @@ void Itkpixv2::resetAllHard() {
     for(unsigned int i=0; i<32; i++)
         core->writeFifo(0x817E817E);
     core->releaseFifo();
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
 }
 
@@ -71,10 +71,10 @@ void Itkpixv2::resetAllSoft() {
 
     this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x018);
     this->writeRegister(&Itkpixv2::GlobalPulseWidth, 10);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
     this->sendGlobalPulse(m_chipId);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
 }
@@ -102,15 +102,15 @@ void Itkpixv2::configureInit() {
     logger->debug(" ... set global register in writeable mode");
     this->writeRegister(&Itkpixv2::GcrDefaultConfig, 0xAC75);
     this->writeRegister(&Itkpixv2::GcrDefaultConfigB, 0x538A);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
     // Send a global pulse to reset multiple things
     logger->debug(" ... send resets via global pulse");
     this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x0FFF);
     this->writeRegister(&Itkpixv2::GlobalPulseWidth, 10);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     this->sendGlobalPulse(m_chipId);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
     // Reset register
     this->writeRegister(&Itkpixv2::GlobalPulseConf, 0);
@@ -137,10 +137,10 @@ void Itkpixv2::configureInit() {
         this->writeRegister(&Itkpixv2::EnCoreCol1, 1<<i);
         this->writeRegister(&Itkpixv2::EnCoreCol2, 1<<i);
         this->writeRegister(&Itkpixv2::EnCoreCol3, 1<<i);
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         this->sendClear(m_chipId);
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
         
@@ -156,7 +156,7 @@ void Itkpixv2::configureInit() {
     // Send a clear cmd
     logger->debug(" ... sending clear command");
     this->sendClear(m_chipId);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     logger->debug("Chip initialisation done!");
@@ -173,7 +173,7 @@ void Itkpixv2::configureGlobal() {
     this->writeRegister(&Itkpixv2::DiffTh1R, 500);
     this->writeRegister(&Itkpixv2::DiffTh1M, 500);
     this->writeRegister(&Itkpixv2::DiffTh2, 0);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
     logger->debug("Configuring all registers ...");
     for (unsigned addr=0; addr<numRegs; addr++) {
@@ -181,21 +181,21 @@ void Itkpixv2::configureGlobal() {
         
         // Special handling of preamp register
         if (addr == 13) { // specifically wait after setting preamp bias
-            while(!core->isCmdEmpty()){;}
+            core->waitCmdEmpty();
             std::this_thread::sleep_for(std::chrono::microseconds(5000));
         }
 
         if (addr % 20 == 0) // Wait every 20 regs to not overflow a buffer
-            while(!core->isCmdEmpty()){;}
+            core->waitCmdEmpty();
     }
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     
     this->writeRegister(&Itkpixv2::DiffTh1L, tmpTh1L);
     this->writeRegister(&Itkpixv2::DiffTh1R, tmpTh1R);
     this->writeRegister(&Itkpixv2::DiffTh1M, tmpTh1M);
     this->writeRegister(&Itkpixv2::DiffTh2, tmpTh2);
     
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 }
 
 void Itkpixv2::configurePixels() {
@@ -210,9 +210,9 @@ void Itkpixv2::configurePixels() {
         for (unsigned row=0; row<n_Row; row++) {
             this->writeRegister(&Itkpixv2::PixPortal, pixRegs[dc][row]);
             if (row%32==0)
-                while(!core->isCmdEmpty()){;}
+                core->waitCmdEmpty();
         }
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
     }
 }
 
@@ -231,7 +231,7 @@ void Itkpixv2::configurePixelMaskParallel() {
             maskBits[row] = toTenBitMask(pixRegs[dc][row]);
         }
         this->sendPixRegBlock(m_chipId, maskBits);
-        while(!core->isCmdEmpty()){;}
+        core->waitCmdEmpty();
     }
 
 }
@@ -252,11 +252,11 @@ void Itkpixv2::configurePixels(std::vector<std::pair<unsigned, unsigned>> &pixel
         this->writeRegister(&Itkpixv2::PixPortal, pixRegs[pixel.first>>1][pixel.second]);
         write_counter++;
         if (write_counter >= 20) {
-            while(!core->isCmdEmpty()){;}
+            core->waitCmdEmpty();
             write_counter = 0;
         }
     }
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 }
 
 yarrStatus Itkpixv2::writeRegister(Itkpixv2RegDefault Itkpixv2GlobalCfg::*ref, uint16_t value) {
@@ -273,7 +273,7 @@ yarrStatus Itkpixv2::readRegister(Itkpixv2RegDefault Itkpixv2GlobalCfg::*ref, ui
     // send a read register command to the chip so that it
     // sends back the current value of the register
     this->sendRdReg(m_chipId, (this->*ref).addr());
-    while(!core->isCmdEmpty()) {}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     // go through the incoming data stream and get the register read data
@@ -321,7 +321,7 @@ yarrStatus Itkpixv2::readRegister(Itkpixv2RegDefault Itkpixv2GlobalCfg::*ref, ui
                         logger->info("Sending another readRegister command.");
                         m_rxcore->flushBuffer();
                         this->sendRdReg(m_chipId, (this->*ref).addr());
-                        while(!core->isCmdEmpty()) {}
+                        core->waitCmdEmpty();
                         break;
                     }
                 }
@@ -467,7 +467,7 @@ yarrStatus Itkpixv2::checkCom() {
 
     m_rxcore->flushBuffer();
     this->sendRdReg(m_chipId, regAddr);
-    while(!core->isCmdEmpty()){;} // Required by the rdRegister() above 
+    core->waitCmdEmpty(); // Required by the rdRegister() above 
                                   // (when relying on isCmdEmpty() to actually send commands).
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
@@ -582,7 +582,7 @@ itkpix_efuse_codec::EfuseData Itkpixv2::readEfuses() {
     // put E-fuse programmer circuit block into READ mode
     //
     this->writeRegister(&Itkpixv2::EfuseConfig, 0x0f0f);
-    while(!core->isCmdEmpty()) {}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10)); 
 
     //
@@ -590,7 +590,7 @@ itkpix_efuse_codec::EfuseData Itkpixv2::readEfuses() {
     //
     //this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x100);
     //this->writeRegister(&Itkpixv2::GlobalPulseWidth, 200);
-    //while(!core->isCmdEmpty()) {}
+    //core->waitCmdEmpty();
     //this->sendGlobalPulse(m_chipId);
 
     //
@@ -622,7 +622,7 @@ uint32_t Itkpixv2::readEfusesRaw() {
     // put E-fuse programmer circuit block into READ mode
     //
     this->writeRegister(&Itkpixv2::EfuseConfig, 0x0f0f);
-    while(!core->isCmdEmpty()) {}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     //
@@ -630,7 +630,7 @@ uint32_t Itkpixv2::readEfusesRaw() {
     //
     //this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x100);
     //this->writeRegister(&Itkpixv2::GlobalPulseWidth, 200);
-    //while(!core->isCmdEmpty()) {}
+    //core->waitCmdEmpty();
     //this->sendGlobalPulse(m_chipId);
 
     //
@@ -684,18 +684,18 @@ yarrStatus Itkpixv2::confAdc(uint16_t MONMUX, bool doCur) {
     }
 
     success = success && (this->writeRegister(&Itkpixv2::MonitorEnable, 1) == yarrSuccess); // Enabling monitoring
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
 
     success = success && (this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x100) == yarrSuccess); // Reset ADC
     success = success && (this->writeRegister(&Itkpixv2::GlobalPulseWidth, 4) == yarrSuccess);   // Duration = 4 inherited from RD53A
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     this->sendGlobalPulse(m_chipId);
     std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Need to wait long enough for ADC to reset
 
     success = success && (this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x1000) == yarrSuccess); //Trigger ADC Conversion
-    while (!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(1000));
 
     this->sendGlobalPulse(m_chipId);
@@ -706,7 +706,7 @@ yarrStatus Itkpixv2::confAdc(uint16_t MONMUX, bool doCur) {
     success = success && (this->writeRegister(&Itkpixv2::MonitorEnable, OriginalMonitorEnable) == yarrSuccess);
     success = success && (this->writeRegister(&Itkpixv2::MonitorV, OriginalMonitorV) == yarrSuccess);
     success = success && (this->writeRegister(&Itkpixv2::MonitorI, OriginalMonitorI) == yarrSuccess);
-    while (!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(1000));
 
     return (success ? yarrSuccess : yarrFailure);
@@ -717,7 +717,7 @@ void Itkpixv2::runRingOsc(uint16_t duration, bool isBankB) {
 
     this->writeRegister(&Itkpixv2::GlobalPulseConf, isBankB ? 0x4000 : 0x2000); //Ring Osc Enable Rout
     this->writeRegister(&Itkpixv2::GlobalPulseWidth, duration);
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     this->sendGlobalPulse(m_chipId);
@@ -725,6 +725,6 @@ void Itkpixv2::runRingOsc(uint16_t duration, bool isBankB) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1)); //This is neccessary to clean. This might be controller dependent.
 
     this->writeRegister(&Itkpixv2::GlobalPulseConf, OriginalGlobalRT); // Recover the original routing
-    while(!core->isCmdEmpty()){;}
+    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 }

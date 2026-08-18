@@ -187,9 +187,9 @@ int main(int argc, char* argv[]) {
         }
     	fe->writeNamedRegister("GlobalPulseConf", pulse_conf);
     	fe->writeNamedRegister("GlobalPulseWidth", pulse_width);
-    	while(!hw->isCmdEmpty()){;}
+    	hw->waitCmdEmpty();
     	dynamic_cast<Rd53b&>(*fe).sendGlobalPulse(dynamic_cast<Rd53bCfg*>(cfg)->getChipId());
-    	while(!hw->isCmdEmpty()){;}
+    	hw->waitCmdEmpty();
     	std::this_thread::sleep_for(std::chrono::microseconds(100));
     	// Reset register
     	fe->writeNamedRegister("GlobalPulseConf", 0);

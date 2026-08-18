@@ -53,7 +53,7 @@ float Rd53bReadRegLoop::ReadResistTemp(Rd53b *fe, bool in_kelvin) {
     fe->writeRegister(&Rd53b::VrefRsensTop, 1);
     fe->writeRegister(&Rd53b::VrefRsensBot, 0);
     fe->writeRegister(&Rd53b::VrefIn, 0);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float voltageTop = fe->adcToV(this->ReadADC(5, false, fe));
@@ -62,7 +62,7 @@ float Rd53bReadRegLoop::ReadResistTemp(Rd53b *fe, bool in_kelvin) {
     fe->writeRegister(&Rd53b::VrefRsensTop, 0);
     fe->writeRegister(&Rd53b::VrefRsensBot, 1);
     fe->writeRegister(&Rd53b::VrefIn, 0);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float voltageBot = fe->adcToV(this->ReadADC(6, false, fe));
@@ -71,7 +71,7 @@ float Rd53bReadRegLoop::ReadResistTemp(Rd53b *fe, bool in_kelvin) {
     fe->writeRegister(&Rd53b::VrefRsensTop, 0);
     fe->writeRegister(&Rd53b::VrefRsensBot, 0);
     fe->writeRegister(&Rd53b::VrefIn, 1);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     // Convert voltage difference into temperature. The sensors at top and bottom of the chip are good for providing relative measurements, not absolute one
@@ -90,7 +90,7 @@ float Rd53bReadRegLoop::ReadTransSensor(Rd53b *fe, TransSensorLocation loc, Tran
     // enable sensor, and switch off bias
     fe->writeRegister(TransSensorCfg[loc][0], 1);
     fe->writeRegister(TransSensorCfg[loc][2], 0);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float VD = 0;
@@ -98,7 +98,7 @@ float Rd53bReadRegLoop::ReadTransSensor(Rd53b *fe, TransSensorLocation loc, Tran
     for (unsigned dem = 0; dem < 16; dem++)
     {
         fe->writeRegister(TransSensorCfg[loc][1], dem);
-        while (!g_tx->isCmdEmpty()){;}
+        g_tx->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         // Readout VMUX
         VD += fe->adcToV(this->ReadADC(TransSensorVMUX[loc][type], false, fe));
@@ -106,7 +106,7 @@ float Rd53bReadRegLoop::ReadTransSensor(Rd53b *fe, TransSensorLocation loc, Tran
 
     // switch on bias and loop again
     fe->writeRegister(TransSensorCfg[loc][2], 1);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float VDR = 0;
@@ -114,7 +114,7 @@ float Rd53bReadRegLoop::ReadTransSensor(Rd53b *fe, TransSensorLocation loc, Tran
     for (unsigned dem = 0; dem < 16; dem++)
     {
         fe->writeRegister(TransSensorCfg[loc][1], dem);
-        while (!g_tx->isCmdEmpty()){;}
+        g_tx->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::microseconds(100));
         // Readout VMUX
         VDR += fe->adcToV(this->ReadADC(TransSensorVMUX[loc][type], false, fe));
@@ -123,7 +123,7 @@ float Rd53bReadRegLoop::ReadTransSensor(Rd53b *fe, TransSensorLocation loc, Tran
     // Switch off sensor and bias
     fe->writeRegister(TransSensorCfg[loc][0], 0);
     fe->writeRegister(TransSensorCfg[loc][2], 0);
-    while (!g_tx->isCmdEmpty()){;}
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
     float deltaV = (VDR - VD) / 16.;
@@ -232,7 +232,7 @@ void Rd53bReadRegLoop::execPart1()
             // In m_EnblRingOsc, [0:7] are for bank A, and [8:12] are for bank B
             feRd53b->writeRegister(&Rd53b::RingOscAEn, (m_EnblRingOscA & 0xff));
 
-            while (!g_tx->isCmdEmpty()){;}
+            g_tx->waitCmdEmpty();
             std::this_thread::sleep_for(std::chrono::microseconds(100));
 
             for (unsigned i = 0; i < m_RingOscRep; i++)
@@ -246,7 +246,7 @@ void Rd53bReadRegLoop::execPart1()
                     // Reset bank A counters
                     feRd53b->writeRegister(&Rd53b::RingOscAClear, 1);
                     feRd53b->writeRegister(&Rd53b::RingOscAClear, 0);
-                    while (!g_tx->isCmdEmpty()){;}
+                    g_tx->waitCmdEmpty();
                     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                     // Run oscillators for some time
@@ -297,7 +297,7 @@ void Rd53bReadRegLoop::execPart1()
                     feRd53b->writeRegister(RingOscBEn[tmpCount], 1);
                 }
             }
-            while (!g_tx->isCmdEmpty()){;}
+            g_tx->waitCmdEmpty();
             std::this_thread::sleep_for(std::chrono::microseconds(100));
             
             for (unsigned i = 0; i < m_RingOscRep; i++)
@@ -310,7 +310,7 @@ void Rd53bReadRegLoop::execPart1()
                     // Reset bank B counters
                     feRd53b->writeRegister(&Rd53b::RingOscBClear, 1);
                     feRd53b->writeRegister(&Rd53b::RingOscBClear, 0);
-                    while (!g_tx->isCmdEmpty()){;}
+                    g_tx->waitCmdEmpty();
                     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                     // Run oscillators for some time

@@ -43,12 +43,12 @@ void FelixDirectMode::init() {
 
     m_done = false;
 
-    while(g_tx->isCmdEmpty() == 0);
+    g_tx->waitCmdEmpty();
 }
 
 void FelixDirectMode::end() {
     SPDLOG_LOGGER_DEBUG(logger, "End");
-    while(g_tx->isCmdEmpty() == 0);
+    g_tx->waitCmdEmpty();
 }
 
 void FelixDirectMode::setMode(int mask, int length)

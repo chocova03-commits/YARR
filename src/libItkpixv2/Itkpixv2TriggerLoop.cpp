@@ -129,7 +129,7 @@ void Itkpixv2TriggerLoop::init() {
     g_tx->setTrigTime(m_trigTime);
 
     g_tx->setCmdEnable(keeper->getTxMask());
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     //std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
@@ -139,7 +139,7 @@ void Itkpixv2TriggerLoop::execPart1() {
     auto itkpixv2 = dynamic_cast<Itkpixv2*>(g_fe);
     dynamic_cast<HwController*>(g_tx)->runMode();
     //itkpixv2->sendClear(16);
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(200));
     //std::this_thread::sleep_for(std::chrono::microseconds(10));
     g_rx->flushBuffer();

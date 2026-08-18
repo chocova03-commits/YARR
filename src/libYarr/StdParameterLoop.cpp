@@ -76,7 +76,7 @@ void StdParameterLoop::writePar() {
             }
         }
     }
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     // Wait for potential stabilisation
     if (m_waitTime.count() > 0)
         std::this_thread::sleep_for(m_waitTime);

@@ -36,6 +36,8 @@ void GlobalFeedbackReceiver::waitForFeedback(unsigned channel) {
         feedbackBinary(channel, data.sign, data.last);
     } else if(fbData->step) {
         feedbackStep(channel, data.sign, data.last);
+    } else if (fbData->final) {
+        feedbackFinal(channel, data.sign, data.last);
     } else {
         feedback(channel, data.sign, data.last);
     }
@@ -140,7 +142,7 @@ void GlobalFeedbackSender::feedback(unsigned channel, double sign, bool last)
     GlobalFeedbackParams params{sign, last};
     FeedbackParams::Variant v(params);
 
-    auto fbParams = std::make_unique<FeedbackParams>(false, false, std::move(v));
+    auto fbParams = std::make_unique<FeedbackParams>(false, false, false, std::move(v));
 
     clip->pushData(std::move(fbParams));
 }
@@ -156,7 +158,7 @@ void GlobalFeedbackSender::feedbackBinary(unsigned channel, double sign, bool la
     logger->trace("Global feedbackBinary: {} {}", sign, last);
     GlobalFeedbackParams params{sign, last};
 
-    auto fbParams = std::make_unique<FeedbackParams>(false, true, params);
+    auto fbParams = std::make_unique<FeedbackParams>(false, true, false, params);
 
     clip->pushData(std::move(fbParams));
 }
@@ -172,7 +174,23 @@ void GlobalFeedbackSender::feedbackStep(unsigned channel, double sign, bool last
     logger->trace("Global feedbackStep: {} {}", sign, last);
     GlobalFeedbackParams params{sign, last};
 
-    auto fbParams = std::make_unique<FeedbackParams>(true, false, params);
+    auto fbParams = std::make_unique<FeedbackParams>(true, false, false, params);
+
+    clip->pushData(std::move(fbParams));
+}
+
+void GlobalFeedbackSender::feedbackFinal(unsigned channel, double value, bool last)
+{
+    if(!clip) {
+        // This is equivalent to no action configured
+        logger->error("Sending feedbackFinal (global) with no pipe connected ");
+        throw std::runtime_error("Missing feedback connection (feedbackFinal)");
+    }
+
+    logger->info("Global feedbackFinal: {} {}", value, last);
+    GlobalFeedbackParams params{value, last};
+
+    auto fbParams = std::make_unique<FeedbackParams>(false, false, true, params);
 
     clip->pushData(std::move(fbParams));
 }
@@ -194,7 +212,7 @@ void PixelFeedbackSender::feedback(unsigned channel, std::unique_ptr<Histo2d> h)
     logger->trace("Pixel feedback on channel {}", channel);
     PixelFeedbackParams params{std::move(h)};
 
-    auto fbParams = std::make_unique<FeedbackParams>(false, false, std::move(params));
+    auto fbParams = std::make_unique<FeedbackParams>(false, false, false, std::move(params));
 
     clip->pushData(std::move(fbParams));
 }
@@ -210,7 +228,7 @@ void PixelFeedbackSender::feedbackStep(unsigned channel, std::unique_ptr<Histo2d
     logger->trace("Pixel feedbackStep on channel {}", channel);
     PixelFeedbackParams params{std::move(h)};
 
-    auto fbParams = std::make_unique<FeedbackParams>(true, false, std::move(params));
+    auto fbParams = std::make_unique<FeedbackParams>(true, false, false, std::move(params));
 
     clip->pushData(std::move(fbParams));
 }
@@ -232,7 +250,7 @@ void TriggerFeedbackSender::feedbackTrigger(unsigned channel, uint32_t info)
     logger->trace("Trigger feedback on channel {}", channel);
     TriggerFeedbackParams params{info};
 
-    auto fbParams = std::make_unique<FeedbackParams>(false, false, params);
+    auto fbParams = std::make_unique<FeedbackParams>(false, false, false, params);
 
     clip->pushData(std::move(fbParams));
 }

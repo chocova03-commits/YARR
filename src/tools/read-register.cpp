@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
                 hw->setCmdEnable(cfg->getTxChannel()); 
                 hw->setRxEnable(cfg->getRegRxChannel());
                 hw->checkRxSync(); // Must be done per fe (Aurora link) and after setRxEnable().
-                while(!hw->isCmdEmpty());
+                hw->waitCmdEmpty();
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                 uint16_t res = 0;
@@ -199,7 +199,7 @@ int main(int argc, char* argv[]) {
                 hw->setCmdEnable(cfg->getTxChannel()); 
                 hw->setRxEnable(cfg->getRegRxChannel());
                 hw->checkRxSync(); // Must be done per fe (Aurora link) and after setRxEnable().
-                while(!hw->isCmdEmpty());
+                hw->waitCmdEmpty();
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                 uint16_t res = 0;

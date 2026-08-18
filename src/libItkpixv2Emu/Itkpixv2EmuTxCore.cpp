@@ -29,6 +29,6 @@ void EmuTxCore<Itkpixv2>::doTrigger() {
         }
     }
     EmuTxCore<Itkpixv2>::writeFifo(0x0);
-    while(not EmuTxCore<Itkpixv2>::isCmdEmpty());
+    EmuTxCore<Itkpixv2>::waitCmdEmpty();
     trigProcRunning = false;
 }

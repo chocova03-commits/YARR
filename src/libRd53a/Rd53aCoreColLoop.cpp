@@ -52,7 +52,7 @@ void Rd53aCoreColLoop::init() {
         rd53a->disableCalCol(dc+2);
         rd53a->disableCalCol(dc+3);
     }
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
 }
 
 void Rd53aCoreColLoop::execPart1() {
@@ -80,7 +80,7 @@ void Rd53aCoreColLoop::execPart1() {
             rd53a->enableCalCol(dc+3);
         }
     //Add fine delay
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
 
     // TODO this needs to be changed to be per FE
@@ -90,8 +90,8 @@ void Rd53aCoreColLoop::execPart1() {
         else 
             rd53a->writeRegister(&Rd53a::InjDelay,m_delayArray[0]);
     }
-    while(!g_tx->isCmdEmpty()) {}
-    
+    g_tx->waitCmdEmpty();
+
     g_stat->set(this, m_impl->m_cur);
     //std::this_thread::sleep_for(std::chrono::milliseconds(20));
 }
@@ -119,7 +119,7 @@ void Rd53aCoreColLoop::end() {
             dynamic_cast<Rd53a*>(fe)->enableCalCol(dc+3);
         }
     }
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
     */
     //std::this_thread::sleep_for(std::chrono::milliseconds(20));
 }

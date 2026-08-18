@@ -66,7 +66,7 @@ void Itkpixv2ParameterLoop::end() {
 
 void Itkpixv2ParameterLoop::writePar() {
     keeper->globalFe<Itkpixv2>()->writeRegister(parPtr, m_cur);
-    while(!g_tx->isCmdEmpty());
+    g_tx->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 

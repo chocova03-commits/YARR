@@ -36,7 +36,7 @@ void Fei4MaskLoop::init() {
     keeper->globalFe<Fei4>()->initMask(m_mask);
     keeper->globalFe<Fei4>()->loadIntoPixel(1 << 0);
     m_cur = min;
-    while(g_tx->isCmdEmpty() == 0);
+    g_tx->waitCmdEmpty();
 }
 
 void Fei4MaskLoop::end() {
@@ -48,7 +48,7 @@ void Fei4MaskLoop::end() {
     keeper->globalFe<Fei4>()->loadIntoPixel(1 << 0);
     if (enable_lCap) keeper->globalFe<Fei4>()->loadIntoPixel(1 << 6);
     if (enable_sCap) keeper->globalFe<Fei4>()->loadIntoPixel(1 << 7);
-    while(g_tx->isCmdEmpty() == 0);
+    g_tx->waitCmdEmpty();
 }
 
 void Fei4MaskLoop::execPart1() {
@@ -70,7 +70,7 @@ void Fei4MaskLoop::execPart2() {
 	keeper->globalFe<Fei4>()->loadIntoPixel(1 << 0);
         //if (enable_lCap) keeper->globalFe<Fei4>()->loadIntoPixel(1 << 6);
         //if (enable_sCap) keeper->globalFe<Fei4>()->loadIntoPixel(1 << 7);
-        while(g_tx->isCmdEmpty() == 0);
+        g_tx->waitCmdEmpty();
     }
 }
 

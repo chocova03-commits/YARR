@@ -44,6 +44,8 @@ class TxCore {
         virtual uint32_t getCmdEnable() = 0;
         /// Is command sending complete
         virtual bool isCmdEmpty() = 0;
+        /// In general we just need to wait for command to be sent, allow overriding
+        virtual void waitCmdEmpty() { while(!isCmdEmpty()) ; }
 
         /**
          * Repeat triggers (aka burster).

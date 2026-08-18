@@ -64,6 +64,14 @@ void Rd53bGlobalFeedback::loadConfig(const json &j) {
     }
 }
 
+void Rd53bGlobalFeedback::feedbackFinal(unsigned channel, double value, bool last) {
+  m_values[channel] = value;
+  if (last) {
+    fbDoneMap[channel] = true;
+  }
+}
+
+
 void Rd53bGlobalFeedback::feedback(unsigned channel, double sign, bool last) {
     // Calculate new step and val
     logger->debug("[{}] Received feedback {} (old: {})", channel, sign, m_oldSign[channel]);
@@ -118,7 +126,7 @@ void Rd53bGlobalFeedback::writePar() {
             g_tx->setCmdEnable(feCfg->getTxChannel());
             // Write parameter
             dynamic_cast<Rd53b*>(fe)->writeRegister(parPtr, m_values[id]);
-            while(!g_tx->isCmdEmpty()){}
+            g_tx->waitCmdEmpty();
         }
     }
     // Reset CMD mask
@@ -155,7 +163,7 @@ void Rd53bGlobalFeedback::init() {
                 }
                 rd53b->configurePixels();
             }
-            while(!g_tx->isCmdEmpty()){}
+            g_tx->waitCmdEmpty();
         }
     }
     g_tx->setCmdEnable(keeper->getTxMask());
