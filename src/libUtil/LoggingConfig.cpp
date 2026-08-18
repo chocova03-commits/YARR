@@ -15,6 +15,48 @@
 
 #include "ProgressAwareSink.h"
 
+namespace {
+  // Drop ANSI CSI escape sequences (e.g. "\033[1;33m" ... "\033[0m" SGR color
+  // codes) from formatted output. Lets messages carry hand-placed terminal
+  // highlighting (which real color sinks pass straight through) without that
+  // highlighting leaking as raw escape bytes into plain sinks such as files.
+  void stripAnsiCodes(const spdlog::memory_buf_t &in, spdlog::memory_buf_t &out) {
+    for(size_t i = 0; i < in.size(); i++) {
+      if(in[i] == '\033' && i+1 < in.size() && in[i+1] == '[') {
+        size_t j = i + 2;
+        while(j < in.size() && (in[j] == ';' || (in[j] >= '0' && in[j] <= '9'))) {
+          j++;
+        }
+        // Final byte of a CSI sequence is in the range 0x40-0x7E
+        if(j < in.size() && in[j] >= 0x40 && in[j] <= 0x7E) {
+          i = j; // Skip the whole escape sequence
+          continue;
+        }
+      }
+      out.push_back(in[i]);
+    }
+  }
+
+  class AnsiStrippingFormatter : public spdlog::formatter {
+  public:
+    explicit AnsiStrippingFormatter(std::unique_ptr<spdlog::formatter> inner)
+      : m_inner(std::move(inner)) {}
+
+    void format(const spdlog::details::log_msg &msg, spdlog::memory_buf_t &dest) override {
+      spdlog::memory_buf_t formatted;
+      m_inner->format(msg, formatted);
+      stripAnsiCodes(formatted, dest);
+    }
+
+    std::unique_ptr<spdlog::formatter> clone() const override {
+      return std::make_unique<AnsiStrippingFormatter>(m_inner->clone());
+    }
+
+  private:
+    std::unique_ptr<spdlog::formatter> m_inner;
+  };
+}
+
 namespace logging {
 void to_json(json& j, const LoggingLoggersConfig& c) {
   j = json{{"name", c.name}};
@@ -141,19 +183,22 @@ static const std::map<std::string, int> level_map = {
   {"trace", SPDLOG_LEVEL_TRACE},
 };
 
-// Apply a pattern to a sink, routing the message payload ('%v') through
-// piratify() and prepending a random quip ('%j'), when pirate mode has been
-// enabled via the secret pass-phrase.
-static void applyPattern(spdlog::sink_ptr &sink, const std::string &pattern) {
+// Build a formatter for `pattern`, routing the message payload ('%v')
+// through piratify() and prepending a random quip ('%j'), when pirate mode
+// has been enabled via the secret pass-phrase.
+static std::unique_ptr<spdlog::formatter> makeFormatter(const std::string &pattern) {
     if (logging::pirateModeEnabled()) {
         auto formatter = std::make_unique<spdlog::pattern_formatter>();
         formatter->add_flag<logging::PirateVFormatter>('v');
         formatter->add_flag<logging::PirateQuipFormatter>('j');
         formatter->set_pattern(logging::insertQuipFlag(pattern));
-        sink->set_formatter(std::move(formatter));
-    } else {
-        sink->set_pattern(pattern);
+        return formatter;
     }
+    return std::make_unique<spdlog::pattern_formatter>(pattern);
+}
+
+static void applyPattern(spdlog::sink_ptr &sink, const std::string &pattern) {
+    sink->set_formatter(makeFormatter(pattern));
 }
 
 static std::string_view level_string(int lvl) {
@@ -236,8 +281,11 @@ void setupLoggers(const LoggingConfig &j, const std::string &path) {
           pattern = jl.pattern;
         }
 
-        spdlog::sink_ptr new_sink_ptr = new_sink;
-        applyPattern(new_sink_ptr, pattern);
+        // This is a file sink, so never let raw terminal color escapes
+        // (hand-placed at call sites) leak into it, on top of the usual
+        // pirate-mode-aware pattern.
+        new_sink->set_formatter(
+            std::make_unique<AnsiStrippingFormatter>(makeFormatter(pattern)));
         other_sinks[key] = new_sink;
     }
 

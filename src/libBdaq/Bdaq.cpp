@@ -6,6 +6,7 @@
 
 #include "Bdaq.h"
 #include "logging.h"
+#include "spdlog/fmt/bundled/color.h"
 
 namespace {
   auto logger = logging::make_log("Bdaq");
@@ -37,9 +38,9 @@ void Bdaq::initialize(bdaqConfig c) {
 		logger->critical(error);
 		exit(-1);
 	}
-	logger->info("\033[1;32mFound board " + dv.boardVersion + " with " +
-		dv.connectorVersion + " running firmware version " +
-		dv.fwVersion + "\033[0m");
+	logger->info(fmt::format(fmt::fg(fmt::terminal_color::green) | fmt::emphasis::bold,
+		"Found board {} with {} running firmware version {}",
+		dv.boardVersion, dv.connectorVersion, dv.fwVersion));
 	logger->info("Board has " + std::to_string(dv.numRxChannels) +
 		" Aurora receiver channel(s)");
 

@@ -16,6 +16,7 @@
 
 #include "lmcurve.h"
 #include "logging.h"
+#include "spdlog/fmt/bundled/color.h"
 
 namespace {
     auto alog = logging::make_log("StarStrobeDelayAnalysis");
@@ -254,10 +255,13 @@ void StarStrobeDelayAnalysis::pushData() {
   double rightEdgeStdDev = hDistRightEdge->getStdDev();
 
   // Print out general info
-  alog->info("\033[1;33m Left edge mean = {} +- {}\033[0m", leftEdgeMean, leftEdgeStdDev);
-  alog->info("\033[1;33m Right edge mean = {} +- {}\033[0m", rightEdgeMean, rightEdgeStdDev);
-  alog->info("\033[1;33m Number of failed fits for left edge = {}\033[0m", m_nFailedfit_left);
-  alog->info("\033[1;33m Number of failed fits for right edge = {}\033[0m", m_nFailedfit_right);
+  {
+    auto style = fmt::fg(fmt::terminal_color::yellow) | fmt::emphasis::bold;
+    alog->info(fmt::format(style, " Left edge mean = {} +- {}", leftEdgeMean, leftEdgeStdDev));
+    alog->info(fmt::format(style, " Right edge mean = {} +- {}", rightEdgeMean, rightEdgeStdDev));
+    alog->info(fmt::format(style, " Number of failed fits for left edge = {}", m_nFailedfit_left));
+    alog->info(fmt::format(style, " Number of failed fits for right edge = {}", m_nFailedfit_right));
+  }
 
   // Output left/right edge distributions
   output->pushData(std::move(hDistLeftEdge));

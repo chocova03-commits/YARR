@@ -32,6 +32,7 @@ namespace fs = std::filesystem;
 
 #include "logging.h"
 #include "LoggingConfig.h"
+#include "spdlog/fmt/bundled/color.h"
 
 #include "ScanOpts.h"
 
@@ -878,8 +879,9 @@ namespace ScanHelper {
     }
     void banner(std::shared_ptr<spdlog::logger> &logger, const std::string &msg) {
         unsigned len=msg.length()+8;
-        std::string frame = "\033[1;31m" + std::string(len,'#') + "\033[0m";
-        std::string body  = "\033[1;31m##  " + msg + "  ##\033[0m";
+        auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
+        std::string frame = fmt::format(style, "{}", std::string(len,'#'));
+        std::string body  = fmt::format(style, "##  {}  ##", msg);
         logger->info(frame);
         logger->info(body);
         logger->info(frame);

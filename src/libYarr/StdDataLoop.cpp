@@ -18,6 +18,7 @@
 #include "TxCore.h"
 
 #include "logging.h"
+#include "spdlog/fmt/bundled/color.h"
 
 using Clock = std::chrono::steady_clock;
 
@@ -162,10 +163,11 @@ void StdDataLoop::execPart2() {
         }
 
         if (newRawDataCount == 0) {
+          auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
           if (emptyRxCycle)
-            SPDLOG_LOGGER_TRACE(sdllog, "\033[1m\033[31m--> Received {} words in {} iterations up to now, but 0 new ones in this (empty) cycle!\033[0m", allRawDataCount, nAllRxReadIterations);
+            SPDLOG_LOGGER_TRACE(sdllog, fmt::format(style, "--> Received {} words in {} iterations up to now, but 0 new ones in this (empty) cycle!", allRawDataCount, nAllRxReadIterations));
           else
-            SPDLOG_LOGGER_DEBUG(sdllog, "\033[1m\033[31m--> Received {} words in {} iterations up to now, but 0 new ones! Trying to read more...\033[0m", allRawDataCount, nAllRxReadIterations);
+            SPDLOG_LOGGER_DEBUG(sdllog, fmt::format(style, "--> Received {} words in {} iterations up to now, but 0 new ones! Trying to read more...", allRawDataCount, nAllRxReadIterations));
         } else {
           SPDLOG_LOGGER_DEBUG(sdllog, "--> Received {} words in {} iterations!", allRawDataCount, nAllRxReadIterations);
           // Received data, reset timeout clock
@@ -216,10 +218,11 @@ void StdDataLoop::execPart2() {
         if (gotNewFeedback) {
           SPDLOG_LOGGER_DEBUG(sdllog, "Received some feedback: {} trigs, {} RRs, {} control, {} errors.", iterationNtrigs, iterationNrrs, iterationNctrl, iterationNerrs);
         } else {
+          auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
           if (emptyRxCycle)
-            SPDLOG_LOGGER_TRACE(sdllog, "\033[1m\033[31mDid not receive any feedback from data processors in this empty cycle.\033[0m");
+            SPDLOG_LOGGER_TRACE(sdllog, fmt::format(style, "Did not receive any feedback from data processors in this empty cycle."));
           else
-            SPDLOG_LOGGER_DEBUG(sdllog, "\033[1m\033[31mDid not receive any feedback from data processors. Trying to read more...\033[0m");
+            SPDLOG_LOGGER_DEBUG(sdllog, fmt::format(style, "Did not receive any feedback from data processors. Trying to read more..."));
         }
 
         // test if this was an "empty" cycle
