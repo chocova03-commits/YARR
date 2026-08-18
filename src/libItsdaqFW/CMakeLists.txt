@@ -31,3 +31,7 @@ install(DIRECTORY include/
     FILES_MATCHING
         PATTERN "*.h"
 )
+
+if (BUILD_TESTS)
+    add_subdirectory(tests)
+endif ()
