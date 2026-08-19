@@ -27,8 +27,8 @@ for a digital scan, or
 for an analog scan. Example outputs of mean ToT maps for the digital and analog scans are shown below.
 
 <figure class="image">
-<img src="images/emulator/Itkpixv2Emu_digitalScanExample.png" alt="ITkPixV2 emulator: Digital scan" width="250">
-<img src="images/emulator/Itkpixv2Emu_analogScanExample.png" alt="ITkPixV2 emulator: analog scan" width="250">
+<img src="../images/emulator/Itkpixv2Emu_digitalScanExample.png" alt="ITkPixV2 emulator: Digital scan" width="250">
+<img src="../images/emulator/Itkpixv2Emu_analogScanExample.png" alt="ITkPixV2 emulator: analog scan" width="250">
 <figcaption>Digital (left) and analog (right) scan ToT maps in the ITkPixV2 emulator.</figcaption>
 </figure>
 
@@ -41,8 +41,8 @@ This randomness, mimicking a non-ideal chip, is further pronounced in threshold 
 For an untuned chip, the threshold distribution is wide due to the per-pixel threshold variations and noise (emulated as Gauss(0, 50e)). The figures below show the untuned threshold distribution and map.
 
 <figure class="image">
-<img src="images/emulator/Itkpixv2Emu_untunedThresholdDist.png" alt="ITkPixV2 emulator: Untuned threshold distribution" width="250">
-<img src="images/emulator/Itkpixv2Emu_untunedThresholdMap.png" alt="ITkPixV2 emulator: Untuned threshold map" width="250">
+<img src="../images/emulator/Itkpixv2Emu_untunedThresholdDist.png" alt="ITkPixV2 emulator: Untuned threshold distribution" width="250">
+<img src="../images/emulator/Itkpixv2Emu_untunedThresholdMap.png" alt="ITkPixV2 emulator: Untuned threshold map" width="250">
 <figcaption>Untuned threshold distribution (left) and map (right), obtained with the ITkPixV2 emulator.</figcaption>
 </figure>
 
@@ -55,8 +55,8 @@ and
 ./bin/scanConsole -r configs/controller/emuCfg_itkpixv2.json -c configs/connectivity/example_itkpixv2_setup.json -s configs/scans/itkpixv2/std_tune_pixelthreshold.json -p -t 2000
 ```
 <figure class="image">
-<img src="images/emulator/Itkpixv2Emu_tunedThresholdDist.png" alt="ITkPixV2 emulator: Untuned threshold distribution" width="250">
-<img src="images/emulator/Itkpixv2Emu_tunedThresholdMap.png" alt="ITkPixV2 emulator: Untuned threshold map" width="250">
+<img src="../images/emulator/Itkpixv2Emu_tunedThresholdDist.png" alt="ITkPixV2 emulator: Untuned threshold distribution" width="250">
+<img src="../images/emulator/Itkpixv2Emu_tunedThresholdMap.png" alt="ITkPixV2 emulator: Untuned threshold map" width="250">
 <figcaption>Tuned (except for the first core column) threshold distribution (left) and map (right), obtained with the ITkPixV2 emulator.</figcaption>
 </figure>
 
@@ -64,7 +64,7 @@ and
 The emulator interacts with the outside through the `Itkpixv2Emu` class. `Itkpixv2Emu` instantiates two functional modules - `Itkpixv2EmuCommandInterpreter` and `Itkpixv2EmuCommandExe`. At the highest level, `Itkpixv2Emu` runs a loop that listens to the Tx and performs command interpretation and execution upon reception of data. This loop runs until stopped from the outside. The loop is sketched in the figure below.
 
 <figure class="image">
-<img src="images/emulator/Itkpixv2EmuTopLevelLoop.png" alt="" width="">
+<img src="../images/emulator/Itkpixv2EmuTopLevelLoop.png" alt="" width="">
 <figcaption>Top-level emulator loop.</figcaption>
 </figure>
 
@@ -83,7 +83,7 @@ struct Cmd {
 These interpreted commands are then passed through a FIFO to the `Itkpixv2EmuCommandExe`, which takes the appropriate action. A diagram of `Itkpixv2EmuCommandInterpreter` functionality is shown in the figure below.
 
 <figure class="image">
-<img src="images/emulator/Itkpixv2EmuCommandInterpreterSchematics.png" alt="" width="">
+<img src="../images/emulator/Itkpixv2EmuCommandInterpreterSchematics.png" alt="" width="">
 <figcaption>Diagram of Itkpixv2EmuCommandInterpreter class functionality</figcaption>
 </figure>
 
@@ -101,7 +101,7 @@ The following actions are taken for each command -
 - `Clear`  - no action
 
 <figure class="image">
-<img src="images/emulator/Itkpixv2EmuCommandExeSchematics.png" alt="" width="">
+<img src="../images/emulator/Itkpixv2EmuCommandExeSchematics.png" alt="" width="">
 <figcaption>Diagram of Itkpixv2EmuCommandExe class functionality</figcaption>
 </figure>
 
@@ -119,7 +119,7 @@ The global threshold calibration assumes linear translation between DAC and char
 ### Pixel threshold (TDAC to e)
 Depending on the TDAC sign, a linear relation is taken with slopes given by 1000 e at + 15 TDAC (positive TDAC) and -1400 e at -15 TDAC (negative TDAC). No offset is assumed in either case.
 
-<img src="images/emulator/Itkpixv2EmuTDACvsCharge.png" alt="" width="300">
+<img src="../images/emulator/Itkpixv2EmuTDACvsCharge.png" alt="" width="300">
 <figcaption>TDAC vs. threshold measurement used for emulator calibration</figcaption>
 </figure>
 
@@ -127,7 +127,7 @@ Depending on the TDAC sign, a linear relation is taken with slopes given by 1000
 ### Charge to ToT (e to bits)
 Very coarse linear calibration dividing 14 non-zero ToTs equally over 33000 e charge over threshold is used. The calibration function `Itkpixv2EmuUtils::chargeToToT` returns ToT + 1, so that serves both as ToT and an indication of a hit in case Tot is `0x0`. The lowest output value is therefore `0x1`. More realistic calibration (e. g. accounting for preamp settings) is currently not implemented.
 
-<img src="images/emulator/Itkpixv2EmuChargevsToT.png" alt="" width="300">
+<img src="../images/emulator/Itkpixv2EmuChargevsToT.png" alt="" width="300">
 <figcaption>Charge vs. ToT measurement used as a basis for emulator response calibration</figcaption>
 </figure>
 
@@ -152,8 +152,8 @@ bin/scanConsole -r configs/controller/emuCfg_rd53a.json -c configs/connectivity/
 ```
 The results obtained from these two scans look like the following
 <figure class="image">
-<img src="images/emulator/digitalscan.png" alt="Digital scan" width="250">
-<img src="images/emulator/analogscan.png" alt="Analog scan" width="250">
+<img src="../images/emulator/digitalscan.png" alt="Digital scan" width="250">
+<img src="../images/emulator/analogscan.png" alt="Analog scan" width="250">
 <figcaption>Digital (left) and analog (right) scan results in the RD53A emulator.</figcaption>
 </figure>
 
@@ -165,7 +165,7 @@ bin/scanConsole -r configs/controller/emuCfg_rd53a.json -c configs/connectivity/
 ```
 After the tuning one should see the occupancy distribution centered around 50% like the following:
 <figure class="image">
-<img src="images/emulator/diff_tune_globalthreshold.png" alt="Global threshold tuning" width="250">
+<img src="../images/emulator/diff_tune_globalthreshold.png" alt="Global threshold tuning" width="250">
 <figcaption>Result of global threshold tuning for linear front-end in the RD53A emulator.</figcaption>
 </figure>
 
@@ -176,7 +176,7 @@ bin/scanConsole -r configs/controller/emuCfg_rd53a.json -c configs/connectivity/
 ```
 This time we should see the occupancy distribution further concentrated around 50% like the following:
 <figure class="image">
-<img src="images/emulator/diff_tune_pixelthreshold.png" alt="Pixel threshold tuning" width="250">
+<img src="../images/emulator/diff_tune_pixelthreshold.png" alt="Pixel threshold tuning" width="250">
 <figcaption>Result of pixel threshold tuning for linear front-end in the RD53A emulator.</figcaption>
 </figure>
 
@@ -186,15 +186,15 @@ bin/scanConsole -r configs/controller/emuCfg_rd53a.json -c configs/connectivity/
 ```
 The threshold and noise distributions will look like following if everything is working fine:
 <figure class="image">
-<img src="images/emulator/sync_threshold.png" alt="Threshold distribution for sync FE" width="300">
-<img src="images/emulator/lin_threshold.png" alt="Threshold distribution for linear FE" width="300">
-<img src="images/emulator/diff_threshold.png" alt="Threshold distribution for differential FE" width="300">
+<img src="../images/emulator/sync_threshold.png" alt="Threshold distribution for sync FE" width="300">
+<img src="../images/emulator/lin_threshold.png" alt="Threshold distribution for linear FE" width="300">
+<img src="../images/emulator/diff_threshold.png" alt="Threshold distribution for differential FE" width="300">
 <figcaption>Threshold distributions for sync, linear, and differential front-ends.</figcaption>
 </figure>
 <figure class="image">
-<img src="images/emulator/sync_noise.png" alt="Noise distribution for sync FE" width="300">
-<img src="images/emulator/lin_noise.png" alt="Noise distribution for linear FE" width="300">
-<img src="images/emulator/diff_noise.png" alt="Noise distribution for differential FE" width="300">
+<img src="../images/emulator/sync_noise.png" alt="Noise distribution for sync FE" width="300">
+<img src="../images/emulator/lin_noise.png" alt="Noise distribution for linear FE" width="300">
+<img src="../images/emulator/diff_noise.png" alt="Noise distribution for differential FE" width="300">
 <figcaption>Noise distributions for sync, linear, and differential front-ends.</figcaption>
 </figure>
 
@@ -214,9 +214,9 @@ The measurement is performed by first tuning the chip to a series of target thre
 These linear functions are implemented in the emulator to map the target threshold in electron charges into Vth.
 
 <figure class="image">
-<img src="images/emulator/SyncVth_threshold.png" alt="Threshold vs. Vth for sync FE" width="250">
-<img src="images/emulator/LinVth_threshold.png" alt="Threshold vs. Vth for linear FE" width="250">
-<img src="images/emulator/DiffVth1_threshold.png" alt="Threshold vs. Vth for differential FE" width="250">
+<img src="../images/emulator/SyncVth_threshold.png" alt="Threshold vs. Vth for sync FE" width="250">
+<img src="../images/emulator/LinVth_threshold.png" alt="Threshold vs. Vth for linear FE" width="250">
+<img src="../images/emulator/DiffVth1_threshold.png" alt="Threshold vs. Vth for differential FE" width="250">
 <figcaption>Threshold vs. Vth for sync, linear, and differential front-ends</figcaption>
 </figure>
 
@@ -225,16 +225,16 @@ The untuned pixel thresholds on the chip have a dispersion. The dispersion is qu
 The distribution obtained can then be fitted with a Gaussian pdf. Both the mean and the sigma of the Gaussian are roughly constants as function of Vth as shown by plots below. In particular, the mean value divided by Vth is compatible with unity. The residual trends are not important to emulate.
 
 <figure class="image">
-<img src="images/emulator/SyncVth_dispersion_mean.png" alt="Mean of threshold dist./Vth vs. Vth for sync FE" width="250">
-<img src="images/emulator/LinVth_dispersion_mean.png" alt="Mean of threshold dist./Vth vs. Vth for linear FE" width="250">
-<img src="images/emulator/DiffVth1_dispersion_mean.png" alt="Mean of threshold dist./Vth vs. Vth for differential FE" width="250">
+<img src="../images/emulator/SyncVth_dispersion_mean.png" alt="Mean of threshold dist./Vth vs. Vth for sync FE" width="250">
+<img src="../images/emulator/LinVth_dispersion_mean.png" alt="Mean of threshold dist./Vth vs. Vth for linear FE" width="250">
+<img src="../images/emulator/DiffVth1_dispersion_mean.png" alt="Mean of threshold dist./Vth vs. Vth for differential FE" width="250">
 <figcaption>Mean of threshold distribution divided by Vth vs. Vth for sync, linear, and differential front-ends</figcaption>
 </figure>
 
 <figure class="image">
-<img src="images/emulator/SyncVth_dispersion_sigma.png" alt="Sigma of threshold dist./Vth vs. Vth for sync FE" width="250">
-<img src="images/emulator/LinVth_dispersion_sigma.png" alt="Sigma of threshold dist./Vth vs. Vth for linear FE" width="250">
-<img src="images/emulator/DiffVth1_dispersion_sigma.png" alt="Sigma of threshold dist./Vth vs. Vth for differential FE" width="250">
+<img src="../images/emulator/SyncVth_dispersion_sigma.png" alt="Sigma of threshold dist./Vth vs. Vth for sync FE" width="250">
+<img src="../images/emulator/LinVth_dispersion_sigma.png" alt="Sigma of threshold dist./Vth vs. Vth for linear FE" width="250">
+<img src="../images/emulator/DiffVth1_dispersion_sigma.png" alt="Sigma of threshold dist./Vth vs. Vth for differential FE" width="250">
 <figcaption>Sigma of threshold distribution divided by Vth vs. Vth for sync, linear, and differential front-ends</figcaption>
 </figure>
 
@@ -245,16 +245,16 @@ Instead of characterizing TDAC response using the real chip, here a simplified a
 The pixel noise is evaluated using the same threshold scans used to study threshold dispersion as discussed above. The mean and sigma of the width of the noise distribution are roughly constants as function of Vth as shown in plots below.
 
 <figure class="image">
-<img src="images/emulator/SyncVth_noise_mean.png" alt="Mean of width of noise vs. Vth for sync FE" width="250">
-<img src="images/emulator/LinVth_noise_mean.png" alt="Mean of width of noise vs. Vth for linear FE" width="250">
-<img src="images/emulator/DiffVth1_noise_mean.png" alt="Mean of width of noise vs. Vth for differential FE" width="250">
+<img src="../images/emulator/SyncVth_noise_mean.png" alt="Mean of width of noise vs. Vth for sync FE" width="250">
+<img src="../images/emulator/LinVth_noise_mean.png" alt="Mean of width of noise vs. Vth for linear FE" width="250">
+<img src="../images/emulator/DiffVth1_noise_mean.png" alt="Mean of width of noise vs. Vth for differential FE" width="250">
 <figcaption>Mean of width of noise vs. Vth for sync, linear, and differential front-ends</figcaption>
 </figure>
 
 <figure class="image">
-<img src="images/emulator/SyncVth_noise_sigma.png" alt="Sigma of width of noise vs. Vth for sync FE" width="250">
-<img src="images/emulator/LinVth_noise_sigma.png" alt="Sigma of width of noise vs. Vth for linear FE" width="250">
-<img src="images/emulator/DiffVth1_noise_sigma.png" alt="Sigma of width of noise vs. Vth for differential FE" width="250">
+<img src="../images/emulator/SyncVth_noise_sigma.png" alt="Sigma of width of noise vs. Vth for sync FE" width="250">
+<img src="../images/emulator/LinVth_noise_sigma.png" alt="Sigma of width of noise vs. Vth for linear FE" width="250">
+<img src="../images/emulator/DiffVth1_noise_sigma.png" alt="Sigma of width of noise vs. Vth for differential FE" width="250">
 <figcaption>Sigma of width of noise vs. Vth for sync, linear, and differential front-ends</figcaption>
 </figure>
 
@@ -262,9 +262,9 @@ The pixel noise is evaluated using the same threshold scans used to study thresh
 The pixel ToT as function of extra charge above threshold is studied in the following steps. First, the chip is tuned to 1000e threshold, with ToT=8 bc at 10ke. Then the ToT is measured at different injection charges, ranging from 8ke to 12ke. Subtracting out the threshold (1ke), the results are summarized in the following plots. A linear function is good enough to model the data in each case.
 
 <figure class="image">
-<img src="images/emulator/Syn_tot.png" alt="ToT vs. extra charge above threshold for sync FE" width="250">
-<img src="images/emulator/Lin_tot.png" alt="ToT vs. extra charge above threshold for linear FE" width="250">
-<img src="images/emulator/Diff_tot.png" alt="ToT vs. extra charge above threshold for differential FE" width="250">
+<img src="../images/emulator/Syn_tot.png" alt="ToT vs. extra charge above threshold for sync FE" width="250">
+<img src="../images/emulator/Lin_tot.png" alt="ToT vs. extra charge above threshold for linear FE" width="250">
+<img src="../images/emulator/Diff_tot.png" alt="ToT vs. extra charge above threshold for differential FE" width="250">
 <figcaption>ToT vs. extra charge above threshold for sync, linear, and differential front-ends</figcaption>
 </figure>
 
