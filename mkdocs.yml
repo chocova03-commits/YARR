@@ -21,6 +21,7 @@ nav:
           - Scan Analyses: scan_analyses.md
           - Scan Output Format: output_format.md
           - Logging configuration: logging.md
+    - Tool Reference: tools.md
     - FrontEnds:
           - FE-I4: fei4.md
           - FE65-P2: fe65p2.md
