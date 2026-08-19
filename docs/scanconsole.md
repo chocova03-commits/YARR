@@ -61,7 +61,7 @@ Example of a controller config:
     }
 }
 ```
-The "type" specifies which hardware controller should be used. Any fields in the "cfg" field are specific the hardware and details can be found here: [TODO](todo)
+The "type" specifies which hardware controller should be used. Any fields in the "cfg" field are specific to the hardware; see the respective controller's documentation page (e.g. [SPEC](pcie_ext.md), [Emulator](emulator.md), [FelixClient](felixclient.md), [BDAQ](bdaq.md)) or an example config under `configs/controller/` for the fields supported by your hardware.
 
 If you are running with multiple PCIexpress cards, each should have its own controller configuration with the appropriate value for `specNum`.
 

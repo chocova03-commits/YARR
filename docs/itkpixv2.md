@@ -44,7 +44,7 @@ Please note that the number of active lanes might also need to be specified in t
 
 ### Link sharing
 
-TODO
+Use the [module-qc-database-tools](https://gitlab.cern.ch/atlas-itk/pixel/module/module-qc-database-tools) repository to generate the correct chip and connectivity configs for a link-sharing setup.
 
 ## Start-up
 

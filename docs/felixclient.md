@@ -319,9 +319,9 @@ Available options:
  -h : Display a help message to print out options and usage information.
 ```
 
-## TODO
+## Status
 
-Support for Pixel readout chips.
+Readout of ITkPixV1, ITkPixV2, and STAR chips is fully supported.
 
 ## Felix Client Bridge
 

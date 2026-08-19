@@ -263,7 +263,6 @@ Make sure to change the chip configuration to transmit at the right speed. Detai
 
 Not all configuration are available for all chip types:
 
-- FE-I4: tbd
 - FE65-P2: 1x1
 - RD53A/B: 4x4, 16x1
 - ABC/HCCStar: 4x1
