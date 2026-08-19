@@ -1,10 +1,182 @@
-# RD53B testing with the Single Chip Card
-
-More details and schematics can be found here: [Single Chip Card](https://twiki.cern.ch/twiki/bin/viewauth/RD53/RD53BTesting#RD53B_Single_Chip_Card_SCC)
+# RD53B Testing
 
 The information presented here is in addition to the information in the [Chip Manual](https://cds.cern.ch/record/2665301). So please refer to the manual for further details on the chip operation.
 
-## SCC checks before starting
+This page focuses on running YARR against an RD53B/ITkPixV1 chip, whether mounted on a flex module or a bare Single Chip Card (SCC). The majority of setups today are flex modules. Hardware bring-up notes for both carrier types are given at the end of this page: [Single Chip Card (SCC) setup](#hardware-single-chip-card-scc-setup) and [Module setup](#hardware-module-setup).
+
+## Scan Console for RD53B
+
+The general structure of the scanConsole command is:
+```bash
+./bin/scanConsole -r configs/controller/specCfg-rd53b.json -c configs/connectivity/example_rd53b_setup.json -s configs/scans/rd53b/<type of scan>.json -p
+```
+
+which specifies the controller (`-r`), the chip list and chip type (`-c`), and the scan (`-s`). The option `-p` selects plotting so plots are produced after the scans.
+If you run a scan for the first time, it will create a default configuration for the chip along with running the scan.
+
+## DAQ specifics for RD53B
+
+### Number Data Lanes
+
+Choose the number of active data lanes according to your setup and firmware. This can be chosen via the ``AuroraActiveLanes`` register where each bit represents one lane.
+Typically 16x1 firmware uses one lane ``AuroraActiveLanes = 1`` and 4x4 firmware uses ``AuroraActiveLanes = 15``.
+
+### Active Lanes
+
+ITkPix can be configured to be read out via 1 and up to 4 lanes. Typically for a chip mounted onto a SCC you would want to use 4 lane read out, while a chip inside a quad module might only use 1 lane.
+
+Three registers are involved in configuring how many lanes should be used for the read out:
+
+- ``AuroraActiveLanes``: determines how many lanes are used to transmit data (does not disable the physical link), possible values 1,3,7,15 to select 1, 2, 3, and 4 lane readout.
+- ``DataMergeOutMux0/1/2/3``: selects which physical lane a logical lane will be transmitted on (allows us to re-reoute data in case the hardware wiring does not match the nominal lane order). Possible values 0, 1, 2, 3.
+- ``SerEnLane``: eneables/disables the serializer in a physical lane (0 to enable, 1 to disable); all lanes can be left enabled (default 15)
+
+When using the YARR-PCIe cards and SCC, possible values are:
+
+| Number of Lanes | ``AuroraActiveLanes`` | ``SerEnLane`` | ``DataMergeOutMux0/1/2/3`` |
+| --------------- | --------------------- | ------------- | -------------------------- |
+| 4               | 15                    | 15            | 3, 2, 1, 0                 |
+| 3               |  7                    | 14            | 3, 2, 1, 0                 |
+| 2               |  3                    | 12            | 3, 2, 1, 0                 |
+| 1               |  1                    |  8            | 3, 2, 1, 0                 |
+
+Please note that the number of active lanes might also need to be specified in the controller config to inform the firmware about how many lanes are used for the readout.
+
+### Link sharing
+
+TODO
+
+## Start-up
+
+### ITkPixV1.0
+
+ITkPixV1 contains a bug which leads to large current on the digital rail caused by wrongly designed ToT latch. It is not desireable to leave the chip in this high current state for too long without at least passive cooling of some sort. The current can be reduced by running a ``std_digitalscan``. Once the current has been reduced it should stay in this mode until fully power cycled.
+
+#### Current
+
+Expected current draw at start-up:
+
+- Digital: typical 1.5A, up to 2.5A
+- Analog: 80-100mA
+
+After ``std_digitalscan``:
+
+- Digital: around 600mA
+- Analog: around 750mA (depending on config)
+
+### ITkPixV1.1
+
+#### Current
+
+Expected current draw at start-up:
+
+- Digital: 200-250mA
+- Analog: 80-100mA
+
+After ``std_digitalscan`` (depends on exact config):
+
+- Digital: around 600mA
+- Analog: around 750mA
+
+## Tuning Routine
+
+We recommend the following tuning routine:
+
+1. Tune global threshold to 1200e (overtune by approx 200e)
+2. Tune pixel threshold to 1000e
+
+## Testing with ITkPixV1.0 and ITkPixV1.1 Quad Modules
+
+Due to an issue in the SW you can only read out ONE chip at a time.
+
+### Testing with ITkPixV1.0
+
+Since one can read only ONE chip at a time, at the beginning of each scan the reset should be avoided, see [MR !482](https://gitlab.cern.ch/YARR/YARR/-/merge_requests/482).
+
+Tuning routine should use precision ToT scans:
+
+- ptot_digitalscan
+- ptot_analogscan
+- ptot_tune_globalthreshold (target 1000e)
+- ptot_tune_pixelthreshold (target 1000e)
+- ptot_thresholdscan
+
+### Testing with ITkPixV1.1
+
+Since one can read only ONE chip at a time, at the beginning of each scan the reset should be avoided, see [MR !482](https://gitlab.cern.ch/YARR/YARR/-/merge_requests/482).
+
+Tuning routine:
+
+- std_digitalscan
+- std_analogscan
+- std_tune_globalthreshold (target 1200e)
+- std_tune_pixelthreshold (target 1000e)
+- std_thresholdscan
+
+### Quad module configuration files with 1-DisplayPort Data Adapter Card
+
+The example below assumes the DisplayPort cable is connected to Port A of the Ohio card. For the physical DisplayPort pin-to-channel mapping and other data/power adapter card details, see the [Hardware: Module setup](#hardware-module-setup) section below.
+
+```bash
+"chipType" : "RD53B",
+"chips" : [
+    {
+        "config" : "configs/rd53b_1DPQuad04_Chip1.json",
+        "tx" : 0,
+        "rx" : 2,
+        "enable" : 1,
+        "locked" : 0
+    },
+    {
+        "config" : "configs/rd53b_1DPQuad04_Chip2.json",
+        "tx" : 0,
+        "rx" : 1,
+        "enable" : 1,
+        "locked" : 0
+    },
+    {
+        "config" : "configs/rd53b_1DPQuad04_Chip3.json",
+        "tx" : 0,
+        "rx" : 0,
+        "enable" : 1,
+        "locked" : 0
+    },
+    {
+        "config" : "configs/rd53b_1DPQuad04_Chip4.json",
+        "tx" : 0,
+        "rx" : 3,
+        "enable" : 1,
+        "locked" : 0
+    }
+]
+}
+```
+
+Summary table of Chip configs:
+
+| #Chip | `ChipID` | `DataMergeOutMux0/1/2/3` | `AuroraActiveLanes` |
+| :---: | :------: | :----------------------: | :-----------------: |
+| Chip1 | 12       | 2/3/0/1                  | 1                   |
+| Chip2 | 13       | 0/1/2/3                  | 1                   |
+| Chip3 | 14       | 1/2/3/0                  | 1                   |
+| Chip4 | 15       | 0/1/2/3                  | 1                   |
+
+## Disabling FEs
+
+The default values for the FEs in the chip configuration are
+
+- `EnCoreCol0`: 65535; enables each bit in core columns 1--16
+- `EnCoreCol1`: 65535; enables each bit in core columns 17--32
+- `EnCoreCol2`: 65535; enables each bit in core columns 33--48
+- `EnCoreCol3`: 63;    enables each bit in core columns 49--54 (ITkPix has only 50 core columns, the last 4 bits are reserved for the CMS chip)
+
+To disable a FE, you need to set the appropriate `EnCoreCol` to 0.
+
+## Hardware: Single Chip Card (SCC) setup
+
+The following applies only when bench-testing a single chip mounted on an SCC.
+
+More details and schematics for the SCC can be found here: [Single Chip Card](https://twiki.cern.ch/twiki/bin/viewauth/RD53/RD53BTesting#RD53B_Single_Chip_Card_SCC)
 
 ### Components
 
@@ -57,182 +229,6 @@ The global chip settings for an SCC should be as below. The default values in YA
 "SerInvTap": 0,
 ```
 
-## DAQ specifics for RD53B
+## Hardware: Module setup
 
-### Number Data Lanes
-
-Choose the number of active data lanes according to your setup and firmware. This can be chosen via the ``AuroraActiveLanes`` register where each bit represents one lane.
-Typically 16x1 firmware uses one lane ``AuroraActiveLanes = 1`` and 4x4 firmware uses ``AuroraActiveLanes = 15``.
-
-## Scan Console for RD53B
-
-The general structure of the scanConsole command is:
-```bash
-./bin/scanConsole -r configs/controller/specCfg-rd53b.json -c configs/connectivity/example_rd53b_setup.json -s configs/scans/rd53b/<type of scan>.json -p
-```
-
-which specifies the controller (`-r`), the chip list and chip type (`-c`), and the scan (`-s`). The option `-p` selects plotting so plots are produced after the scans.
-If you run a scan for the first time, it will create a default configuration for the chip along with running the scan.
-
-## Start-up
-
-### ITkPixV1.0
-
-ITkPixV1 contains a bug which leads to large current on the digital rail caused by wrongly designed ToT latch. It is not desireable to leave the chip in this high current state for too long without at least passive cooling of some sort. The current can be reduced by running a ``std_digitalscan``. Once the current has been reduced it should stay in this mode until fully power cycled.
-
-#### Current
-
-Expected current draw at start-up:
-
-- Digital: typical 1.5A, up to 2.5A
-- Analog: 80-100mA
-
-After ``std_digitalscan``:
-
-- Digital: around 600mA
-- Analog: around 750mA (depending on config)
-
-### ITkPixV1.1
-
-#### Current
-
-Expected current draw at start-up:
-
-- Digital: 200-250mA
-- Analog: 80-100mA
-
-After ``std_digitalscan`` (depends on exact config):
-
-- Digital: around 600mA
-- Analog: around 750mA
-
-## Tuning Routine
-
-We recommend the following tuning routine:
-
-1. Tune global threshold to 1200e (overtune by approx 200e)
-2. Tune pixel threshold to 1000e
-
-## Active Lanes
-
-ITkPix can be configured to be read out via 1 and up to 4 lanes. Typically for a chip mounted onto a SCC you would want to use 4 lane read out, while a chip inside a quad module might only use 1 lane.
-
-Three registers are involved in configuring how many lanes should be used for the read out:
-
-- ``AuroraActiveLanes``: determines how many lanes are used to transmit data (does not disable the physical link), possible values 1,3,7,15 to select 1, 2, 3, and 4 lane readout.
-- ``DataMergeOutMux0/1/2/3``: selects which physical lane a logical lane will be transmitted on (allows us to re-reoute data in case the hardware wiring does not match the nominal lane order). Possible values 0, 1, 2, 3.
-- ``SerEnLane``: eneables/disables the serializer in a physical lane (0 to enable, 1 to disable); all lanes can be left enabled (default 15)
-
-When using the YARR-PCIe cards and SCC, possible values are:
-
-| Number of Lanes | ``AuroraActiveLanes`` | ``SerEnLane`` | ``DataMergeOutMux0/1/2/3`` |
-| --------------- | --------------------- | ------------- | -------------------------- |
-| 4               | 15                    | 15            | 3, 2, 1, 0                 |
-| 3               |  7                    | 14            | 3, 2, 1, 0                 |
-| 2               |  3                    | 12            | 3, 2, 1, 0                 |
-| 1               |  1                    |  8            | 3, 2, 1, 0                 |
-
-Please note that the number of active lanes might also need to be specified in the controller config to inform the firmware about how many lanes are used for the readout.
-
-## Link sharing
-
-TODO
-
-## Testing with ITkPixV1.0 and ITkPixV1.1 Quad Modules
-
-The design files for the quad PCB [Common Quad v2.4](https://gitlab.cern.ch/itk-pixel-hybrid/itkpixv1_quad/-/tree/RD53B_ITKPixV1_QuadHybrid_Rev2.4)
-
-Due to an issue in the SW you can only read out ONE chip at a time.
-
-### Testing with ITkPixV1.0
-
-Since one can read only ONE chip at the time, at the begining of each scan the reset should be avoided, MR is here https://gitlab.cern.ch/YARR/YARR/-/merge_requests/482 
-
-Tunning routine should use precision ToT scans:
-
-- ptot_digitalscan
-- ptot_analogscan
-- ptot_tune_globalthreshold (target 1000e)
-- ptot_tune_pixelthreshold (target 1000e)
-- ptot_thresholdscan
-
-### Testing with ITkPixV1.1
-
-Since one can read only ONE chip at the time, at the begining of each scan the reset should be avoided, MR is here https://gitlab.cern.ch/YARR/YARR/-/merge_requests/482 
-
-Tunning routine:
-
-- std_digitalscan
-- std_analogscan
-- std_tune_globalthreshold (target 1200e)
-- std_tune_pixelthreshold (target 1000e)
-- std_thresholdscan
-
-
-### Quad module configuration files with 1-DisplayPort Data Adapter Card
-
-The DisplayPort is connected to Port A of the Ohio cars. Note that DisplayPort pins are connected to:
-
-- pins 1,3 correspond to channel 0
-- pins 4,6 to channel 1
-- pins 7,9 to channel 2
-- pins 10,12 to channel 3
-
-Connectifvity file when DisplayPort cable is connected to Port A of the Ohio card
-
-```bash
-"chipType" : "RD53B",
-"chips" : [
-    {
-        "config" : "configs/rd53b_1DPQuad04_Chip1.json",
-        "tx" : 0,
-        "rx" : 2,
-        "enable" : 1,
-        "locked" : 0
-    },
-    {
-        "config" : "configs/rd53b_1DPQuad04_Chip2.json",
-        "tx" : 0,
-        "rx" : 1,
-        "enable" : 1,
-        "locked" : 0
-    },
-    {
-        "config" : "configs/rd53b_1DPQuad04_Chip3.json",
-        "tx" : 0,
-        "rx" : 0,
-        "enable" : 1,
-        "locked" : 0
-    },
-    {
-        "config" : "configs/rd53b_1DPQuad04_Chip4.json",
-        "tx" : 0,
-        "rx" : 3,
-        "enable" : 1,
-        "locked" : 0
-    }
-]
-}
-```
-
-Summary table of Chip configs:
-
-| #Chip | `ChipID` | `DataMergeOutMux0/1/2/3` | `AuroraActiveLanes` |
-| :---: | :------: | :----------------------: | :-----------------: |
-| Chip1 | 12       | 2/3/0/1                  | 1                   |
-| Chip2 | 13       | 0/1/2/3                  | 1                   |
-| Chip3 | 14       | 1/2/3/0                  | 1                   |
-| Chip4 | 15       | 0/1/2/3                  | 1                   |
-
-
-## Disabling FEs
-
-The default values for the FEs in the chip configuration are
-
-- `EnCoreCol0`: 65535; enables each bit in core columns 1--16
-- `EnCoreCol1`: 65535; enables each bit in core columns 17--32
-- `EnCoreCol2`: 65535; enables each bit in core columns 33--48
-- `EnCoreCol3`: 63;    enables each bit in core columns 49--54 (ITkPix has only 50 core columns, the last 4 bits are reserved for the CMS chip)
-
-To disable a FE, you need to set the appropriate `EnCoreCol` to 0.
-
+Module hardware (flex PCB, data pigtail, power pigtail, data adapter card, power adapter card) is documented in the [itk-pixel-hybrid](https://gitlab.cern.ch/itk-pixel-hybrid) GitLab group, not in this repository. The design files for the quad PCB (Common Quad v2.4) are maintained in the [itk-pixel-hybrid](https://gitlab.cern.ch/itk-pixel-hybrid/itkpixv1_quad/-/tree/RD53B_ITKPixV1_QuadHybrid_Rev2.4) GitLab group. See the [Quad module configuration files with 1-DisplayPort Data Adapter Card](#quad-module-configuration-files-with-1-displayport-data-adapter-card) section above for the software-side connectivity config that goes with this hardware.

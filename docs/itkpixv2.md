@@ -1,57 +1,8 @@
-# ITkPixV2 testing with the Single Chip Card
-
-More details and schematics can be found here: [Single Chip Card](https://twiki.cern.ch/twiki/bin/viewauth/RD53/RD53BTesting#RD53B_Single_Chip_Card_SCC)
-TODO update for itkpixv2? ^
+# ITkPixV2 Testing
 
 The information presented here is in addition to the information in the [Chip Manual](https://cds.cern.ch/record/2665301). So please refer to the manual for further details on the chip operation.
 
-## SCC checks before starting
-
-### Components
-
-- ``C24`` should be removed
-- Either ``R15`` or ``R17`` should be mounted, not both
-- Either ``R14`` or ``R16`` should be mounted, not both
-- ``GND_SNS``, ``VDDD_SNS``, ``R_SCAN``, ``R7``, ``R10``, ``R_GND_BDAQ`` should not be mounted
-### Jumpers
-
-- IREF should be trimmed to 4uA. The 4 ``IREF_TRIM`` pin pairs correspond to a binary number that tunes the IREF. To tune IREF, various ``IREF_TRIM`` jumper configurations are tried until the ``Vref_ADC`` pin reads as close to ``0.845 V`` as possible. Untuned ``IREF_TRIM`` should be set to ``0xB`` (``1011``), meaning only bit 2 closed with a jumper. 
-- If no ChipId jumper is placed, the default ChipId is ``0xF``/``15``.
-- ``VDD_EFUSE`` should be shorted to GND (jumper inserted)
-- No ``DEBUG`` jumpers (``PIMTM``, ``TEST_MODE``, ``BYP_MODE``) should be placed
-
-### Powering mode
-
-Preferred mode for testing should be LDO mode.
-
-- LDO mode:
-    - ``PWR_D`` jumper should have center connected to VIND only
-    - ``PWR_A`` jumper should have center connected to VINA only
-    - ``VDD_PLL_SEL`` jumper should have center connected to VDDA only
-    - ``VDD_CML_SEL`` jumper should have center connected to VDDA only
-    - ``SHUNT_EN`` should be open
-    - Supply 1.6V on ``VIND`` and ``VINA``
-
-- Direct power:
-    - ``PWR_D`` jumper should have center connected to VDDD
-    - ``PWD_A`` jumper should have center connected to VDDA
-    - If PLL and CML shall be powered externally, connect ``VDD_PLL_SEL`` and ``VDD_CML_SEL`` jumper center connected to VEXT (connecting it to the second Molex connector)
-    - ``SHUNT_EN`` should be open
-    - Supply ``VDDD`` and ``VDDA`` such that voltage on SCC is not higher than 1.25V, ideally 1.2V.
-
-- SLDO mode:
-    - Power jumpers the same as for LDO mode
-    - ``SHUNT_EN`` jumper should be closed
-    - ``VOFS`` jumper should be closed
-    - Crosscheck value of ``R_EXTA``, ``R_EXTD``, ``R_IOFS``, and ``R_IOFS_LB`` to be according to your operational needs (read manual for further info).
-    - Supply current fitting your offset and slope choice, optimal voltage across the module is around 1.6V
-
-## DAQ specifics for ITkPixV2
-
-### Number Data Lanes
-
-Choose the number of active data lanes according to your setup and firmware. This can be chosen via the ``AuroraActiveLanes`` register where each bit represents one lane.
-Typically 16x1 firmware uses one lane ``AuroraActiveLanes = 1`` and 4x4 firmware uses ``AuroraActiveLanes = 15``.
+This page focuses on running YARR against an ITkPixV2 chip, whether mounted on a flex module or a bare Single Chip Card (SCC). The majority of setups today are flex modules. Hardware bring-up notes for both carrier types are given at the end of this page: [Single Chip Card (SCC) setup](#hardware-single-chip-card-scc-setup) and [Module setup](#hardware-module-setup).
 
 ## Scan Console for ITkPixV2
 
@@ -63,30 +14,14 @@ The general structure of the scanConsole command is:
 which specifies the controller (`-r`), the chip list and chip type (`-c`), and the scan (`-s`). The option `-p` selects plotting so plots are produced after the scans.
 If you run a scan for the first time, it will create a default configuration for the chip along with running the scan.
 
-## Start-up
+## DAQ specifics for ITkPixV2
 
-#### Current
+### Number Data Lanes
 
-Expected current draw at start-up:
+Choose the number of active data lanes according to your setup and firmware. This can be chosen via the ``AuroraActiveLanes`` register where each bit represents one lane.
+Typically 16x1 firmware uses one lane ``AuroraActiveLanes = 1`` and 4x4 firmware uses ``AuroraActiveLanes = 15``.
 
-- Digital: 200-250mA
-- Analog: 80-100mA
-
-After ``std_digitalscan`` (depends on exact config):
-
-- Digital: around 600m
-- Analog: around 750mA
-
-## Tuning Routine
-
-We recommend the following tuning routine:
-
-1. Tune global threshold to 1200e (overtune by 200e)
-2. Tune global preamp to 7 ToT @ 6000e
-3. Tune global threshold to 1200e (overtune by 200e)
-4. Tune pixel threshold to 1000e
-
-## Active Lanes
+### Active Lanes
 
 ITkPix can be configured to be read out via 1 and up to 4 lanes. Typically for a chip mounted onto a SCC you would want to use 4 lane read out, while a chip inside a quad module might only use 1 lane.
 
@@ -107,9 +42,32 @@ When using the YARR-PCIe cards and SCC, possible values are:
 
 Please note that the number of active lanes might also need to be specified in the controller config to inform the firmware about how many lanes are used for the readout.
 
-## Link sharing
+### Link sharing
 
 TODO
+
+## Start-up
+
+#### Current
+
+Expected current draw at start-up:
+
+- Digital: 200-250mA
+- Analog: 80-100mA
+
+After ``std_digitalscan`` (depends on exact config):
+
+- Digital: around 600mA
+- Analog: around 750mA
+
+## Tuning Routine
+
+We recommend the following tuning routine:
+
+1. Tune global threshold to 1200e (overtune by 200e)
+2. Tune global preamp to 7 ToT @ 6000e
+3. Tune global threshold to 1200e (overtune by 200e)
+4. Tune pixel threshold to 1000e
 
 ## Testing with ITkPixV2 Quad Modules
 
@@ -124,16 +82,9 @@ TODO
 - std_thresholdscan
 - std_totscan (target 6000e)
 
-
 ### Configuration files with 1-DisplayPort Data Adapter Card
 
-The DisplayPort is connected to Port A of the Ohio cars. Note that DisplayPort pins are connected to:
-- pins 1,3 correspond to channel 0
-- pins 4,6 to channel 1
-- pins 7,9 to channel 2
-- pins 10,12 to channel 3
-
-Connectivity file when DisplayPort cable is connected to Port A of the Ohio card
+For the physical DisplayPort pin-to-channel mapping and other data/power adapter card details, see the [itk-pixel-hybrid](https://gitlab.cern.ch/itk-pixel-hybrid) GitLab group. The example below assumes the DisplayPort cable is connected to Port A of the Ohio card.
 
 ```bash
 "chipType" : "ITKPIXV2",
@@ -179,7 +130,6 @@ Summary table of Chip configs:
 | Chip3 | 14       | 1/2/3/0                  | 1                   |
 | Chip4 | 15       | 0/1/2/3                  | 1                   |
 
-
 ## Disabling FEs
 
 The default values for the FEs in the chip configuration are
@@ -190,7 +140,6 @@ The default values for the FEs in the chip configuration are
 - `EnCoreCol3`: 63;    enables each bit in core columns 49--54 (ITkPix has only 50 core columns, the last 4 bits are reserved for the CMS chip)
 
 To disable a FE, you need to set the appropriate `EnCoreCol` to 0.
-
 
 ## Scripts and Apps
 
@@ -217,3 +166,53 @@ INFO: Iref for chip 3 matches expected value? 7 = 7 True
 INFO: Iref for chip 4 matches expected value? 8 = 8 True
 INFO: [True, False, True, True]
 ```
+
+## Hardware: Single Chip Card (SCC) setup
+
+The following applies only when bench-testing a single chip mounted on an SCC.
+
+More details and schematics for the SCC can be found here: [Single Chip Card](https://twiki.cern.ch/twiki/bin/viewauth/RD53/RD53BTesting#RD53B_Single_Chip_Card_SCC)
+
+### Components
+
+- ``C24`` should be removed
+- Either ``R15`` or ``R17`` should be mounted, not both
+- Either ``R14`` or ``R16`` should be mounted, not both
+- ``GND_SNS``, ``VDDD_SNS``, ``R_SCAN``, ``R7``, ``R10``, ``R_GND_BDAQ`` should not be mounted
+
+### Jumpers
+
+- IREF should be trimmed to 4uA. The 4 ``IREF_TRIM`` pin pairs correspond to a binary number that tunes the IREF. To tune IREF, various ``IREF_TRIM`` jumper configurations are tried until the ``Vref_ADC`` pin reads as close to ``0.845 V`` as possible. Untuned ``IREF_TRIM`` should be set to ``0xB`` (``1011``), meaning only bit 2 closed with a jumper. 
+- If no ChipId jumper is placed, the default ChipId is ``0xF``/``15``.
+- ``VDD_EFUSE`` should be shorted to GND (jumper inserted)
+- No ``DEBUG`` jumpers (``PIMTM``, ``TEST_MODE``, ``BYP_MODE``) should be placed
+
+### Powering mode
+
+Preferred mode for testing should be LDO mode.
+
+- LDO mode:
+    - ``PWR_D`` jumper should have center connected to VIND only
+    - ``PWR_A`` jumper should have center connected to VINA only
+    - ``VDD_PLL_SEL`` jumper should have center connected to VDDA only
+    - ``VDD_CML_SEL`` jumper should have center connected to VDDA only
+    - ``SHUNT_EN`` should be open
+    - Supply 1.6V on ``VIND`` and ``VINA``
+
+- Direct power:
+    - ``PWR_D`` jumper should have center connected to VDDD
+    - ``PWD_A`` jumper should have center connected to VDDA
+    - If PLL and CML shall be powered externally, connect ``VDD_PLL_SEL`` and ``VDD_CML_SEL`` jumper center connected to VEXT (connecting it to the second Molex connector)
+    - ``SHUNT_EN`` should be open
+    - Supply ``VDDD`` and ``VDDA`` such that voltage on SCC is not higher than 1.25V, ideally 1.2V.
+
+- SLDO mode:
+    - Power jumpers the same as for LDO mode
+    - ``SHUNT_EN`` jumper should be closed
+    - ``VOFS`` jumper should be closed
+    - Crosscheck value of ``R_EXTA``, ``R_EXTD``, ``R_IOFS``, and ``R_IOFS_LB`` to be according to your operational needs (read manual for further info).
+    - Supply current fitting your offset and slope choice, optimal voltage across the module is around 1.6V
+
+## Hardware: Module setup
+
+Module hardware (flex PCB, data pigtail, power pigtail, data adapter card, power adapter card) is documented in the [itk-pixel-hybrid](https://gitlab.cern.ch/itk-pixel-hybrid) GitLab group, not in this repository. See the [Configuration files with 1-DisplayPort Data Adapter Card](#configuration-files-with-1-displayport-data-adapter-card) section above for the software-side connectivity config that goes with this hardware.
