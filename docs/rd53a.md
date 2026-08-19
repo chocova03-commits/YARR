@@ -263,9 +263,9 @@ The TLU only produces trigger when the software is running with e.g. ``./EudetTl
 
 The second DP-miniDP cable connects the RJ45-DP connector to port D which should accept TLU input with the non-multichip FW on the FPGA.
 
-## Disabling FEs
+## Disabling Core Columns
 
-The default values for the FEs in the chip configuration are
+The default values for the core columns in the chip configuration are
 
 - `EnCoreColDiff1`: 65535; enables each bit in the 16 core columns 
 - `EnCoreColDiff2`: 1; enables the 17th core column
@@ -273,4 +273,4 @@ The default values for the FEs in the chip configuration are
 - `EnCoreColLin2`: 1; enables the 17th core column
 - `EnCoreColSync`: 65535; enables each bit in the 16 core columns
 
-To disable a FE, you need to set the appropriate `EnCoreCol` to 0.
+To disable a core column, you need to set the appropriate bit in `EnCoreCol` to 0.

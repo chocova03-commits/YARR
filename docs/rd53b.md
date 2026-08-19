@@ -161,16 +161,16 @@ Summary table of Chip configs:
 | Chip3 | 14       | 1/2/3/0                  | 1                   |
 | Chip4 | 15       | 0/1/2/3                  | 1                   |
 
-## Disabling FEs
+## Disabling Core Columns
 
-The default values for the FEs in the chip configuration are
+The default values for the core columns in the chip configuration are
 
 - `EnCoreCol0`: 65535; enables each bit in core columns 1--16
 - `EnCoreCol1`: 65535; enables each bit in core columns 17--32
 - `EnCoreCol2`: 65535; enables each bit in core columns 33--48
 - `EnCoreCol3`: 63;    enables each bit in core columns 49--54 (ITkPix has only 50 core columns, the last 4 bits are reserved for the CMS chip)
 
-To disable a FE, you need to set the appropriate `EnCoreCol` to 0.
+To disable a core column, you need to set the appropriate bit in `EnCoreCol` to 0.
 
 ## Hardware: Single Chip Card (SCC) setup
 
