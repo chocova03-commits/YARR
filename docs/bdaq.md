@@ -405,6 +405,6 @@ Here is a compilation of potential issues, with their solutions.
 
 Hit patterns similar to the one below:
 
-  <img src="./images/bdaqDigitalPattern.png" alt="Digital Pattern" width="400"/>
+  <img src="../images/bdaqDigitalPattern.png" alt="Digital Pattern" width="400"/>
   
 - Increase **"rxWaitTime"**, **5 ms steps** seem reasonable. More information [here](#bdaq-controller-parameters-bdaqcfgjson)

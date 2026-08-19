@@ -43,6 +43,6 @@ need for the connectivity configuration file.
 - **-h** : prints all available command line arguments
 - **-t  ``<target_charge>`` [``<target_tot>``]** : Set target values for threshold (charge only) and tot (charge and tot).
 - **-p** : Enable plotting of results (generate png files).
-- **-o ``<dir>``** : Base output directory. (Default ./data/)
+- **-o ``<dir>``** : Base output directory. (Default ./data/reanalysis/)
 - **-m ``<int>``** : 0 = disable pixel masking, 1 = reset pixel masking, default = enable pixel masking
 - **-l ``<path>``** => Logger config : this points to a json file to configure the [logging](logging.md) system. The default is to print info, warnings and errors to the console with appropriate colorization.

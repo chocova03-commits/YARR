@@ -9,7 +9,7 @@ See the ITSDAQ TWiki pages for information.
 Basic communication testing:
 
 ```bash
-bin/star_test configs/controller/itsdaq.json
+bin/test_star configs/controller/itsdaq.json
 ```
 
 Scan configuration (support is incomplete):

@@ -36,10 +36,15 @@ The next scan will then start at run number `000001`.
 ```
 {
   "runNumber": 42,
-  "ctrlCfg": { ... },        # controller config as used
-  "connectivity": [ ... ],   # connectivity config as used
-  "scan": { ... },           # scan config as used
-  "ctrlStatus": { ... }      # hardware status at run time
+  "testType": "std_digitalscan",  # scan name; the scan config itself is
+                                   # saved separately as std_digitalscan.json
+  "ctrlCfg": { ... },              # controller config as used
+  "connectivity": [ ... ],         # connectivity config as used
+  "ctrlStatus": { ... },           # hardware status before the scan
+  "ctrlPostScanStatus": { ... },   # hardware status after the scan
+  "stopwatch": { ... },            # timing breakdown (config/scan/processing/analysis), in ms
+  "exec": "...",                   # the exact command line used to invoke scanConsole
+  "yarr_version": { ... }          # YARR version info
 }
 ```
 
