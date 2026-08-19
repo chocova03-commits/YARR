@@ -64,7 +64,7 @@ $ lspci
 ```
   2. Check if the test programs runs successfully (Note that the ``Could not map BAR4, ...`` is normal for the Series 7 FPGAs)
 ```bash
-$ cd Yarr/src
+$ cd Yarr
 $ bin/specComTest
 void SpecCom::init() -> Opening SPEC with id #0
 void SpecCom::init() -> Mapping BARs
@@ -145,11 +145,13 @@ More info can be found [here](https://numato.com/product/nereid-kintex-7-pci-exp
 Only used for FE-I4 and FE65-P2 type chips.
 ![SPEC_S6](images/spec_s6.jpg)
 
+> **Note:** `specS6programFpga` and the `test` binary referenced below have since been removed from the YARR build. This procedure is kept for historical reference only; use the current `specComTest`/`specReadWriteReg` tools in `src/libSpec/app/` for Spartan6 SPEC readiness checks instead.
+
 For the Spartan 6 case it is required to have installed the software first. Then using the software the firmware is loaded into the board:
 
 - Program the FPGA on the SPEC board
 ```bash
-    $ cd Yarr/src
+    $ cd Yarr
     $ bin/specS6ProgramFpga <path to Yarr-fw repo>/syn/spec/quad_fei4_revB/quad_fei4_revB.bit
     Opening file: ../hdl/syn/yarr_quad_fei4_revB.bit
     Size: 1.41732 MB
@@ -181,10 +183,10 @@ For the Spartan 6 case it is required to have installed the software first. Then
 - Look for the flags ``CONFIG_DONE`` and ``SPRI_DONE`` to signal successful programming
 - Four LEDs on the SPEC board (close to the PCIe connector) should flash up like KITT from Knight Rider
 - Which exact bit-file needs to be programmed depends on the use-case
-- You can test if the firmware programming was successful by:
+- You can test if the firmware programming was successful by running `bin/specComTest` (see [Check the PCIe Status](#check-the-pcie-status) above). Older documentation referenced a `bin/test` binary that has since been removed:
 ```bash
-$ cd Yarr/src
-$ bin/test
+$ cd Yarr
+$ bin/specComTest
 void SpecController::init() -> Opening SPEC with id #0
 void SpecController::init() -> Mapping BARs
 void SpecController::init() -> Mapped BAR0 at 0x0x7f885e98c000 with size 0x100000

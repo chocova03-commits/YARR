@@ -200,9 +200,11 @@ For a random trigger source scan one has to mask digital and analog bad pixels a
 
 When taking data with a radioactive source, modify in `std_noisescan.json`: `"createMask": false` to prevent changing the enable mask, and adjust `"time": 600` in seconds to set the scan duration.
 
-For RD53A module QC, use frontend-specific scans for the masking. There are automated scripts in `scripts` which can be used, e.g.
+For RD53A module QC, use frontend-specific scans for the masking, e.g. for the synchronous frontend:
 ```
-./scripts/rd53a-module_syn_masking.sh configs/controller/specCfg-rd53a-4x3.json configs/connectivity/example_rd53a.json
+bin/scanConsole -r configs/controller/specCfg-rd53a-4x3.json -c configs/connectivity/example_rd53a.json -s configs/scans/rd53a/syn_digitalscan.json -m 1
+bin/scanConsole -r configs/controller/specCfg-rd53a-4x3.json -c configs/connectivity/example_rd53a.json -s configs/scans/rd53a/syn_analogscan.json
+bin/scanConsole -r configs/controller/specCfg-rd53a-4x3.json -c configs/connectivity/example_rd53a.json -s configs/scans/rd53a/syn_noisescan.json
 ```
 This combines the scans above for the synchronous frontend and prepares it for the source scan. Then run the frontend-specific source scan `syn_noisescan.json` with `"createMask": false` and adjusted scan duration.
 
@@ -216,7 +218,7 @@ The trigger loop in this scan does not sent an ECR signal during the scan. The s
 
 #### Hit-Or ("self-trigger")
 
-For the "self-triggering" source scan using Hit-Or as a trigger, a second DP-miniDP cable is needed to connect to the second DP port in the SCC and port B on the Ohio card, which should have the [modifications](fw_guide.md#modifications) on port B. The corresponding firmware has to be used and can be obtained from firmware [v0.9.2](https://github.com/Yarr/Yarr-fw/tree/v0.9.2) as the bit files which do not end with ``_4chip.bit``. For the controller configuration, instead of the `specCfg-rd53a.json` `specCfgExtTrigger.json` is to be used. The Hit-Or lines have to be enabled in the chip config:
+For the "self-triggering" source scan using Hit-Or as a trigger, a second DP-miniDP cable is needed to connect to the second DP port in the SCC and port B on the Ohio card, which should have the [modifications](fw_guide.md#modifications) on port B. The corresponding firmware has to be used and can be obtained from firmware [v0.9.2](https://github.com/Yarr/Yarr-fw/tree/v0.9.2) as the bit files which do not end with ``_4chip.bit``. For the controller configuration, instead of the `specCfg-rd53a.json` `specCfg-rd53a-extTrigger.json` is to be used. The Hit-Or lines have to be enabled in the chip config:
 ```
 "HitOr0MaskDiff0": 65535,
 "HitOr0MaskDiff1": 1,

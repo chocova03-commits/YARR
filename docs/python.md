@@ -4,7 +4,7 @@ YARR provides Python bindings to the `ScanConsole` interface via [pybind11](http
 
 ## Building
 
-Python bindings are enabled by default. They require Python 3 development headers. To build:
+Python bindings are disabled by default (`YARR_ENABLE_PYTHON=OFF`). They require Python 3 development headers. To build:
 
 ```bash
 mkdir build && cd build
@@ -13,14 +13,14 @@ make -j$(nproc) install
 cd ..
 ```
 
-The shared library `_pyyarr.so` is installed alongside the `pyYARR` package wrapper in the `lib/` directory.
+The compiled extension `_pyyarr.so` is installed to the `lib/` directory, while the `pyYARR` package wrapper (`pyYARR/__init__.py`, which imports from `_pyyarr`) is installed separately under `python/pyYARR/`.
 
 ## Setting up the Python path
 
-Add the installed library directory to `PYTHONPATH` so Python can find the module:
+Both directories need to be on `PYTHONPATH` so Python can find the `pyYARR` package and the compiled extension it wraps:
 
 ```bash
-export PYTHONPATH=$PWD/lib:$PYTHONPATH
+export PYTHONPATH=$PWD/lib:$PWD/python:$PYTHONPATH
 ```
 
 Verify the import works:

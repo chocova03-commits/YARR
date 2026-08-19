@@ -224,12 +224,12 @@ bin/testFelixClient configs/controller/felix_client.json -r 0 2 -w 5
 
 To read FELIX registers:
 ```
-bin/felixRgister configs/controller/felix_client.json REGISTER_NAME [OPTIONS...]
+bin/felixRegister configs/controller/felix_client.json REGISTER_NAME [OPTIONS...]
 ```
 
 To write FELIX registers:
 ```
-bin/felixRgister configs/controller/felix_client.json REGISTER_NAME REGISTER_VALUE [OPTIONS...]
+bin/felixRegister configs/controller/felix_client.json REGISTER_NAME REGISTER_VALUE [OPTIONS...]
 ```
 
 Available options:

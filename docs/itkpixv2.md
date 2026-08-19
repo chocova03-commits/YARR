@@ -94,7 +94,7 @@ Three registers are involved in configuring how many lanes should be used for th
 
 - ``AuroraActiveLanes``: determines how many lanes are used to transmit data (does not disable the physical link), possible values 1,3,7,15 to select 1, 2, 3, and 4 lane readout.
 - ``DataMergeOutMux0/1/2/3``: selects which physical lane a logical lane will be transmitted on (allows us to re-reoute data in case the hardware wiring does not match the nominal lane order). Possible values 0, 1, 2, 3.
-- ``SerEnLane``: eneables/disables the serializer in a physical lane (0 to enable, 1 to disable); all lanes can be left enabled (default 15)
+- ``SerEnLane``: eneables/disables the serializer in a physical lane (1 to enable, 0 to disable); all lanes can be left enabled (default 15)
 
 When using the YARR-PCIe cards and SCC, possible values are:
 

@@ -13,7 +13,7 @@ NB for some hardware controllers there are extra dependencies requried.
 Just want to install the latest version of the YARR software? Follow the quick install instructions here. In case of a new machine, or if you're not sure, follow the more detailed instructions below.
 
 The main dependency is the compiler. Builds under clang are supported, but
-with no particular version restriction. For gcc, we require at least gcc
+require at least clang 11.0. For gcc, we require at least gcc
 version 9 and the build is currently tested against gcc 15 system. Anything
 in between is expected to work.
 
@@ -65,7 +65,7 @@ In case of issues, please refer to the more detailed instructions below, or cons
 ### Dependencies for Alma 9
 - If not installed before, you need some standard packages:
 ```bash
-$ sudo yum install gnuplot texlive-epstopdf cmake
+$ sudo yum install gnuplot texlive-epstopdf cmake zeromq-devel root python3-devel boost-devel
 ```
 
 ### Dependencies for Centos 7/8
@@ -97,7 +97,6 @@ $ git checkout <tagged version>
 ```
 The most up-to date development can be found in the devel branch.
 
-- A version history and description can be found [here](version.md)
 - Note, Yarr is also available in a [GitHub repository.](https://github.com/Yarr/ "GitHub repository"), but using the GitLab version is recommended as it is used for active development.
 
 
@@ -151,13 +150,13 @@ $ cd ..
         - ``$ cmake -DYARR_CONTROLLERS_TO_BUILD="Spec;Emu;FelixClient"``
 
 - In order to specify specific hardware controller and/or front-end libraries to build,
-one can provide an OR'ed chain of their names to the `SELECT_LIBS` CMake variable. For example, if the default list of hardware controllers is `YARR_CONTROLLERS_TO_BUILD="Spec;Emu;FelixClient"` and the default list of front-ends to build is `YARR_FRONT_ENDS_TO_BUILD="Fei4;Star;Rd53a;Rd53b"` one can specify that only the `Spec` hardware controller and `Rd53b` front-end libraries are built by doing:
+one can provide a semicolon-separated list of their names to the `YARR_CONTROLLERS_TO_BUILD` and
+`YARR_FRONT_ENDS_TO_BUILD` CMake variables. For example, the default list of hardware controllers is
+`YARR_CONTROLLERS_TO_BUILD="Spec;Emu"` and the default list of front-ends to build is
+`YARR_FRONT_ENDS_TO_BUILD="Fei4;Rd53a;Star;Rd53b;Itkpixv2"`; one can specify that only the `Spec`
+hardware controller and `Rd53b` front-end library are built by doing:
 ```
-    $ cmake3 -DSELECT_LIBS="Spec|Rd53b" ..
-```
-- In order to specify a subset of executables to be built, one can provide an OR'ed chain of the names of the executables to be built with the `SELECT_TOOLS` CMake variable. For example, to only build the `scanConsole` executable one can do:
-```
-    $ cmake3 -DSELECT_TOOLS=scanConsole ..
+    $ cmake -DYARR_CONTROLLERS_TO_BUILD="Spec" -DYARR_FRONT_ENDS_TO_BUILD="Rd53b" ..
 ```
 - Expert note: you can choose a specific toolchain via:
 ```bash
@@ -179,13 +178,13 @@ Some of the options and dependencies are described in [the instructions how to u
 |------------|------|---------------|----------------------------|
 | BUILD_TESTS:BOOL | OFF | Build the YARR test suite | |
 | CMAKE_BUILD_TYPE:STRING | "" | Standard CMake setting: used by Yarr as always a release with stripped debug infos is built| |
-| CMAKE_CXX_STANDARD:STRING | 17 | Standard CMake setting: C++ standard to use | |
+| CMAKE_CXX_STANDARD:STRING | 20 | Standard CMake setting: C++ standard to use | |
 | CMAKE_INSTALL_PREFIX:PATH | in source tree | Standard CMake setting: install path prefix, standard in source installation tries not overwrite anything, better to do an out-of-tree installation | |
 | YARR_ACTIVE_LOGGER_LEVEL:STRING | DEBUG | SPDLOG_ACTIVE_LEVEL below which logger macros are disabled at build time. One of TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL, OFF. | |
-| YARR_CONTROLLERS_TO_BUILD:STRING | all | Semicolon-separated list of controllers to build, or "all". | |
-| YARR_DEBUG_PRINT_TARGETS:BOOL | ON | Prints all targets and their properties. Useful for debugging and for writing a dependency on Yarr. | |
+| YARR_CONTROLLERS_TO_BUILD:STRING | "Spec;Emu" | Semicolon-separated list of controllers to build, or "all". | |
+| YARR_DEBUG_PRINT_TARGETS:BOOL | OFF | Prints all targets and their properties. Useful for debugging and for writing a dependency on Yarr. | |
 | YARR_EMULATORS_TO_BUILD:STRING | "StarEmu;Fei4Emu;Rd53aEmu;Itkpixv2Emu" | Front-end specific emulators to build (if Emu in controller list). | Emu in YARR_CONTROLLERS_TO_BUILD |
-| YARR_ENABLE_PYTHON:BOOL | ON | Build python bindings | |
+| YARR_ENABLE_PYTHON:BOOL | OFF | Build python bindings | |
 | YARR_ENABLE_FELIX_CLIENT_BRIDGE:BOOL | OFF | Build felix_client_bridge app | |
 | YARR_FORCE_FETCHCONTENT_SPDLOG:BOOL | OFF | Force built-in spdlog | |
 | YARR_FORCE_OWN_INSTALL_PREFIX:BOOL | OFF | Force Yarr to use own install prefix even as subdirectory | |

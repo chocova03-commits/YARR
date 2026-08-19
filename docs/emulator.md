@@ -269,7 +269,10 @@ The pixel ToT as function of extra charge above threshold is studied in the foll
 </figure>
 
 # RD53B emulator
-Does not exist yet.
+There is no dedicated RD53B emulator (no such variant exists alongside `Rd53aEmu`/`Itkpixv2Emu`/`StarEmu`); RD53B/ITkPixV1 chips cannot currently be run against a software emulator.
+
+# FE-I4 emulator
+A minimal FE-I4 emulator exists (`src/libFei4Emu/`), registered as controller type `emu` (as opposed to the `emu_<Chip>` naming used by the other emulators). See `configs/controller/emuCfg.json` for an example controller configuration.
 
 # Star emulator
 The Star emulator emulates HCCStar and ABCStar front-end ASICs for
@@ -290,7 +293,7 @@ An example of the Star emulator controller config is provided in "configs/contro
         "cfg" : {
             "hprPeriod" : 40000,
             "feCfg" : "configs/emulator/emu_fe0_star.json",
-            "chipCfg" : "config/connectivity/example_star_setup.json"
+            "chipCfg" : "configs/connectivity/example_star_setup.json"
         }
     }
 }
@@ -320,7 +323,7 @@ Similarly, to use the example controller config with `bin/scanConsole`,
 the connectivity config specified by `-c` needs to be compatible with the channels
 in the controller config. For example:
 ```bash
-$ bin/scanConsole -r configs/controller/emuCfg_star.json -c config/connectivity/example_star_setup.json -s <scan config>
+$ bin/scanConsole -r configs/controller/emuCfg_star.json -c configs/connectivity/example_star_setup.json -s <scan config>
 ```
 
 The tx and rx channels for the Star emulator are configured via the
@@ -331,7 +334,7 @@ The chip config file specified by the `"chipCfg"` field in the
 controller config contains the chip type (in case of the Star emulator,
 this should always be `"Star"`) and a list of chips with their
 register configuration, tx and rx channels, etc.
-Below is an example of the Star chip config ("config/connectivity/example_star_setup.json"):
+Below is an example of the Star chip config ("configs/connectivity/example_star_setup.json"):
 ```json
 {
     "chipType" : "Star",

@@ -78,7 +78,7 @@ If you run a scan for the first time, it will create a default configuration for
 
 ### ITkPixV1.0
 
-ITkPixV1 contains a bug which leads to large current on the digital rail caused by wrongly designed ToT latch. It is not desireable to leave the chip in this high current state for too long without at least passive cooling of some sort. The current can be reduced either by running a ``std_digitalscan`` or the ``clear_tot_mem`` routine (``clear_tot_mem`` might need to be run two times``). Once the current has been reduced it should stay in this mode until fully power cycled.
+ITkPixV1 contains a bug which leads to large current on the digital rail caused by wrongly designed ToT latch. It is not desireable to leave the chip in this high current state for too long without at least passive cooling of some sort. The current can be reduced by running a ``std_digitalscan``. Once the current has been reduced it should stay in this mode until fully power cycled.
 
 #### Current
 
@@ -103,7 +103,7 @@ Expected current draw at start-up:
 
 After ``std_digitalscan`` (depends on exact config):
 
-- Digital: around 600m
+- Digital: around 600mA
 - Analog: around 750mA
 
 ## Tuning Routine

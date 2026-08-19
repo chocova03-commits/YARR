@@ -6,6 +6,7 @@ YARR is a readout system based around the concept of moving intelligence from th
 * Simple PCIe Carrier Cards (SPEC): XpressK7 160/325, Trenz TEF1001 R1/R2, Numato Nereid K7 and Xilinx KC705
 * FELIX-STAR + NETIO-NEXT
 * BDAQ Hardware
+* ITSDAQ
 
 The currently supported readout chips are:
 
@@ -36,7 +37,6 @@ Support for YARR can be found in the [YARR Matter Most channel.](https://matterm
 │   ├── logging
 │   ├── scans : scan config for various front-end types
 ├── docs : this documentation
-├── python : python scripts using bindings
 ├── scripts : various other scripts for QoL
 ├── src : main source code
 │   ├── libBdaq : BDAQ platform controller
@@ -57,6 +57,7 @@ Support for YARR can be found in the [YARR Matter Most channel.](https://matterm
 │   ├── libYarr : Primary Yarr library
 │   ├── python : python bindings
 │   ├── tools : Primary Yarr executeables
+├── tests : CMake consumption tests and scan regression test scripts
 ```
 
 

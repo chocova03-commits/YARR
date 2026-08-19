@@ -32,13 +32,22 @@ Note: If you omit the scan config, your chip will only be configurated.
 
 Additional command line arguments for the scanConsole are:
     
-- **-h** : this, prints all available command line arguments
+- **-h, --help** : this, prints all available command line arguments
+- **-v, --version** : Print version.
 - **-t  ``<target_charge>`` [``<target_tot>``]** : Set target values for threshold (charge only) and tot (charge and tot).
 - **-p** : Enable plotting of results.
+- **-g** : Enable making a data pipeline graph.
 - **-o ``<dir>``** : Output directory. (Default ./data/)
 - **-m ``<int>``** : 0 = disable pixel masking, 1 = reset pixel masking, default = enable pixel masking
+- **-n ``<int>``** : Number of threads used to write and plot output files. (Default: hardware concurrency, fallback 4)
 - **-k**: Report known items (Scans, Hardware etc.)
 - **-l ``<path>``** => Logger config : this points to a json file to configure the [logging](logging.md) system. The default is to print info, warnings and errors to the console with appropriate colorization.
+- **-y, --skip-config** : Disable configuring front-ends prior to running the scan.
+- **-z, --skip-reset** : Disable sending the global front-end reset command prior to running the scan.
+- **-I** : Set interactive mode.
+- **-Q** : Set QC scan mode.
+- **-c ``<connectivity.json>`` [``<cfg2.json>`` ...]** : the connectivity option also accepts multiple connectivity files in a single invocation, one per hardware setup being read out together.
+- **-d ``<database.json>``, -i ``<site.json>``, -u ``<user.json>``, -W ``<tag>``** : LocalDB configuration and upload options, see [LocalDB](https://atlas-itk-pixel-localdb.docs.cern.ch/).
 
 ### Controller Config
 Example of a controller config:
@@ -202,7 +211,7 @@ For example, consider the following config:
             "rx" : 0,
             "enable" : 1,
             "locked" : false,
-            "active": true,
+            "active": true
         },
         {
             "config" : "configs/rd53a_Quad_ChipB.json",
@@ -230,7 +239,7 @@ Consider the following example:
             "rx" : 0,
             "enable" : 1,
             "locked" : false,
-            "activeLoop": true,
+            "activeLoop": true
         },
         {
             "config" : "configs/rd53a_Quad_ChipB.json",
@@ -274,7 +283,7 @@ The `ChipId` and the chip `Name`, which will be the name used in the plots, are 
 ```json
 "Parameter": {
   "ChipId": 0,
-  "Name": "JohnDoe_0",            
+  "Name": "JohnDoe_0"
 }
 ```
 The default ChipId is 0 so please compare the wire-bonded chip ID with the one set in the configuration file.

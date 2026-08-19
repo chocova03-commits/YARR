@@ -19,6 +19,11 @@ Analyse the delay reported in [L13D](scan_histogrammers.md#l13d) histograms.
 
 Save histograms to disk. The directory is specified on the command line.
 
+## InjDelayTune
+
+Feedback-based tuning of the injection delay parameter loop, using
+[OccupancyMap](scan_histogrammers.md#occupancymap) data.
+
 ## L1Analysis
 
 Summarise output from the  [L1Dist](scan_histogrammers.md#l1dist) histograms.
@@ -64,6 +69,11 @@ Process tag histograms.
 ## TotAnalysis
 
 Process Tot histograms.
+
+## TriggerThrottleAnalysis
+
+Determine trigger throttling parameters based on occupancy versus injection
+level.
 
 ## TODO fill in more information
 
