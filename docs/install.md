@@ -172,6 +172,44 @@ $ make install
 $ cd ..
 ```
 
+#### macOS build (experimental)
+
+Building on macOS is supported for development purposes, currently validated for the `FelixClient`
+hardware controller and the software `Emu` controller (with the `StarEmu`/`Itkpixv2Emu` chip
+emulators), together with the `Rd53b`, `Itkpixv2` and `Star` front-ends. Controllers that talk to a
+PCIe card via the custom kernel driver (`Spec`, `Bdaq`, `ItsdaqFW`) need a Linux kernel module and
+will not work on macOS.
+
+Prerequisites:
+- Xcode command line tools, for `clang`/`clang++` (`xcode-select --install`)
+- `cmake` (e.g. `brew install cmake`)
+
+Configure with the `macos-clang` toolchain file and restrict the controller/front-end lists to what
+you need, e.g. `FelixClient` and `Emu` (limited to the `StarEmu`/`Itkpixv2Emu` chip emulators) with
+the `Rd53b`, `Itkpixv2` and `Star` front-ends:
+
+```bash
+$ cd Yarr/
+$ mkdir build
+$ cd build
+$ cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/macos-clang \
+           -DYARR_CONTROLLERS_TO_BUILD="FelixClient;Emu" \
+           -DYARR_EMULATORS_TO_BUILD="StarEmu;Itkpixv2Emu" \
+           -DYARR_FRONT_ENDS_TO_BUILD="Rd53b;Itkpixv2;Star"
+$ make -j$(sysctl -n hw.ncpu)
+$ make install
+$ cd ..
+```
+
+`YARR_EMULATORS_TO_BUILD` only takes effect when `Emu` is included in `YARR_CONTROLLERS_TO_BUILD`;
+it defaults to all four front-end emulators (`StarEmu;Fei4Emu;Rd53aEmu;Itkpixv2Emu`), so it's worth
+trimming it down to the chips you actually build.
+
+The `FelixClient` controller pulls in its FELIX dependencies (`felix-def`, `felix-interface`,
+`felix-client-thread`, `felix-io-client`) straight from the CERN GitLab via CMake's FetchContent,
+the same as on Linux, so no additional setup is required unless you want to link against a
+pre-compiled FELIX installation via `Felix_ROOT`.
+
 Some of the options and dependencies are described in [the instructions how to use YARR as a dependency](consuming_yarr.md). Overview of most option switches:
 
 | option | default | comment | depends on option  |

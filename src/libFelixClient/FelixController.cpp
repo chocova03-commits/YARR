@@ -112,10 +112,10 @@ void FelixController::loadConfig(const json &j) {
         //Must set the path encoding/decoding registers to 0x0 for per-link control as done with configureChannel 
         //This is opposed to the default register value which is 0x11111111
         fclog->info("Resetting encoding and decoding patterns");
-        uint8_t LINK_MAX = 12;
+        uint8_t NUM_LINKS = 12;
         uint8_t DEC_EGORUP_MAX = 7;
         uint8_t ENC_EGROUP_MAX = 5;
-        for(uint8_t li = 0; li < LINK_MAX; ++li){
+        for(uint8_t li = 0; li < NUM_LINKS; ++li){
           for(uint8_t ei = 0; ei < DEC_EGORUP_MAX; ++ei){
             setEgroupEncodingDecoding(li, ei, false, 0x0);
           }
