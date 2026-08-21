@@ -30,17 +30,17 @@ nav:
           - RD53C (ITkPix v2): itkpixv2.md
           - RD53 common info: rd53.md
           - Star: star.md
-    - LocalDB:
-          - LocalDB: https://atlas-itk-pixel-localdb.docs.cern.ch/
-    - Plotting Tools:
-          - Plotting Tools: plotting.md
     - Hardware controllers:
           - FelixClient: felixclient.md
           - BDAQ Hardware: bdaq.md
           - ITSDAQ FW: itsdaq.md
-    - AnalysisConsole: analysisconsole.md
-    - Troubleshooting: troubleshooting.md
-    - Emulator: emulator.md
+    - Miscellaneous:
+          - Plotting Tools: plotting.md
+          - LocalDB: https://atlas-itk-pixel-localdb.docs.cern.ch/
+          - AnalysisConsole: analysisconsole.md
+          - Emulator: emulator.md
+          - Troubleshooting: troubleshooting.md
+
 theme: readthedocs
 
 markdown_extensions:

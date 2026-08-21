@@ -7,7 +7,7 @@ $ git clone https://gitlab.cern.ch/YARR/yarr-pcie/spec-driver.git
 
 <span style="color:red">The installation of the kernel driver is only required once and sometimes after a kernel update.</span>
 
-# Installation
+## Installation
 
 PCIe kernel driver can be installed in the following way:
 

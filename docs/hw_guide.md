@@ -1,4 +1,4 @@
-# Commercial Hardware Guide
+# Hardware Guide for PCs and Parts
 
 ## DAQ PC
 
@@ -35,7 +35,7 @@ Some example setups that have been tested working and in use:
 - Power supply Corsair CP-9020182-EU (140 CHF)
 - RAM memory CORSAIR VENGEANCE LPX 16Go 1x16
 - Hard disk Western Digital WD4005FZBX 4TB (180 CHF)
-- Case Lian Li PC-O11DX 
+- Case Lian Li PC-O11DX
 
 
 ## DisplayPort cables

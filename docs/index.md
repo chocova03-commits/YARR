@@ -3,7 +3,7 @@
 ## What is YARR?
 YARR is a readout system based around the concept of moving intelligence from the FPGA firmware into the host computer software. The role of the FPGA is the one of a reconfigurable I/O interface and not anymore the one of a hardware accelerator. YARR supports multiple types of FPGA platforms:
 
-* Simple PCIe Carrier Cards (SPEC): XpressK7 160/325, Trenz TEF1001 R1/R2, Numato Nereid K7 and Xilinx KC705
+* Simple PCIe Carrier Cards (SPEC): XpressK7 160/325, Trenz TEF1001 R1/R2/R3, Numato Nereid K7 and Xilinx KC705
 * FELIX-STAR + NETIO-NEXT
 * BDAQ Hardware
 * ITSDAQ
@@ -18,14 +18,14 @@ The currently supported readout chips are:
 
 ## Support
 
-Support for YARR can be found in the [YARR Matter Most channel.](https://mattermost.web.cern.ch/yarr/ "YARR MatterMost")
+Support for YARR can be found in the [YARR Mattermost channel.](https://mattermost.web.cern.ch/yarr/ "YARR MatterMost")
 
 
 ## Links to docs in development
 
-* Future docs: https://yarr.web.cern.ch/yarr/devel/
-* Developer docs: https://yarr.web.cern.ch/doxygen/devel/
-* Coverage: https://yarr.web.cern.ch/yarr/devel/coverage/
+* Future docs: [https://yarr.web.cern.ch/yarr/devel/](https://yarr.web.cern.ch/yarr/devel/)
+* Developer docs: [https://yarr.web.cern.ch/doxygen/devel/](https://yarr.web.cern.ch/doxygen/devel/)
+* Coverage: [https://yarr.web.cern.ch/yarr/devel/coverage/](https://yarr.web.cern.ch/yarr/devel/coverage/)
 
 ## Folder Structure
 ```bash
