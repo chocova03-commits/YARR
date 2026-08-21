@@ -1,4 +1,6 @@
-# DAQ PC
+# Hardware Guide for PCs and Parts
+
+## DAQ PC
 
 ASUS mainboards are strongly recommended.
 
@@ -13,9 +15,9 @@ Some example setups that have been tested working and in use:
 - [System 2](https://pcpartpicker.com/list/m7ZhrV)
 - [Mini version](https://pcpartpicker.com/list/MrXM3F)
 
-## Example Main Components
+### Example Main Components
 
-### A more recent build (2024)
+#### A more recent build (2024)
 - CPU: Intel Core i5-14600K 3.5 GHz 14-Core Processor  (£289.99 @ Amazon UK)
 - CPU Cooler: Noctua NH-D15S 82.52 CFM CPU Cooler  (£89.95 @ Amazon UK)
 - Motherboard: Asus PRIME H770-PLUS ATX LGA1700 Motherboard  (£194.99 @ AWD-IT)
@@ -25,7 +27,7 @@ Some example setups that have been tested working and in use:
 - Power Supply: be quiet! System Power 10 850 W 80+ Gold Certified ATX Power Supply  (£86.15 @ NeoComputers)
 - Total: £909.67
 
-### An older example
+#### An older example
 - Motherboard ASUS 90MB0WG0-M0EAY0 (140 CHF)
 - CPU Intel Core i5-8400 (6X2.8) BOXED 1151v2 (200 CHF)
 - CPU fan NH-L9I (50 CHF)
@@ -36,7 +38,7 @@ Some example setups that have been tested working and in use:
 - Case Lian Li PC-O11DX
 
 
-# DisplayPort cables
+## DisplayPort cables
 DisplayPort (DP) cables used for readout should be rated to v1.2
 or better.
 Below is a list with recommended cables:

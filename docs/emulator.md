@@ -1,4 +1,6 @@
-# RD53C / ITkPixV2 emulator
+# Frontend Emulators
+
+## RD53C / ITkPixV2 emulator
 
 ITkPixV2 emulator covers range of the real chip functionality. From the DAQ perspective, there's no difference between the two. The emulator receives commands and sends outputs via a virtual controller. Internally, it holds a full SW representation of the chip registers, an encoder and command interpreter. Currently supported functionality includes
 - All flavours of register writing
@@ -13,7 +15,7 @@ ITkPixV2 emulator covers range of the real chip functionality. From the DAQ pers
 
 With the functionality above, one can run digital, analog and threshold scans as well as full threshold tuning.
 
-## Quickstart
+### Quickstart
 
 All scans can be run through scanConsole, using the usual scan configurations and the emulator's controller under configs/controller/emuCfg_itkpixv2.json, e. g.:
 
@@ -60,7 +62,7 @@ and
 <figcaption>Tuned (except for the first core column) threshold distribution (left) and map (right), obtained with the ITkPixV2 emulator.</figcaption>
 </figure>
 
-## Inner structure
+### Inner structure
 The emulator interacts with the outside through the `Itkpixv2Emu` class. `Itkpixv2Emu` instantiates two functional modules - `Itkpixv2EmuCommandInterpreter` and `Itkpixv2EmuCommandExe`. At the highest level, `Itkpixv2Emu` runs a loop that listens to the Tx and performs command interpretation and execution upon reception of data. This loop runs until stopped from the outside. The loop is sketched in the figure below.
 
 <figure class="image">
@@ -68,7 +70,7 @@ The emulator interacts with the outside through the `Itkpixv2Emu` class. `Itkpix
 <figcaption>Top-level emulator loop.</figcaption>
 </figure>
 
-### Command interpretation
+#### Command interpretation
 All command interpretation is handled by the `Itkpixv2EmuCommandInterpreter` class. It is attached to the input Tx and for conveniece pre-buffers the incoming stream in 8-bit blocks. Depending on the header of each command, appropriate number of 8-bit blocks is processed at a time. Whenever needed, the block is 8-to-5 decoded through a LUT. Finally, a `Cmd` struct is formed:
 
 ```
@@ -88,7 +90,7 @@ These interpreted commands are then passed through a FIFO to the `Itkpixv2EmuCom
 </figure>
 
 
-### Carrying out commands
+#### Carrying out commands
 `Cmd` structs form the input to the `Itkpixv2EmuCommandExe`, which decides what action to take based on the `Cmd` header. `Itkpixv2EmuCommandExe` holds instances of several helper classes, such as `Itkpixv2Encoder` for producing the output streams, `Itkpixv2Cfg` to represent the chip registers and `ItkpixLayout` to represent ToT in the chip matrix. In the current state, commands are carried out serially, but the development was done with consideration of potential future multi-threading.
 
 The following actions are taken for each command -
@@ -107,16 +109,16 @@ The following actions are taken for each command -
 
 
 
-## Calibrations
+### Calibrations
 Several calibrations based on real-chip measurements are used to translate between DAC, charge and ToT.
 
-### Injection charge (DAC to e)
+#### Injection charge (DAC to e)
 The injection charge is set in DACs in the chip registers, and is translated into electrons through a linear relation provided in `Itkpixv2Cfg::toCharge` function.
 
-### Global threshold (DAC to e)
+#### Global threshold (DAC to e)
 The global threshold calibration assumes linear translation between DAC and charge with 2200 e at 300 DAC (with no offset).
 
-### Pixel threshold (TDAC to e)
+#### Pixel threshold (TDAC to e)
 Depending on the TDAC sign, a linear relation is taken with slopes given by 1000 e at + 15 TDAC (positive TDAC) and -1400 e at -15 TDAC (negative TDAC). No offset is assumed in either case.
 
 <img src="../images/emulator/Itkpixv2EmuTDACvsCharge.png" alt="" width="300">
@@ -124,7 +126,7 @@ Depending on the TDAC sign, a linear relation is taken with slopes given by 1000
 </figure>
 
 
-### Charge to ToT (e to bits)
+#### Charge to ToT (e to bits)
 Very coarse linear calibration dividing 14 non-zero ToTs equally over 33000 e charge over threshold is used. The calibration function `Itkpixv2EmuUtils::chargeToToT` returns ToT + 1, so that serves both as ToT and an indication of a hit in case Tot is `0x0`. The lowest output value is therefore `0x1`. More realistic calibration (e. g. accounting for preamp settings) is currently not implemented.
 
 <img src="../images/emulator/Itkpixv2EmuChargevsToT.png" alt="" width="300">
@@ -132,13 +134,15 @@ Very coarse linear calibration dividing 14 non-zero ToTs equally over 33000 e ch
 </figure>
 
 
-### Noise
+#### Noise
 Gaussian noise with mean 0 e and RMS of 50 e is generated and added to the injected charge before subtracting the threshold.
 
+## RD53B emulator
+There is no dedicated RD53B emulator (no such variant exists alongside `Rd53aEmu`/`Itkpixv2Emu`/`StarEmu`); RD53B/ITkPixV1 chips cannot currently be run against a software emulator.
 
-# RD53A emulator
+## RD53A emulator
 
-## Usage
+### Usage
 
 Assuming the user has installed the software following instructions in install.md, now go to "build" folder.
 
@@ -198,7 +202,7 @@ The threshold and noise distributions will look like following if everything is 
 <figcaption>Noise distributions for sync, linear, and differential front-ends.</figcaption>
 </figure>
 
-## Input parameters
+### Input parameters
 RD53A emulator has been implemented based on following measurements performed on real chips. The parameterizations implemented in the software emulator are summarized in the table below, and more details are provided in the following sections.
 
 | Description | Parameterization |
@@ -209,7 +213,7 @@ RD53A emulator has been implemented based on following measurements performed on
 | Noise [e] | Mean Sync/Lin: 80, Diff: 40. Sigma=10 for all FEs |
 | ToT [bc] vs. extra charge above threshold [10ke] | <ul><li>Sync: 1.21539 + 7.61735 ⨉ charge</li><li>Lin: 1.51625 + 7.29853 ⨉ charge</li><li>Diff: 4.56053 + 4.04173 ⨉ charge</li></ul> |
 
-### Vth vs. threshold
+#### Vth vs. threshold
 The measurement is performed by first tuning the chip to a series of target thresholds following the procedure detailed in rd53a.md, and then plot the mean of the threshold distribution from a Gaussian fit as function of Vth values (the sigma of the Gaussian is included as error bar) for each front-end. The results are summarized in the following plots for three front-ends. Each case the data can be fitted well with a straight line.
 These linear functions are implemented in the emulator to map the target threshold in electron charges into Vth.
 
@@ -220,7 +224,7 @@ These linear functions are implemented in the emulator to map the target thresho
 <figcaption>Threshold vs. Vth for sync, linear, and differential front-ends</figcaption>
 </figure>
 
-### Untuned pixel threshold dispersion
+#### Untuned pixel threshold dispersion
 The untuned pixel thresholds on the chip have a dispersion. The dispersion is quantified using the real chip at different Vth values, with other global registers as well as pixel registers at default values. The obtained threshold distribution is first translated from electron charges to Vth using the linear function derived in previous section. Then it is divided by the corresponding Vth value of the front-end.
 The distribution obtained can then be fitted with a Gaussian pdf. Both the mean and the sigma of the Gaussian are roughly constants as function of Vth as shown by plots below. In particular, the mean value divided by Vth is compatible with unity. The residual trends are not important to emulate.
 
@@ -238,10 +242,10 @@ The distribution obtained can then be fitted with a Gaussian pdf. Both the mean 
 <figcaption>Sigma of threshold distribution divided by Vth vs. Vth for sync, linear, and differential front-ends</figcaption>
 </figure>
 
-### Pixel TDAC vs. threshold
+#### Pixel TDAC vs. threshold
 Instead of characterizing TDAC response using the real chip, here a simplified approach is taken: a simple linear transformation of TDAC is added to the smeared threshold value. The coefficients of the linear function is tuned to roughly reproduce the observed resolution of threshold distribution after tuning.
 
-### Pixel noise
+#### Pixel noise
 The pixel noise is evaluated using the same threshold scans used to study threshold dispersion as discussed above. The mean and sigma of the width of the noise distribution are roughly constants as function of Vth as shown in plots below.
 
 <figure class="image">
@@ -258,7 +262,7 @@ The pixel noise is evaluated using the same threshold scans used to study thresh
 <figcaption>Sigma of width of noise vs. Vth for sync, linear, and differential front-ends</figcaption>
 </figure>
 
-### Time-over-threshold (ToT) vs. extra charge above threshold
+#### Time-over-threshold (ToT) vs. extra charge above threshold
 The pixel ToT as function of extra charge above threshold is studied in the following steps. First, the chip is tuned to 1000e threshold, with ToT=8 bc at 10ke. Then the ToT is measured at different injection charges, ranging from 8ke to 12ke. Subtracting out the threshold (1ke), the results are summarized in the following plots. A linear function is good enough to model the data in each case.
 
 <figure class="image">
@@ -268,19 +272,17 @@ The pixel ToT as function of extra charge above threshold is studied in the foll
 <figcaption>ToT vs. extra charge above threshold for sync, linear, and differential front-ends</figcaption>
 </figure>
 
-# RD53B emulator
-There is no dedicated RD53B emulator (no such variant exists alongside `Rd53aEmu`/`Itkpixv2Emu`/`StarEmu`); RD53B/ITkPixV1 chips cannot currently be run against a software emulator.
 
-# FE-I4 emulator
+## FE-I4 emulator
 A minimal FE-I4 emulator exists (`src/libFei4Emu/`), registered as controller type `emu` (as opposed to the `emu_<Chip>` naming used by the other emulators). See `configs/controller/emuCfg.json` for an example controller configuration.
 
-# Star emulator
+## Star emulator
 The Star emulator emulates HCCStar and ABCStar front-end ASICs for
 Strips.
 More information about the Star emulator can be found in:
 https://cernbox.cern.ch/index.php/s/shnadHRkX8g4ASY.
 
-## Usage
+### Usage
 To use the Star emulator, set `"type"` in the controller config to
 `"emu_Star"`, and run `bin/scanConsole` or
 `bin/star_test` using this controller config.
@@ -329,7 +331,7 @@ $ bin/scanConsole -r configs/controller/emuCfg_star.json -c configs/connectivity
 The tx and rx channels for the Star emulator are configured via the
 field `"chipCfg"` of the controller config. See more details below.
 
-### Emulated Chip Configuration
+#### Emulated Chip Configuration
 The chip config file specified by the `"chipCfg"` field in the
 controller config contains the chip type (in case of the Star emulator,
 this should always be `"Star"`) and a list of chips with their
@@ -355,7 +357,7 @@ Register contents of the HCCStar, as well as the ABCStar chips that connect
 to it, are configured based on "configs/defaults/default_star.json" as
 specified in the filed `"config"`.
 
-#### Configuration for multiple HCCStars
+##### Configuration for multiple HCCStars
 To set up multiple HCCStar chips running in same or different
 communication channels, simply add more entries in the `"chips"` array
 and specify their tx and rx channels.
@@ -393,7 +395,7 @@ second HCCStars also share the same rx channel 2, while the third one
 uses a separate rx channel 3. The fourth HCCStar uses a different tx
 channel 4 and a different rx channel 5.
 
-#### Configuration for the multi-level trigger mode
+##### Configuration for the multi-level trigger mode
 To run the Star emulator in the multi-level trigger mode, a second tx
 channel per FE needs to be set up for R3L1 commands.
 This can be achieved by adding a `"tx2"` for each `"tx"` in the
