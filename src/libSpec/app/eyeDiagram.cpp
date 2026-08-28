@@ -28,19 +28,22 @@ constexpr const char* COLOR_RESET = "\033[0m";
 
 // Bias the chosen delay towards the low edge of the eye rather than dead
 // center: the high edge has been observed to degrade faster than the low
-// edge, so centering leaves less margin than intended.
-constexpr double EYE_LOW_EDGE_FRACTION = 0.25;
+// edge, so centering leaves less margin than intended. The right bias point
+// is link/setup dependent, so it's exposed via -e rather than fixed here.
+constexpr double DEFAULT_EYE_LOW_EDGE_FRACTION = 0.4;
 
 void printHelp() {
-    std::cout << "Usage: ./bin/eyeDiagram [-h] [-r <hw_controller_file>] [-c <connectivity_file>] [-t <test_size>] [-s]\n\n"
+    std::cout << "Usage: ./bin/eyeDiagram [-h] [-r <hw_controller_file>] [-c <connectivity_file>] [-t <test_size>] [-e <eye_low_edge_fraction>] [-s]\n\n"
         << "Options:\n"
         << "  -h                   Display this help message.\n"
         << "  -r <hw_controller_file>   Specify hardware controller JSON path.\n"
         << "  -c <connectivity_file>    Specify connectivity config JSON path.\n"
         << "  -t <test_size>            Specify the error counter test size. Default 1 x 10^6\n"
+        << "  -e <eye_low_edge_fraction> Fraction into the eye width (from the low edge, 0-1) to place\n"
+        << "                             the chosen delay. Default " << DEFAULT_EYE_LOW_EDGE_FRACTION << ".\n"
         << "  -s                   Skip chip configuration.\n"
-        << "  -n                   Don't update the controller condfig with the best delay values\n" 
-        << "  -v                   Print out and store raw error counter values.\n"; 
+        << "  -n                   Don't update the controller condfig with the best delay values\n"
+        << "  -v                   Print out and store raw error counter values.\n";
 
 }
 
@@ -90,11 +93,12 @@ int main(int argc, char **argv) {
     bool save_delay=true;
     bool skip_config=false;
     bool print_raw_value=false;
+    double eye_low_edge_fraction = DEFAULT_EYE_LOW_EDGE_FRACTION;
 
     uint16_t cdrclksel = 0;
     uint16_t serblckperiod = 50;
 
-    while ((c = getopt(argc, argv, "hr:c:t:nsv")) != -1) {
+    while ((c = getopt(argc, argv, "hr:c:t:e:nsv")) != -1) {
         switch (c) {
             case 'h':
                 printHelp();
@@ -108,15 +112,22 @@ int main(int argc, char **argv) {
             case 't' :
                 test_size = std::stoi(optarg);
                 break;
+            case 'e' :
+                eye_low_edge_fraction = std::stod(optarg);
+                if (eye_low_edge_fraction < 0.0 || eye_low_edge_fraction > 1.0) {
+                    logger->critical("-e eye_low_edge_fraction must be between 0 and 1 (got {})", eye_low_edge_fraction);
+                    return -1;
+                }
+                break;
             case 'n' :
                 save_delay = false;
-                break;    
+                break;
             case 's' :
                 skip_config = true;
-                break;   
+                break;
             case 'v' :
                 print_raw_value = true;
-                break;   
+                break;
             default:
                 logger->critical("Invalid command line parameter(s) given!");
                 return -1;
@@ -318,7 +329,7 @@ int main(int argc, char **argv) {
         }    
         int delay=0;
         if (best_width!=0){
-            delay=(int) best_val+(best_width*EYE_LOW_EDGE_FRACTION);
+            delay=(int) best_val+(best_width*eye_low_edge_fraction);
             logger->info("Delay setting for lane {} with eye width {}: {}", i, best_width, delay);
         } else {
             logger->info("No good delay setting for lane {}", i);
