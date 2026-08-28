@@ -364,6 +364,7 @@ void addOutputFileSink(const std::string &outputDir) {
     auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(outputDir + "stdout.log");
     file_sink->set_level(default_sink->level());
     file_sink->set_pattern(default_pattern_used);
+    file_sink->set_formatter(std::make_unique<AnsiStrippingFormatter>(makeFormatter(default_pattern_used)));
 
     spdlog::apply_all([&](const std::shared_ptr<spdlog::logger>& l) {
         l->sinks().push_back(file_sink);
