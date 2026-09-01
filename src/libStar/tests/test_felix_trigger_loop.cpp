@@ -77,7 +77,7 @@ public:
 /*
   Some helper functions for checking triggers stored in the buffer / trickle memory
 */
-uint32_t increment_bytes(uint8_t header) {
+uint32_t command_length_bytes(uint8_t header) {
   switch (header) {
     case LCB_FELIX::IDLE:
       return 1;
@@ -96,7 +96,7 @@ uint32_t increment_bytes(uint8_t header) {
   }
 }
 
-uint32_t increment_BCs(uint8_t header) {
+uint32_t command_length_BCs(uint8_t header) {
   switch (header) {
     case LCB_FELIX::IDLE:
     case LCB_FELIX::L0A:
@@ -127,7 +127,7 @@ uint32_t count_triggers(const std::vector<uint8_t>& buffer) {
       if (buffer[ibyte+1] & 1) ntrigs+=1;
     }
 
-    ibyte += increment_bytes(buffer[ibyte]);
+    ibyte += command_length_bytes(buffer[ibyte]);
   }
 
   return ntrigs;
@@ -156,10 +156,10 @@ double get_trig_frequency(const std::vector<uint8_t>& buffer) {
       }
     } else {
       // increase BC in case of other frames
-      BC += increment_BCs(buffer[ibyte]);
+      BC += command_length_BCs(buffer[ibyte]);
     }
 
-    ibyte += increment_bytes(buffer[ibyte]);
+    ibyte += command_length_bytes(buffer[ibyte]);
 
     if (trigBCs.size() > 2)
       break;
@@ -204,7 +204,7 @@ int get_trig_delay(const std::vector<uint8_t>& buffer) {
       } else {
         // Other fast command
         if (startCount) {
-          delay += increment_BCs(LCB_FELIX::FASTCMD);
+          delay += command_length_BCs(LCB_FELIX::FASTCMD);
         }
       }
 
@@ -223,13 +223,13 @@ int get_trig_delay(const std::vector<uint8_t>& buffer) {
       }
     } else { // other frames
       if (startCount) {
-        delay += increment_BCs(buffer[ibyte]);
+        delay += command_length_BCs(buffer[ibyte]);
       }
     }
 
     if (stopCount) break;
 
-    ibyte += increment_bytes(buffer[ibyte]);
+    ibyte += command_length_bytes(buffer[ibyte]);
   } // end of while(ibyte < buffer.size())
 
   if (not startCount) {
@@ -407,10 +407,14 @@ TEST_CASE("StarFelixTriggerLoopTest", "[star][trigger_loop]") {
   // lcbChn + 1
   uint32_t trickleChn = lcbChn + 1;
 
+  REQUIRE (std::dynamic_pointer_cast<StarFelixTriggerLoop>(action));
+
+  auto &sftl = *std::dynamic_pointer_cast<StarFelixTriggerLoop>(action);
+
   //
   // Number of triggers
   // Expected number of triggers
-  uint32_t nTrigs_expected = std::dynamic_pointer_cast<StarFelixTriggerLoop>(action)->getTrigCnt();
+  uint32_t nTrigs_expected = sftl.getTrigCnt();
   CAPTURE ( nTrigs_expected );
 
   // triggers per iteration of trickle memory
@@ -425,7 +429,7 @@ TEST_CASE("StarFelixTriggerLoopTest", "[star][trigger_loop]") {
   //
   // Frequency according to triggers in the tx buffer/trickle memory
   // Expected trigger frequency
-  double trigFreq_expected = std::dynamic_pointer_cast<StarFelixTriggerLoop>(action)->getTrigFreq();
+  double trigFreq_expected = sftl.getTrigFreq();
   CAPTURE ( trigFreq_expected );
 
   double trigFreq_sent = get_trig_frequency(tx.m_fifo[trickleChn]);
@@ -436,7 +440,7 @@ TEST_CASE("StarFelixTriggerLoopTest", "[star][trigger_loop]") {
   //
   // Trigger delay
   if (not j["noInject"]) {
-    int trigDelay_expected = std::dynamic_pointer_cast<StarFelixTriggerLoop>(action)->getTrigDelay();
+    int trigDelay_expected = sftl.getTrigDelay();
     CAPTURE ( trigDelay_expected );
 
     int trigDelay_sent = get_trig_delay(tx.m_fifo[trickleChn]);
