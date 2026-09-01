@@ -8,6 +8,7 @@
 #include "LCBUtils.h"
 #include "LCBFwUtils.h"
 #include "StarFelixTriggerLoop.h"
+#include "Utils.h"
 
 /*
   TxCore to record bytes that are sent to different tx channels
@@ -245,6 +246,17 @@ int get_trig_delay(const std::vector<uint8_t>& buffer) {
   return delay;
 }
 
+std::string hexify_bytes(const std::vector<uint8_t> &data)
+{
+  std::string d;
+  for(auto c: data) {
+    if(!d.empty()) d += " ";
+    d += Utils::hexify(c);
+  }
+
+  return d;
+}
+
 TEST_CASE("StarFelixTriggerLoopTest", "[star][trigger_loop]") {
   std::shared_ptr<LoopActionBase> action = StdDict::getLoopAction("StarFelixTriggerLoop");
 
@@ -448,4 +460,73 @@ TEST_CASE("StarFelixTriggerLoopTest", "[star][trigger_loop]") {
 
     REQUIRE ( trigDelay_sent == trigDelay_expected );
   }
+}
+
+struct GTCTest {
+  std::string name;
+  uint8_t mask = 8;
+  uint8_t trigger = 2;
+  bool bcr = false;
+
+  unsigned idle_count = 0;
+
+  uint8_t cal_delay = 0;
+
+  int expected_delay = 0;
+};
+
+TEST_CASE("Check get_trig_delay", "[star][trigger_loop][felix]") {
+  std::vector<uint8_t> buffer;
+
+  auto tc = GENERATE
+    (
+     GTCTest{"Cal delay 0, trigger in first slot"},
+     GTCTest{
+       .name="Cal delay 0, trigger in last slot",
+       .mask=1,
+       .expected_delay=3
+     },
+     GTCTest{
+       .name="Cal delay 0, one idle frame, trigger in first slot",
+       .idle_count=1,
+       .expected_delay=4
+     },
+     GTCTest{
+       .name="Cal delay 0, one idle frame, trigger in last slot",
+       .mask=1,
+       .idle_count=1,
+       .expected_delay=7,
+     },
+     GTCTest{
+       .name="Cal delay 1, one idle frame, trigger in last slot",
+       .mask=1,
+       .idle_count=1,
+       .cal_delay=1,
+       .expected_delay=6,
+     },
+     GTCTest{
+       .name="No trigger",
+       .mask=0,
+       .expected_delay=-1
+     }
+     );
+
+  CAPTURE (tc.name);
+  CAPTURE (tc.cal_delay);
+  CAPTURE (tc.idle_count);
+  CAPTURE (tc.mask);
+
+  auto cmd = LCB_FELIX::fast_command(LCB::ABC_CAL_PULSE, tc.cal_delay);
+  buffer.insert(buffer.end(), cmd.begin(), cmd.end());
+
+  for(unsigned i=0; i<tc.idle_count; i++) {
+    auto idle = LCB_FELIX::idle();
+    buffer.insert(buffer.end(), idle.begin(), idle.end());
+  }
+  auto l0a = LCB_FELIX::l0a_mask(tc.mask, tc.trigger, tc.bcr);
+  buffer.insert(buffer.end(), l0a.begin(), l0a.end());
+
+  CAPTURE(hexify_bytes(buffer));
+
+  CHECK (get_trig_delay(buffer) == tc.expected_delay);
 }
