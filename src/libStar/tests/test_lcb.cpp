@@ -1,6 +1,7 @@
 #include "catch.hpp"
 
 #include "LCBUtils.h"
+#include "LCBFwUtils.h"
 
 TEST_CASE("6b8b check", "[star][lcb]") {
   std::vector<bool> v(256);
@@ -66,6 +67,45 @@ TEST_CASE("L0A Test", "[star][lcb]") {
         REQUIRE ( LCB::get_l0_tag(f) == t);
       }
     }
+  }
+}
+
+TEST_CASE("L0A mask test", "[star][lcb]") {
+  // Explicitly check sense of L0A mask in LCB
+
+  // Mask 1 is the last slot in time
+  uint8_t mask = 1;
+  uint8_t tag = 4;
+  bool bcr = false;
+
+  LCB::Frame f = LCB::l0a_mask(mask, tag, bcr);
+  CHECK (f == 0x7265);
+
+  // Trigger in first two BCs
+  mask = 0xc;
+  tag = 0x41;
+
+  f = LCB::l0a_mask(mask, tag, bcr);
+  CHECK (f == 0x9971);
+
+  // Trigger in last two BCs
+  mask = 0x3;
+  tag = 0x43;
+
+  f = LCB::l0a_mask(mask, tag, bcr);
+  CHECK (f == 0x87c3);
+}
+
+TEST_CASE("L0A mask test FW", "[star][lcb]") {
+  // Explicitly check sense of L0A mask in LCB FW encoding
+
+  // All we can do is check that it's the same as input
+  uint8_t tag = 4;
+  bool bcr = false;
+
+  for(uint8_t mask = 1; mask<16; mask++) {
+    auto buffer = LCB_FELIX::l0a_mask(mask, tag, bcr);
+    CHECK ((buffer[1] & 0xf) == mask);
   }
 }
 
