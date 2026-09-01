@@ -30,6 +30,13 @@ namespace LCB_FELIX {
     };
   }
 
+  /**
+   * Command to insert L0A command.
+   *
+   * @param mask 4-bit mask of BCs to trigger. MSB (bit 3) comes first.
+   * @param tag 7-bit L0tag of first trigger in mask.
+   * @param bcr Should a BCR be encoded.
+   */
   inline std::array<uint8_t, 3> l0a_mask(uint8_t mask, uint8_t tag, bool bcr=false) {
     return {
       L0A,
