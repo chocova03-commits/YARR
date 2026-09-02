@@ -150,14 +150,11 @@ int main(int argc, char **argv) {
     json jcontroller;
     jcontroller = ScanHelper::openJsonFile(hw_controller_filename);
     specNum=jcontroller["ctrlCfg"]["cfg"]["specNum"];
-
-    SpecCom mySpec(specNum);
     logger->info("Scanning link quality against delay on Spec Card {}", specNum);
 
     // instantiate the hw controller
     std::unique_ptr<HwController> hw;
     try {
-        jcontroller = ScanHelper::openJsonFile(hw_controller_filename);
         hw = ScanHelper::loadController(jcontroller);
     } catch (std::exception& e) {
         std::cerr << "ERROR: Unable to load controller from provided config, exception caught: " << e.what() << std::endl;
@@ -166,6 +163,16 @@ int main(int argc, char **argv) {
     hw->setupMode();
     hw->setTrigEnable(0);
     hw->disableRx(); // needed?
+
+    // The delay/error-counter registers poked below aren't exposed via the
+    // HwController/TxCore/RxCore interface, so reach the underlying SpecCom
+    // directly instead of opening a second, independent SpecCom on the same
+    // physical card.
+    auto mySpec = dynamic_cast<SpecCom*>(hw.get());
+    if (mySpec == nullptr) {
+        std::cerr << "ERROR: eyeDiagram requires a Spec controller" << std::endl;
+        return 1;
+    }
 
     auto jconn = ScanHelper::openJsonFile(connectivity_filename);
 
@@ -223,10 +230,10 @@ int main(int argc, char **argv) {
     file.open("results.txt");
 
     // Enable manual delay control
-    mySpec.writeSingle(0x2 << 14 | 0x6, 0xffff); 
+    mySpec->writeSingle(0x2 << 14 | 0x6, 0xffff); 
 
-    mySpec.writeSingle(0x2 << 14 | 0x8, test_size); 
-    mySpec.writeSingle(0x2 << 14 | 0x9, 0); 
+    mySpec->writeSingle(0x2 << 14 | 0x8, test_size); 
+    mySpec->writeSingle(0x2 << 14 | 0x9, 0); 
 
     std::vector<std::vector<double> > resultVec;
     resultVec.resize(n_lanes);
@@ -244,20 +251,20 @@ int main(int argc, char **argv) {
         s+=std::to_string(i)+" | ";
         std::cout << std::setw(5) << i << " | ";
         for (uint32_t j = 0 ; j<n_lanes; j++) {
-            mySpec.writeSingle(0x2 << 14 | 0x4, j); 
-            mySpec.writeSingle(0x2 << 14 | 0x5, i); 
+            mySpec->writeSingle(0x2 << 14 | 0x4, j); 
+            mySpec->writeSingle(0x2 << 14 | 0x5, i); 
         }
 
         // Reset and restart error counter
-        mySpec.writeSingle(0x2 << 14 | 0xb, 1); 
-        mySpec.writeSingle(0x2 << 14 | 0xb, 0); 
+        mySpec->writeSingle(0x2 << 14 | 0xb, 1); 
+        mySpec->writeSingle(0x2 << 14 | 0xb, 0); 
 
         std::this_thread::sleep_for(std::chrono::microseconds(wait));
 
         for (uint32_t j = 0 ; j<n_lanes; j++) {
-            mySpec.writeSingle(0x2 << 14 | 0xa, j); 
+            mySpec->writeSingle(0x2 << 14 | 0xa, j); 
             uint32_t errors = 0;
-            errors = mySpec.readSingle(0x2<<14 | 0xb);
+            errors = mySpec->readSingle(0x2<<14 | 0xb);
             double error_count = -1;
             double value=-1;
             double link_quality=-1;
