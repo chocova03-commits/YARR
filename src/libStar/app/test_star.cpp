@@ -209,6 +209,9 @@ namespace {
     /// Default to updating IDs once readout success
     bool setNotBroadcastIds = true;
 
+    /// By default stop on the first failed sub-test
+    bool keepGoing = false;
+
     // Original Spec version
     std::vector<uint32_t> rxChannels = {6};
     std::vector<uint32_t> txChannels = {0xFFFF};
@@ -270,6 +273,7 @@ void printHelp() {
   std::cout << " -i : All expected ICs (default all: 0x7ff).\n";
   std::cout << " -3 : Configure HCC for 320 instead of 640 (default).\n";
   std::cout << " -b : Always use broadcast for read/write (default is to update map based on HPR).\n";
+  std::cout << " -k : Keep going in sequence after error.\n";
   std::cout << " -R : Send reset commands.\n";
   std::cout << " -v : Report carried data between actions (diagnostic).\n";
   std::cout << " -w <timeout_ms> : General timeout in milliseconds.\n";
@@ -1595,6 +1599,11 @@ bool runTestSequence(std::string testSequence, TxCore& txCore, RxCore& rxCore, T
       }
       logger->info("Running test {}", t);
       success &= tests[t](txCore, rxCore);
+
+      if(!testData.keepGoing && !success) {
+        logger->info("Aborting test sequence due to failure");
+        break;
+      }
     }
   } else {
     logger->error("Unknown test sequence: {}", testSequence);
@@ -1659,7 +1668,7 @@ int main(int argc, char *argv[]) {
         {nullptr, 0, nullptr, 0}};
 
     int c;
-    while ((c = getopt_long(argc, argv, "3hbvTi:l:r:t:dRs:c:w:V:", long_options, nullptr)) != -1) {
+    while ((c = getopt_long(argc, argv, "3hbkvTi:l:r:t:dRs:c:w:V:", long_options, nullptr)) != -1) {
       switch(c) {
       case 'h':
         printHelp();
@@ -1670,6 +1679,9 @@ int main(int argc, char *argv[]) {
       case 'b':
         testData.setNotBroadcastIds = false;
         break;
+      case 'k':
+        testData.keepGoing = true;
+        return 0;
       case 'i':
         try {
           // Allow hex
@@ -1885,6 +1897,11 @@ int main(int argc, char *argv[]) {
           testSequence = testSequence.substr(firstColon + 1);
         }
         logger->trace(" Remaining custom sequence: '{}'", testSequence);
+
+        if(!testData.keepGoing && !success) {
+          logger->info("Stopping test sequence due to failure");
+          break;
+        }
       }
     } else if(isupper(testSequence[0])) {
       logger->info("Run test sequence: {}", testSequence);
