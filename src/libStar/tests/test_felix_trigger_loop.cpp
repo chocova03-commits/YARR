@@ -8,6 +8,7 @@
 #include "LCBUtils.h"
 #include "LCBFwUtils.h"
 #include "StarFelixTriggerLoop.h"
+#include "Utils.h"
 
 /*
   TxCore to record bytes that are sent to different tx channels
@@ -77,7 +78,7 @@ public:
 /*
   Some helper functions for checking triggers stored in the buffer / trickle memory
 */
-uint32_t increment_bytes(uint8_t header) {
+uint32_t command_length_bytes(uint8_t header) {
   switch (header) {
     case LCB_FELIX::IDLE:
       return 1;
@@ -96,7 +97,7 @@ uint32_t increment_bytes(uint8_t header) {
   }
 }
 
-uint32_t increment_BCs(uint8_t header) {
+uint32_t command_length_BCs(uint8_t header) {
   switch (header) {
     case LCB_FELIX::IDLE:
     case LCB_FELIX::L0A:
@@ -127,7 +128,7 @@ uint32_t count_triggers(const std::vector<uint8_t>& buffer) {
       if (buffer[ibyte+1] & 1) ntrigs+=1;
     }
 
-    ibyte += increment_bytes(buffer[ibyte]);
+    ibyte += command_length_bytes(buffer[ibyte]);
   }
 
   return ntrigs;
@@ -156,10 +157,10 @@ double get_trig_frequency(const std::vector<uint8_t>& buffer) {
       }
     } else {
       // increase BC in case of other frames
-      BC += increment_BCs(buffer[ibyte]);
+      BC += command_length_BCs(buffer[ibyte]);
     }
 
-    ibyte += increment_bytes(buffer[ibyte]);
+    ibyte += command_length_bytes(buffer[ibyte]);
 
     if (trigBCs.size() > 2)
       break;
@@ -204,7 +205,7 @@ int get_trig_delay(const std::vector<uint8_t>& buffer) {
       } else {
         // Other fast command
         if (startCount) {
-          delay += increment_BCs(LCB_FELIX::FASTCMD);
+          delay += command_length_BCs(LCB_FELIX::FASTCMD);
         }
       }
 
@@ -223,13 +224,13 @@ int get_trig_delay(const std::vector<uint8_t>& buffer) {
       }
     } else { // other frames
       if (startCount) {
-        delay += increment_BCs(buffer[ibyte]);
+        delay += command_length_BCs(buffer[ibyte]);
       }
     }
 
     if (stopCount) break;
 
-    ibyte += increment_bytes(buffer[ibyte]);
+    ibyte += command_length_bytes(buffer[ibyte]);
   } // end of while(ibyte < buffer.size())
 
   if (not startCount) {
@@ -243,6 +244,17 @@ int get_trig_delay(const std::vector<uint8_t>& buffer) {
   // -1 is the value set to m_trigDelay in StarFelixTriggerLoop in case it cannot insert a pulse command
 
   return delay;
+}
+
+std::string hexify_bytes(const std::vector<uint8_t> &data)
+{
+  std::string d;
+  for(auto c: data) {
+    if(!d.empty()) d += " ";
+    d += Utils::hexify(c);
+  }
+
+  return d;
 }
 
 TEST_CASE("StarFelixTriggerLoopTest", "[star][trigger_loop]") {
@@ -407,10 +419,14 @@ TEST_CASE("StarFelixTriggerLoopTest", "[star][trigger_loop]") {
   // lcbChn + 1
   uint32_t trickleChn = lcbChn + 1;
 
+  REQUIRE (std::dynamic_pointer_cast<StarFelixTriggerLoop>(action));
+
+  auto &sftl = *std::dynamic_pointer_cast<StarFelixTriggerLoop>(action);
+
   //
   // Number of triggers
   // Expected number of triggers
-  uint32_t nTrigs_expected = std::dynamic_pointer_cast<StarFelixTriggerLoop>(action)->getTrigCnt();
+  uint32_t nTrigs_expected = sftl.getTrigCnt();
   CAPTURE ( nTrigs_expected );
 
   // triggers per iteration of trickle memory
@@ -425,7 +441,7 @@ TEST_CASE("StarFelixTriggerLoopTest", "[star][trigger_loop]") {
   //
   // Frequency according to triggers in the tx buffer/trickle memory
   // Expected trigger frequency
-  double trigFreq_expected = std::dynamic_pointer_cast<StarFelixTriggerLoop>(action)->getTrigFreq();
+  double trigFreq_expected = sftl.getTrigFreq();
   CAPTURE ( trigFreq_expected );
 
   double trigFreq_sent = get_trig_frequency(tx.m_fifo[trickleChn]);
@@ -436,7 +452,7 @@ TEST_CASE("StarFelixTriggerLoopTest", "[star][trigger_loop]") {
   //
   // Trigger delay
   if (not j["noInject"]) {
-    int trigDelay_expected = std::dynamic_pointer_cast<StarFelixTriggerLoop>(action)->getTrigDelay();
+    int trigDelay_expected = sftl.getTrigDelay();
     CAPTURE ( trigDelay_expected );
 
     int trigDelay_sent = get_trig_delay(tx.m_fifo[trickleChn]);
@@ -444,4 +460,73 @@ TEST_CASE("StarFelixTriggerLoopTest", "[star][trigger_loop]") {
 
     REQUIRE ( trigDelay_sent == trigDelay_expected );
   }
+}
+
+struct GTCTest {
+  std::string name;
+  uint8_t mask = 8;
+  uint8_t trigger = 2;
+  bool bcr = false;
+
+  unsigned idle_count = 0;
+
+  uint8_t cal_delay = 0;
+
+  int expected_delay = 0;
+};
+
+TEST_CASE("Check get_trig_delay", "[star][trigger_loop][felix]") {
+  std::vector<uint8_t> buffer;
+
+  auto tc = GENERATE
+    (
+     GTCTest{"Cal delay 0, trigger in first slot"},
+     GTCTest{
+       .name="Cal delay 0, trigger in last slot",
+       .mask=1,
+       .expected_delay=3
+     },
+     GTCTest{
+       .name="Cal delay 0, one idle frame, trigger in first slot",
+       .idle_count=1,
+       .expected_delay=4
+     },
+     GTCTest{
+       .name="Cal delay 0, one idle frame, trigger in last slot",
+       .mask=1,
+       .idle_count=1,
+       .expected_delay=7,
+     },
+     GTCTest{
+       .name="Cal delay 1, one idle frame, trigger in last slot",
+       .mask=1,
+       .idle_count=1,
+       .cal_delay=1,
+       .expected_delay=6,
+     },
+     GTCTest{
+       .name="No trigger",
+       .mask=0,
+       .expected_delay=-1
+     }
+     );
+
+  CAPTURE (tc.name);
+  CAPTURE (tc.cal_delay);
+  CAPTURE (tc.idle_count);
+  CAPTURE (tc.mask);
+
+  auto cmd = LCB_FELIX::fast_command(LCB::ABC_CAL_PULSE, tc.cal_delay);
+  buffer.insert(buffer.end(), cmd.begin(), cmd.end());
+
+  for(unsigned i=0; i<tc.idle_count; i++) {
+    auto idle = LCB_FELIX::idle();
+    buffer.insert(buffer.end(), idle.begin(), idle.end());
+  }
+  auto l0a = LCB_FELIX::l0a_mask(tc.mask, tc.trigger, tc.bcr);
+  buffer.insert(buffer.end(), l0a.begin(), l0a.end());
+
+  CAPTURE(hexify_bytes(buffer));
+
+  CHECK (get_trig_delay(buffer) == tc.expected_delay);
 }
