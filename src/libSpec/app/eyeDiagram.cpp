@@ -297,7 +297,7 @@ int main(int argc, char **argv) {
     file << s;
     logger->info("Done scanning!  \n");
 
-    logger->info("Determining delay settings:");
+    logger->info("Determining delay settings using eye low-edge fraction: {}", eye_low_edge_fraction);
 
     std::vector<int> delayVec;
     delayVec.resize(n_lanes);
@@ -330,7 +330,7 @@ int main(int argc, char **argv) {
         int delay=0;
         if (best_width!=0){
             delay=(int) best_val+(best_width*eye_low_edge_fraction);
-            logger->info("Delay setting for lane {} with eye width {}: {}", i, best_width, delay);
+            logger->info("Delay setting for lane {} with eye width {} (fraction {}): {}", i, best_width, eye_low_edge_fraction, delay);
         } else {
             logger->info("No good delay setting for lane {}", i);
         }
