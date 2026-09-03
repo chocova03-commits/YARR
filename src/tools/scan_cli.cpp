@@ -9,9 +9,7 @@ int main(int argc, char *argv[]) {
     if(res<=0) return res;
     res=con.loadConfig(); if(res!=0) return (res);
     res=con.initHardware(); if(res!=0) return (res);
-    res=con.configure();
-    if(res<0) return res;
-    if(res>0) return 0; // configured front-ends without a scan, nothing left to do
+    res=con.configure(); if(res!=0) return (res);
     res=con.setupScan(); if(res!=0) return (res);
     con.run();
     con.cleanup();
