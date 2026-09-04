@@ -14,7 +14,7 @@ def load_json(filename):
 def test_threshold_scan(chip_label, chip_id, golden_image_path, stand_config):
     #define new and golden path files
     scan_dir = pathlib.Path(f"./outputs/threshold-scan/000001_std_thresholdscan_hr")
-    matches = list(scan_dir.glob(f"{chip_id}_ThresholdMap-*.json")) if scan_dir.exists() else []
+    matches = list(scan_dir.glob(f"{chip_id}_ThresholdMap.json")) if scan_dir.exists() else []
     assert len(matches) == 1, (
         f"Expected exactly one ThresholdMap file for {chip_id} in {scan_dir}, found: {matches}"
     )
