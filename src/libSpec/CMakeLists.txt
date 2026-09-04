@@ -31,6 +31,7 @@ LIST(APPEND apps
         specComTest
         switchLPM
         eyeDiagram
+        cmlBiasScan
         dataMergingCheck
         specErrorCheckDma
         specErrorCheckSingle
