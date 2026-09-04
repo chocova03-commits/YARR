@@ -18,11 +18,11 @@ namespace {
     std::string formatDuration(std::chrono::seconds secs) {
         long long total = secs.count();
         if (total < 0) total = 0;
-        long long h = total / 3600;
-        long long m = (total % 3600) / 60;
-        long long s = total % 60;
-        char buf[16];
-        std::snprintf(buf, sizeof(buf), "%02lld:%02lld:%02lld", h, m, s);
+        uint16_t h = (total / 3600) % 65536;
+        uint16_t m = ((total % 3600) / 60) % 60;
+        uint16_t s = total % 60;
+        char buf[16]; // Should be more if really going to run for 1000s hours
+        std::snprintf(buf, sizeof(buf), "%02d:%02d:%02d", h, m, s);
         return std::string(buf);
     }
 }
