@@ -1933,6 +1933,8 @@ FunctionMap &TestData::buildTests () {
   static FunctionMap tests = {
       // Read HCCStar HPRs
       {"checkHCCHPRs", [&](auto &t, auto &r) {return checkHCCHPRs(t, r, rxChannels, doResets, timeout_ms);}},
+      {"checkHCCHPRs_NoReset", [&](auto &t, auto &r) {return checkHCCHPRs(t, r, rxChannels, false, timeout_ms);}},
+      {"checkHCCHPRs_WithReset", [&](auto &t, auto &r) {return checkHCCHPRs(t, r, rxChannels, true, timeout_ms);}},
       // Probe HCCs
       {"probeHCCs", [&](auto &t, auto &r) {return probeHCCs(t, r, hccStars, txChannels, rxChannels, setHccId, timeout_ms, setNotBroadcastIds);}},
       // Read many HCC registers
@@ -1942,6 +1944,8 @@ FunctionMap &TestData::buildTests () {
 
       // Configure HCCs to enable communications with ABCs
       {"configureHCC", [&](auto &t, auto &_) {configureHCC(t, *starCfg, doResets, icEnablesMask, mode640); return true;}},
+      {"configureHCC_NoReset", [&](auto &t, auto &_) {configureHCC(t, *starCfg, false, icEnablesMask, mode640); return true;}},
+      {"configureHCC_WithReset", [&](auto &t, auto &_) {configureHCC(t, *starCfg, true, icEnablesMask, mode640); return true;}},
       {"configureHCCIfReset", [&](auto &t, auto &_) {if(doResets) configureHCC(t, *starCfg, doResets, icEnablesMask, mode640); return true;}},
       // configure HCC into the Packet Transparent mode
       {"configureHCCForPacketTransp", [&](auto &t, auto &r) {configureHCC_PacketTransp(t, *starCfg, doResets, icEnablesMask, mode640); return true; }},
@@ -1962,6 +1966,8 @@ FunctionMap &TestData::buildTests () {
 
       // Configure ABCs
       {"configureABC", [&](auto &t, auto &r) {configureABC(t, *starCfg, doResets); return true;}},
+      {"configureABC_NoReset", [&](auto &t, auto &r) {configureABC(t, *starCfg, true); return true;}},
+      {"configureABC_WithReset", [&](auto &t, auto &r) {configureABC(t, *starCfg, false); return true;}},
       {"configureABCIfReset", [&](auto &t, auto &r) {if(doResets) configureABC(t, *starCfg, doResets); return true;}},
 
       {"resetABC", [&](auto &t, auto &r) {resetABC(t, *starCfg); return true;}},
