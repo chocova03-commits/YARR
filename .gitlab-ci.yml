@@ -221,7 +221,7 @@ job_build_test_gcc_9:
   stage: build
   image: registry.cern.ch/docker.io/library/gcc:9
   script:
-    - apt-get update
+    - apt-get -o Acquire::Check-Valid-Until=false update
     - apt-get install -y cmake make
     - mkdir build
     - cd build
