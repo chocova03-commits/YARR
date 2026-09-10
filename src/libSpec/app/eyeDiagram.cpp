@@ -28,19 +28,22 @@ constexpr const char* COLOR_RESET = "\033[0m";
 
 // Bias the chosen delay towards the low edge of the eye rather than dead
 // center: the high edge has been observed to degrade faster than the low
-// edge, so centering leaves less margin than intended.
-constexpr double EYE_LOW_EDGE_FRACTION = 0.25;
+// edge, so centering leaves less margin than intended. The right bias point
+// is link/setup dependent, so it's exposed via -e rather than fixed here.
+constexpr double DEFAULT_EYE_LOW_EDGE_FRACTION = 0.4;
 
 void printHelp() {
-    std::cout << "Usage: ./bin/eyeDiagram [-h] [-r <hw_controller_file>] [-c <connectivity_file>] [-t <test_size>] [-s]\n\n"
+    std::cout << "Usage: ./bin/eyeDiagram [-h] [-r <hw_controller_file>] [-c <connectivity_file>] [-t <test_size>] [-e <eye_low_edge_fraction>] [-s]\n\n"
         << "Options:\n"
         << "  -h                   Display this help message.\n"
         << "  -r <hw_controller_file>   Specify hardware controller JSON path.\n"
         << "  -c <connectivity_file>    Specify connectivity config JSON path.\n"
         << "  -t <test_size>            Specify the error counter test size. Default 1 x 10^6\n"
+        << "  -e <eye_low_edge_fraction> Fraction into the eye width (from the low edge, 0-1) to place\n"
+        << "                             the chosen delay. Default " << DEFAULT_EYE_LOW_EDGE_FRACTION << ".\n"
         << "  -s                   Skip chip configuration.\n"
-        << "  -n                   Don't update the controller condfig with the best delay values\n" 
-        << "  -v                   Print out and store raw error counter values.\n"; 
+        << "  -n                   Don't update the controller condfig with the best delay values\n"
+        << "  -v                   Print out and store raw error counter values.\n";
 
 }
 
@@ -90,11 +93,12 @@ int main(int argc, char **argv) {
     bool save_delay=true;
     bool skip_config=false;
     bool print_raw_value=false;
+    double eye_low_edge_fraction = DEFAULT_EYE_LOW_EDGE_FRACTION;
 
     uint16_t cdrclksel = 0;
     uint16_t serblckperiod = 50;
 
-    while ((c = getopt(argc, argv, "hr:c:t:nsv")) != -1) {
+    while ((c = getopt(argc, argv, "hr:c:t:e:nsv")) != -1) {
         switch (c) {
             case 'h':
                 printHelp();
@@ -108,15 +112,22 @@ int main(int argc, char **argv) {
             case 't' :
                 test_size = std::stoi(optarg);
                 break;
+            case 'e' :
+                eye_low_edge_fraction = std::stod(optarg);
+                if (eye_low_edge_fraction < 0.0 || eye_low_edge_fraction > 1.0) {
+                    logger->critical("-e eye_low_edge_fraction must be between 0 and 1 (got {})", eye_low_edge_fraction);
+                    return -1;
+                }
+                break;
             case 'n' :
                 save_delay = false;
-                break;    
+                break;
             case 's' :
                 skip_config = true;
-                break;   
+                break;
             case 'v' :
                 print_raw_value = true;
-                break;   
+                break;
             default:
                 logger->critical("Invalid command line parameter(s) given!");
                 return -1;
@@ -139,14 +150,11 @@ int main(int argc, char **argv) {
     json jcontroller;
     jcontroller = ScanHelper::openJsonFile(hw_controller_filename);
     specNum=jcontroller["ctrlCfg"]["cfg"]["specNum"];
-
-    SpecCom mySpec(specNum);
     logger->info("Scanning link quality against delay on Spec Card {}", specNum);
 
     // instantiate the hw controller
     std::unique_ptr<HwController> hw;
     try {
-        jcontroller = ScanHelper::openJsonFile(hw_controller_filename);
         hw = ScanHelper::loadController(jcontroller);
     } catch (std::exception& e) {
         std::cerr << "ERROR: Unable to load controller from provided config, exception caught: " << e.what() << std::endl;
@@ -155,6 +163,16 @@ int main(int argc, char **argv) {
     hw->setupMode();
     hw->setTrigEnable(0);
     hw->disableRx(); // needed?
+
+    // The delay/error-counter registers poked below aren't exposed via the
+    // HwController/TxCore/RxCore interface, so reach the underlying SpecCom
+    // directly instead of opening a second, independent SpecCom on the same
+    // physical card.
+    auto mySpec = dynamic_cast<SpecCom*>(hw.get());
+    if (mySpec == nullptr) {
+        std::cerr << "ERROR: eyeDiagram requires a Spec controller" << std::endl;
+        return 1;
+    }
 
     auto jconn = ScanHelper::openJsonFile(connectivity_filename);
 
@@ -193,7 +211,7 @@ int main(int argc, char **argv) {
 
             // Wait for fifo to be empty
             std::this_thread::sleep_for(std::chrono::microseconds(10));
-            while(!hw->isCmdEmpty());
+            hw->waitCmdEmpty();
         }
     }
 
@@ -212,10 +230,10 @@ int main(int argc, char **argv) {
     file.open("results.txt");
 
     // Enable manual delay control
-    mySpec.writeSingle(0x2 << 14 | 0x6, 0xffff); 
+    mySpec->writeSingle(0x2 << 14 | 0x6, 0xffff); 
 
-    mySpec.writeSingle(0x2 << 14 | 0x8, test_size); 
-    mySpec.writeSingle(0x2 << 14 | 0x9, 0); 
+    mySpec->writeSingle(0x2 << 14 | 0x8, test_size); 
+    mySpec->writeSingle(0x2 << 14 | 0x9, 0); 
 
     std::vector<std::vector<double> > resultVec;
     resultVec.resize(n_lanes);
@@ -233,20 +251,20 @@ int main(int argc, char **argv) {
         s+=std::to_string(i)+" | ";
         std::cout << std::setw(5) << i << " | ";
         for (uint32_t j = 0 ; j<n_lanes; j++) {
-            mySpec.writeSingle(0x2 << 14 | 0x4, j); 
-            mySpec.writeSingle(0x2 << 14 | 0x5, i); 
+            mySpec->writeSingle(0x2 << 14 | 0x4, j); 
+            mySpec->writeSingle(0x2 << 14 | 0x5, i); 
         }
 
         // Reset and restart error counter
-        mySpec.writeSingle(0x2 << 14 | 0xb, 1); 
-        mySpec.writeSingle(0x2 << 14 | 0xb, 0); 
+        mySpec->writeSingle(0x2 << 14 | 0xb, 1); 
+        mySpec->writeSingle(0x2 << 14 | 0xb, 0); 
 
         std::this_thread::sleep_for(std::chrono::microseconds(wait));
 
         for (uint32_t j = 0 ; j<n_lanes; j++) {
-            mySpec.writeSingle(0x2 << 14 | 0xa, j); 
+            mySpec->writeSingle(0x2 << 14 | 0xa, j); 
             uint32_t errors = 0;
-            errors = mySpec.readSingle(0x2<<14 | 0xb);
+            errors = mySpec->readSingle(0x2<<14 | 0xb);
             double error_count = -1;
             double value=-1;
             double link_quality=-1;
@@ -286,7 +304,7 @@ int main(int argc, char **argv) {
     file << s;
     logger->info("Done scanning!  \n");
 
-    logger->info("Determining delay settings:");
+    logger->info("Determining delay settings using eye low-edge fraction: {}", eye_low_edge_fraction);
 
     std::vector<int> delayVec;
     delayVec.resize(n_lanes);
@@ -318,8 +336,8 @@ int main(int argc, char **argv) {
         }    
         int delay=0;
         if (best_width!=0){
-            delay=(int) best_val+(best_width*EYE_LOW_EDGE_FRACTION);
-            logger->info("Delay setting for lane {} with eye width {}: {}", i, best_width, delay);
+            delay=(int) best_val+(best_width*eye_low_edge_fraction);
+            logger->info("Delay setting for lane {} with eye width {} (fraction {}): {}", i, best_width, eye_low_edge_fraction, delay);
         } else {
             logger->info("No good delay setting for lane {}", i);
         }

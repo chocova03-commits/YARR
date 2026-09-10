@@ -28,8 +28,8 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${MIN_GCC_VERSION})
         message(FATAL_ERROR "GCC version must be at least ${MIN_GCC_VERSION}!")
     endif()
-elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11.0)
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11.0)
         message(FATAL_ERROR "Clang version must be at least 11.0!")
     endif()
 else()
@@ -53,10 +53,20 @@ else()
 endif()
 
 add_compile_options(
-  $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-Wfatal-errors>
-  $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-Wno-deprecated>
-  $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-Wnon-virtual-dtor>
+  $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wfatal-errors>
+  $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wno-deprecated>
+  $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wnon-virtual-dtor>
 )
+
+# YARR's chip/controller libraries and Scan/Yarr have circular runtime dependencies by design
+# (e.g. FelixClient calls into Scan's Bookkeeper/StdDict registry, Scan calls into Yarr's
+# version info, Yarr links the front-end/controller libraries). On Linux this is tolerated
+# because ELF shared libraries may carry unresolved symbols, resolved at load time against
+# whatever else is in the process. macOS's linker resolves dylib symbols strictly at link
+# time, so mirror the Linux behavior for shared libraries only (not executables).
+if(APPLE)
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-undefined,dynamic_lookup")
+endif()
 
 # compiler settings ---------------------------------------------------------------------------------------
 
@@ -105,7 +115,13 @@ set(CMAKE_SKIP_BUILD_RPATH FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+if(APPLE)
+    # macOS dyld has no equivalent of ELF's $ORIGIN token; @loader_path is the
+    # per-binary-relative token it understands instead.
+    set(CMAKE_INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
+else()
+    set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+endif()
 
 # Clear existing RPATHs to be safe
 

@@ -216,7 +216,7 @@ int main(int argc, char* argv[]) {
 
     std::this_thread::sleep_for(std::chrono::microseconds(100000));
     for (int j=0; j<1000; j++){
-        while(!hw->isCmdEmpty()){;}
+        hw->waitCmdEmpty();
 
         hw->flushBuffer();
 
@@ -231,7 +231,7 @@ int main(int argc, char* argv[]) {
         hw->writeFifo(0xAAAAAAAA);
         hw->writeFifo(0xAAAAAAAA);
 
-        while(!hw->isCmdEmpty()){;}
+        hw->waitCmdEmpty();
 
         std::this_thread::sleep_for(std::chrono::microseconds(20));
 

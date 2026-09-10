@@ -10,6 +10,7 @@
 
 #include "logging.h"
 #include "LoggingConfig.h"
+#include "PirateSpeak.h"
 
 #include "ScanHelper.h"
 #include "ScanOpts.h"
@@ -25,6 +26,8 @@
 #include "FrontEndClipBoards.h"
 #include "ScanBase.h"
 #include "DBHandler.h"
+#include "ScanProgress.h"
+#include "ProgressBar.h"
 
 #include "storage.hpp"
 #include "ScanConsoleImpl.h"
@@ -124,6 +127,7 @@ int ScanConsoleImpl::init(ScanOpts options) {
         loggerConfig = logging::defaultConfig();
     }
     spdlog::info("Configuring logger ...");
+    logging::setPirateMode(scanOpts.pirateMode);
     logging::setupLoggers(loggerConfig);
     ScanHelper::banner(logger,"Welcome to YARR - ScanConsole");
     return 1;
@@ -153,6 +157,7 @@ int ScanConsoleImpl::loadConfig() {
     if(scanOpts.doOutput) {
         strippedScan = ScanHelper::createOutputDir(scanOpts.scanType, runCounter, scanOpts.outputDir);
         ScanHelper::createSymlink(dataDir,strippedScan,runCounter);
+        logging::addOutputFileSink(scanOpts.outputDir);
     }
 
     if(scanOpts.scan_config_provided) {
@@ -341,7 +346,7 @@ int ScanConsoleImpl::configure() {
             bookie->getFe(id)->configure();
             // Wait for fifo to be empty
             std::this_thread::sleep_for(std::chrono::microseconds(100));
-            while(!hwCtrl->isCmdEmpty());
+            hwCtrl->waitCmdEmpty();
         }
         cfg_end = std::chrono::steady_clock::now();
         logger->info("Sent configuration to all FEs in {} ms!",
@@ -607,7 +612,9 @@ void ScanConsoleImpl::run() {
     ScanHelper::banner(logger,"Run Scan");
 
     scan_start = std::chrono::steady_clock::now();
+    ScanProgress::instance().init(*scanBase);
     scanBase->run();
+    ScanProgress::instance().finish();
     scanBase->postScan();
     logger->info("Scan done!");
 
@@ -668,6 +675,7 @@ void ScanConsoleImpl::run() {
     }
     // join clipboard monitor
     bookie->joinFeClipboardMonitor();
+    ProgressBar::instance().clearAll();
 
     all_done = std::chrono::steady_clock::now();
     logger->info("All done!");

@@ -39,7 +39,7 @@ Next, the software needs to be updated. Check out the latest tag (`1.4.6` or hig
 Finally, the exisiting chip configs need to be updated to from 640Mbps to 1.28 Gbps. A dedicated script is provided for taking care of this automatically, simply run: 
 
 ```bash
-python3 scripts/update_config.py -c <connectivity_file>
+python3 scripts/update_chip_dbconfig.py -c <connectivity_file>
 ```
 
 where you provide the module connectivity file is provided as an argument. Now the setup is ready for running scans. Before running any scan on a new module, an eye diagram needs to be run to determine a good deserialiser delay setting. The eye diagram is run as: 
@@ -62,7 +62,7 @@ In summary, there are four steps to switching to 1.28 Gbps:
 
 2. Check out the latest software tag (`1.4.6` or above) and recompile 
 
-3. For each module: Update the chip configs using the `scripts/update_config.py`
+3. For each module: Update the chip configs using the `scripts/update_chip_dbconfig.py`
 
 4. For each module: Before running any other scans, run an eye diagram
 

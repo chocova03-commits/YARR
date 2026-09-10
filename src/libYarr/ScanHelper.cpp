@@ -32,6 +32,7 @@ namespace fs = std::filesystem;
 
 #include "logging.h"
 #include "LoggingConfig.h"
+#include "spdlog/fmt/bundled/color.h"
 
 #include "ScanOpts.h"
 
@@ -366,11 +367,14 @@ namespace ScanHelper {
                 fe->setActiveLoop(activeLoop);
             }
 
-            // Check for hidden clipboard monitor parameter, and start them if true
+            // Check for hidden clipboard monitor parameter, enabled by default;
+            // set to false/0 to opt out for a given chip.
+            bool clipboardMonitor = true;
             if (chip.contains("clipboardMonitor")) {
-                if(chip["clipboardMonitor"] > 0) {
-                    bookie.addFeClipboardMonitor((unsigned)bookie.getNumOfEntries() - 1, feCfg->getName());
-                }
+                clipboardMonitor = chip["clipboardMonitor"] > 0;
+            }
+            if (clipboardMonitor) {
+                bookie.addFeClipboardMonitor((unsigned)bookie.getNumOfEntries() - 1, feCfg->getName());
             }
 
             std::size_t botDirPos = chipConfigPath.find_last_of('/');
@@ -875,8 +879,9 @@ namespace ScanHelper {
     }
     void banner(std::shared_ptr<spdlog::logger> &logger, const std::string &msg) {
         unsigned len=msg.length()+8;
-        std::string frame = "\033[1;31m" + std::string(len,'#') + "\033[0m";
-        std::string body  = "\033[1;31m##  " + msg + "  ##\033[0m";
+        auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
+        std::string frame = fmt::format(style, "{}", std::string(len,'#'));
+        std::string body  = fmt::format(style, "##  {}  ##", msg);
         logger->info(frame);
         logger->info(body);
         logger->info(frame);
@@ -985,12 +990,17 @@ namespace ScanHelper {
         scanOpts.dbUserCfgPath = defaultDbUserCfgPath();
         for (int i=1;i<argc;i++)scanOpts.commandLineStr.append(std::string(argv[i]).append(" "));
         scanOpts.progName=argv[0];
+        // Not documented in --help: a hidden pass-phrase to enable the
+        // pirate-speak log easter egg. Anything other than an exact match
+        // is silently ignored.
+        constexpr int PIRATE_OPT = 1000;
         const struct option long_options[] =
         {
             {"help", no_argument, nullptr, 'h'},
             {"version", no_argument, nullptr, 'v'},
             {"skip-config", no_argument, nullptr, 'y'},
             {"skip-reset", no_argument, nullptr, 'z'},
+            {"yarr", required_argument, nullptr, PIRATE_OPT},
             {nullptr, 0, nullptr, 0}};
         int c;
         while (true) {
@@ -1084,6 +1094,11 @@ namespace ScanHelper {
                 case 'W': // Write to DB
                     scanOpts.dbUse = true;
                     scanOpts.dbTag = std::string(optarg);
+                    break;
+                case PIRATE_OPT:
+                    if (std::string(optarg) == "yarrharrfiddledeedee") {
+                        scanOpts.pirateMode = true;
+                    }
                     break;
                 case '?':
                     if (optopt == 's') {

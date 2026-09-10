@@ -24,14 +24,16 @@ The following test binaries are produced (all require `BUILD_TESTS=on`):
 | `bin/testStarEmu` | libStarEmu | Star emulator, broadcast, packet encoding |
 | `bin/testStar` | libStar | Star/ABC analysis, chip config, scan loops, data processor |
 | `bin/testItkpixv2` | libItkpixv2 | ITkPixV2 data processor (including edge cases, error handling, benchmarks) |
+| `bin/testRd53a` | libRd53a | RD53A chip config JSON round-trip |
 | `bin/testRd53b` | libRd53b | RD53B data processor (including edge cases and benchmarks) |
 | `bin/testFelix` | libFelixClient | FELIX elink control (only built when a FELIX backend is available) |
+| `bin/testItsdaqFW` | libItsdaqFW | ITSDAQ packet queue processing (only built when ItsdaqFW is in `YARR_CONTROLLERS_TO_BUILD`) |
 
 Run all unconditional tests:
 
 ```bash
 bin/testYarr && bin/testUtil && bin/testEmu && bin/testFei4 && \
-bin/testStarEmu && bin/testStar && bin/testItkpixv2 && bin/testRd53b
+bin/testStarEmu && bin/testStar && bin/testItkpixv2 && bin/testRd53a && bin/testRd53b
 ```
 
 ### Filtering by tag or name

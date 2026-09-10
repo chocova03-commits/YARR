@@ -211,6 +211,19 @@ TEST_CASE("StarDataProcessorPrintTemplate", "[star][data_processor]") {
     };
   }
 
+  SECTION("Data Cluster 2") {
+    expected = "Packet's abc clusters are:\n  0) InputChannel: 5, Address: 0xe5, Next Strip Pattern: 000.\n  1) InputChannel: 9, Address: 0xe5, Next Strip Pattern: 000.\n";
+
+    expected = "Packet type is TYP_LP\nPacket info: BCID 3 (0), L0ID 0\n" + expected;
+
+    bytes = {
+      0x20, 0x06, // Header
+      0x2f, 0x28, // Hit input channel 7, 0xe5 only
+      0x4f, 0x28, // Hit input channel 9, 0xe5 only
+      0x6f, 0xed  // Trailer
+    };
+  }
+
   SECTION("ABC Read") {
     expected = " ABC 0 ABC status 9141 Address: 51 value: 0000000c\n";
 
@@ -296,6 +309,18 @@ TEST_CASE("StarDataProcessorPrintTemplate", "[star][data_processor]") {
     }
     CHECK(output[i] == expected[i]);
   }
+
+  // Reset
+  oss = std::stringstream{};
+
+  // Run again with word input
+  std::vector<uint32_t> words((bytes.size() + 3)/4);
+  std::copy(bytes.data(), bytes.data() + bytes.size(), (uint8_t*)words.data());
+  StarProcessPacket((uint8_t*)words.data(), (uint8_t*)(words.data() + words.size()), proc);
+
+  output = oss.str();
+  CHECK (output == expected);
+  CHECK (output.size() == expected.size());
 }
 
 namespace {
@@ -603,4 +628,111 @@ TEST_CASE("StarDataProcessorReadAbc", "[star][data_processor]") {
   CAPTURE(oi, oa, ov, os);
 
   CHECK (output == expected);
+}
+
+struct ErrorProcessor : public EmptyProc {
+  std::string parse_error_string;
+
+  void parse_error(const char *msg) {
+    parse_error_string = msg;
+  }
+};
+
+namespace {
+
+struct BadLengthTestData {
+  std::string expected_error;
+  std::vector<uint8_t> input_bytes;
+};
+
+}
+
+TEST_CASE("StarDataProcessorBadLength", "[star][data_processor]") {
+
+  auto tc = GENERATE
+    (
+     BadLengthTestData{"Not enough words",
+                       {0x20}
+     },
+
+     BadLengthTestData{"Not enough words", {
+         0x20, 0x20,
+     }},
+
+     BadLengthTestData{"Not enough words", {
+         0x20, 0x20, 0x20,
+     }},
+
+     BadLengthTestData{"Bad packet type",
+            {
+              0x00, 0x33, 0x00, 0x33,
+            }
+     },
+
+     BadLengthTestData{"Expect size 6 for HCC read packet",
+            {
+              0x80, 0xf5,
+              0x78, 0x50,
+              0x07, 0x90, 0x00
+            }
+     },
+
+     BadLengthTestData{"Expect size 9 for ABC read packet",
+            {
+                0x40, 0x3f,
+                0x07, 0x85,
+                0x51, 0xff,
+                0xf9, 0x14,
+                0x90, 0x00
+            }
+     },
+
+     BadLengthTestData{"Reached end of words without the end pattern!",
+         {
+           0x20, 0x06, // Header
+           0x4f, 0x28,
+           0x5f, 0x28
+         }
+     },
+
+     BadLengthTestData{"Bad cluster, bit 15 set",
+                       {0x20, 0x06, // Header
+                        0x83, 0x8f,
+                        0x6f, 0xed  // Trailer
+                       }
+     },
+
+     // Put empty test last
+     BadLengthTestData{"Not enough words", {}}
+     );
+
+  CAPTURE (tc.expected_error);
+
+  auto &bytes = tc.input_bytes;
+
+  CAPTURE (bytes);
+
+  ErrorProcessor proc;
+
+  StarProcessPacket(bytes.data(), bytes.data() + bytes.size(), proc);
+
+  CAPTURE (proc.parse_error_string);
+
+  CHECK (proc.parse_error_string == tc.expected_error);
+
+  if(bytes.size() < 4) {
+    // These now OK because 32-bit is already 4 bytes
+    return;
+  }
+
+  // Now rerun with 32-bit words
+  std::vector<uint32_t> words((bytes.size() + 3)/4);
+  std::copy(bytes.data(), bytes.data() + bytes.size(), (uint8_t*)words.data());
+  StarProcessPacket((uint8_t*)words.data(), (uint8_t*)(words.data() + words.size()), proc);
+
+  auto error_with_words = proc.parse_error_string;
+
+  CAPTURE (error_with_words);
+
+  CHECK (proc.parse_error_string == tc.expected_error);
 }

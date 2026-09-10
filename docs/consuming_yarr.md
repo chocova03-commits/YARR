@@ -35,7 +35,7 @@ The install will place:
 
 Default if no install path is set is an in-source install. Yarr will try to avoid overwriting files which are under git control ie not all parts will be installed. If Yarr is added with add_subdirectory (or FetchContent) to a parent project then by default the parent project install path will be used for installation. This behaviour can be overriden by setting YARR_FORCE_OWN_INSTALL_PREFIX to true (install in own source directory even if a sub build was detected).
     
-By default C++17 will be used but another version can be set and forced by (e.g.):
+By default C++20 will be used but another version can be set and forced by (e.g.):
 
 ```
 -DCMAKE_CXX_STANDARD=17
@@ -44,6 +44,8 @@ By default C++17 will be used but another version can be set and forced by (e.g.
 # How to consume Yarr as a dependency
 
 Yarr supports several consumption methods which should cover most of the standard ways. Everything that is optional to be compiled is organized in form of components which are described in the bottom. In the following examples only random components are chosen.
+
+Runnable examples of each consumption method are kept under the top-level `tests/` directory: `add_subdirectory_test`, `fetch_content_test`, `find_package_test` and `external_project_superbuild_test`.
 
 ## find_package()
 

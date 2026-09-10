@@ -89,7 +89,12 @@ function(detect_in_tdaq_install OUT_VAR)
 endfunction()
 
 # debug symbol stripping ---------------------------------------------------------------------------------------
+# Splitting debug info into a separate file via objcopy/strip's --add-gnu-debuglink is a GNU
+# binutils / ELF specific mechanism. It doesn't apply on macOS (Mach-O, no objcopy), so skip it there.
 function(post_build_debug_library name)
+  if(NOT CMAKE_OBJCOPY OR NOT CMAKE_STRIP)
+    return()
+  endif()
   detect_in_tdaq_install(IS_TDAQ_INSTALL)
   set(our_debug_name lib${name}.so.debug)
   if(IS_TDAQ_INSTALL)
@@ -111,6 +116,9 @@ function(post_build_debug_library name)
 endfunction(post_build_debug_library)
 
 function(post_build_debug_executable name)
+  if(NOT CMAKE_OBJCOPY OR NOT CMAKE_STRIP)
+    return()
+  endif()
   detect_in_tdaq_install(IS_TDAQ_INSTALL)
   set(our_debug_name ${name}.debug)
   if(IS_TDAQ_INSTALL)

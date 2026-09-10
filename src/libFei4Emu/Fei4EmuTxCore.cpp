@@ -19,6 +19,6 @@ void EmuTxCore<Fei4>::doTrigger() {
         }
     }
     EmuTxCore<Fei4>::writeFifo(0x0);
-    while(not EmuTxCore<Fei4>::isCmdEmpty());
+    EmuTxCore<Fei4>::waitCmdEmpty();
     trigProcRunning = false;
 }

@@ -205,7 +205,15 @@ namespace LCB {
     return (SixEight::encode((bits>>6) & 0x3f) << 8) | SixEight::encode(bits&0x3f);
   }
 
-  /// L0A: tag is 0-6, mask is 8-11
+  /**
+   * Command to insert L0A command.
+   *
+   * @param mask 4-bit mask of BCs to trigger. MSB (bit 3) comes first.
+   * @param tag 7-bit L0tag of first trigger in mask.
+   * @param bcr Should a BCR be encoded.
+   *
+   * Encoding: tag is 0-6, mask is bits 7-10, BCR is bit 11
+   */
   inline Frame l0a_mask(uint8_t mask, uint8_t tag, bool bcr = false) {
     return raw_bits((bcr?0x800:0) | ((mask&0xf) << 7) | (tag & 0x7f));
   }

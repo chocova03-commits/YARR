@@ -113,7 +113,7 @@ void Itkpixv2MaskLoop::init() {
             }
         }
         itkpixv2->configurePixels();
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
     g_tx->setCmdEnable(keeper->getTxMask());
 }
@@ -210,7 +210,7 @@ void Itkpixv2MaskLoop::execPart1() {
         //for (auto n: modPixels)
         //  logger->info("{} {}",n.first,n.second);
         itkpixv2->configurePixels(modPixels);
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
 
     g_tx->setCmdEnable(keeper->getTxMask());
@@ -252,7 +252,7 @@ void Itkpixv2MaskLoop::execPart2() {
                 }
             }	
             itkpixv2->configurePixels(modPixels);
-            while(!g_tx->isCmdEmpty()) {}	
+            g_tx->waitCmdEmpty();	
         }
     }
 

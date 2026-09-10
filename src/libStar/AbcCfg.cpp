@@ -195,6 +195,22 @@ AbcStarRegInfo::AbcStarRegInfo(int version) {
         abcWriteMap[addr] = regMap[addr];
     }
 
+    // Map from address to storage
+    unsigned lastReg=0;
+    for (const ABCStarRegister &reg : AbcNames::listRegs()) {
+        if(version == 1 &&
+           ((reg > ABCStarRegister::ADCS3 && reg <= ABCStarRegister::ADCS7)
+            || (reg > ABCStarRegister::CREG1 && reg <= ABCStarRegister::CREG6))) {
+          continue;
+        }
+
+        int addr = (int)reg;
+        // Save position of register in memory to the registerMap
+        m_registerMap[addr] = lastReg;
+
+        lastReg++;
+    }
+
     auto &subregdefs = (version == 0)?
       s_abcsubregdefs_v0 : s_abcsubregdefs_v1;
 
@@ -205,7 +221,7 @@ AbcStarRegInfo::AbcStarRegInfo(int version) {
         auto offset = std::get<2>(def);
         auto width = std::get<3>(def);
         const auto& reg_info = regMap.at(addr);
-        abcSubRegisterMap_all[reg_id] = reg_info->addSubRegister(subregname, offset, width);
+        abcSubRegisterMap_all[(unsigned)reg_id] = reg_info->addSubRegister(subregname, offset, width);
     }
 
     // Copy to const for remainder of life
@@ -216,7 +232,6 @@ AbcStarRegInfo::AbcStarRegInfo(int version) {
 
 AbcCfg::AbcCfg(int version)
   : m_abcID(0),
-    m_registerMap{},
     m_registerSet{},
     m_info(AbcStarRegInfo::instance(version))
 {
@@ -240,8 +255,14 @@ void AbcCfg::setupMaps(int version) {
 
         Register tmp_Reg(m_info->abcregisterMap.at(addr), 0);
         m_registerSet.push_back( std::move(tmp_Reg) ); //Save it to the list
-        int lastReg = m_registerSet.size()-1;
-        m_registerMap[addr] = lastReg; //Save it's position in memory to the registerMap
+        unsigned lastReg = m_registerSet.size()-1;
+
+        unsigned offset_check = m_info->m_registerMap[addr];
+
+        if(offset_check != lastReg) {
+          logger->warn("Mismatched mapping! {} {}", addr, lastReg);
+          abort();
+        }
     }
 }
 
@@ -359,14 +380,16 @@ void AbcCfg::setRegisterValue(ABCStarRegister addr, uint32_t val) {
     getRegister(addr).setValue(val);
 }
 
-AbcStarRegInfo::SubInfoPtr AbcStarRegInfo::subRegFromEnum(ABCStarSubRegister subReg) const
+const SubRegisterInfo &AbcStarRegInfo::subRegFromEnum(ABCStarSubRegister subReg) const
 {
-    try {
-        return abcSubRegisterMap_all.at(subReg);
-    } catch(std::out_of_range &e) {
+    auto &info = abcSubRegisterMap_all[(unsigned)subReg];
+    if(info) {
+        return *info;
+    } else {
         logger->info("Failed request for subReg: {}", AbcNames::subRegToString(subReg));
-        for(auto &sr: abcSubRegisterMap_all) {
-            logger->debug(" Have: {}", AbcNames::subRegToString(sr.first));
+        for(unsigned i=0; i<abcSubRegisterMap_all.size(); i++) {
+            if(!abcSubRegisterMap_all[i]) continue;
+            logger->debug(" Have: {}", AbcNames::subRegToString(ABCStarSubRegister(i)));
         }
         throw std::out_of_range("Attempt to get info for bad ABC sub register");
     }

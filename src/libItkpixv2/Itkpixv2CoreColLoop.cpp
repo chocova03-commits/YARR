@@ -118,7 +118,7 @@ void Itkpixv2CoreColLoop::end() {
             }
         }
         iChannel++;
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
     g_tx->setCmdEnable(keeper->getTxMask());
 }
@@ -174,7 +174,7 @@ void Itkpixv2CoreColLoop::setCores() {
         itkpixv2->writeRegister(&Itkpixv2::EnCoreCol1, m_coreCols[1]);
         itkpixv2->writeRegister(&Itkpixv2::EnCoreCol2, m_coreCols[2]);
         itkpixv2->writeRegister(&Itkpixv2::EnCoreCol3, m_coreCols[3]);
-        while(!g_tx->isCmdEmpty()) {}
+        g_tx->waitCmdEmpty();
     }
 
     // Turn off columns that were originally off in chip config
@@ -195,7 +195,7 @@ void Itkpixv2CoreColLoop::setCores() {
                 fe->writeNamedRegister(registerName,toSet); // write the register
             }
             iChannel++; //increase chip index if chip was active
-            while(!g_tx->isCmdEmpty()) {}
+            g_tx->waitCmdEmpty();
 
         }
     }
@@ -206,19 +206,19 @@ void Itkpixv2CoreColLoop::setCores() {
     //itkpixv2->writeRegister(&Itkpixv2::RstCoreCol1, m_coreCols[1]);
     //itkpixv2->writeRegister(&Itkpixv2::RstCoreCol2, m_coreCols[2]);
     //itkpixv2->writeRegister(&Itkpixv2::RstCoreCol3, m_coreCols[3]);
-    //while(!g_tx->isCmdEmpty()) {}
+    //g_tx->waitCmdEmpty();
     // Enable injection to core
     itkpixv2->writeRegister(&Itkpixv2::EnCoreColCal0, m_coreCols[0]);
     itkpixv2->writeRegister(&Itkpixv2::EnCoreColCal1, m_coreCols[1]);
     itkpixv2->writeRegister(&Itkpixv2::EnCoreColCal2, m_coreCols[2]);
     itkpixv2->writeRegister(&Itkpixv2::EnCoreColCal3, m_coreCols[3]);
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
     // Enable hitORs
     itkpixv2->writeRegister(&Itkpixv2::HitOrMask0, ~m_coreCols[0]);
     itkpixv2->writeRegister(&Itkpixv2::HitOrMask1, ~m_coreCols[1]);
     itkpixv2->writeRegister(&Itkpixv2::HitOrMask2, ~m_coreCols[2]);
     itkpixv2->writeRegister(&Itkpixv2::HitOrMask3, ~m_coreCols[3]);	
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
     // Turn on PToT if needed
     if (m_usePToT) {
         itkpixv2->writeRegister(&Itkpixv2::PtotCoreColEn0, m_coreCols[0]);
@@ -226,6 +226,6 @@ void Itkpixv2CoreColLoop::setCores() {
         itkpixv2->writeRegister(&Itkpixv2::PtotCoreColEn2, m_coreCols[2]);
         itkpixv2->writeRegister(&Itkpixv2::PtotCoreColEn3, m_coreCols[3]);
     }
-    while(!g_tx->isCmdEmpty()) {}
+    g_tx->waitCmdEmpty();
 }
 

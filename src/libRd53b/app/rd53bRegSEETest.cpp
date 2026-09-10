@@ -11,6 +11,7 @@
 #include "storage.hpp"
 #include "logging.h"
 #include "LoggingConfig.h"
+#include "spdlog/fmt/bundled/color.h"
 
 #include "ScanHelper.h"
 #include "Bookkeeper.h"
@@ -200,9 +201,12 @@ int main(int argc, char *argv[])
     // Setup logger with some defaults
     logging::setupLoggers(logging::defaultConfig());
 
-    logger->info("\033[1;31m#################################\033[0m");
-    logger->info("\033[1;31m# RD53B Test Tool: SEE register #\033[0m");
-    logger->info("\033[1;31m#################################\033[0m");
+    {
+        auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
+        logger->info(fmt::format(style, "#################################"));
+        logger->info(fmt::format(style, "# RD53B Test Tool: SEE register #"));
+        logger->info(fmt::format(style, "#################################"));
+    }
 
     logger->info("Parsing command line parameters ...");
     int c;
@@ -249,9 +253,12 @@ int main(int argc, char *argv[])
     logger->info("Chip config file path  : {}", cfgFilePath);
     logger->info("Ctrl config file path  : {}", ctrlFilePath);
 
-    logger->info("\033[1;31m#################\033[0m");
-    logger->info("\033[1;31m# Init Hardware #\033[0m");
-    logger->info("\033[1;31m#################\033[0m");
+    {
+        auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
+        logger->info(fmt::format(style, "#################"));
+        logger->info(fmt::format(style, "# Init Hardware #"));
+        logger->info(fmt::format(style, "#################"));
+    }
 
     logger->info("-> Opening controller config: {}", ctrlFilePath);
 
@@ -274,9 +281,12 @@ int main(int argc, char *argv[])
 
     Bookkeeper bookie(&*hwCtrl, &*hwCtrl);
 
-    logger->info("\033[1;31m###################\033[0m");
-    logger->info("\033[1;31m##  Chip Config  ##\033[0m");
-    logger->info("\033[1;31m###################\033[0m");
+    {
+        auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
+        logger->info(fmt::format(style, "###################"));
+        logger->info(fmt::format(style, "##  Chip Config  ##"));
+        logger->info(fmt::format(style, "###################"));
+    }
 
     Rd53b rd53b;
     rd53b.init(&*hwCtrl, FrontEndConnectivity(0,0));
@@ -317,8 +327,7 @@ int main(int argc, char *argv[])
     }
 
     hwCtrl->setCmdEnable(0);
-    while (!hwCtrl->isCmdEmpty())
-        ;
+    hwCtrl->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(10));
 
     if (initialize)
@@ -326,7 +335,7 @@ int main(int argc, char *argv[])
         rd53b.configureInit();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        while (!hwCtrl->isCmdEmpty());
+        hwCtrl->waitCmdEmpty();
 
         rd53b.configureGlobal();
         /* Put global threshold to high value to avoid large current */
@@ -336,7 +345,7 @@ int main(int argc, char *argv[])
         rd53b.writeRegister(&Rd53b::DiffVff, 200);
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        while (!hwCtrl->isCmdEmpty());
+        hwCtrl->waitCmdEmpty();
 
         if (randomize)
         {
@@ -365,23 +374,20 @@ int main(int argc, char *argv[])
                 std::uniform_int_distribution<> regVal(0, 0xFFFF);
                 j_glob_seu[regName] = regVal(generator);
                 rd53b.sendWrReg(rd53b.getChipId(), addr, j_glob_seu[regName]);
-                while (!hwCtrl->isCmdEmpty())
-                    ;
+                hwCtrl->waitCmdEmpty();
             }
 
             /* Save the config file */
             saveCfgFile(rd53b, outputPrefix + "_rndm" + std::to_string(seed) + ".json", j_glob_seu);
         }
         rd53b.configurePixels();
-        while (!hwCtrl->isCmdEmpty())
-            ;
+        hwCtrl->waitCmdEmpty();
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     hwCtrl->setRxEnable(0);
-    while (!hwCtrl->isCmdEmpty())
-        ;
+    hwCtrl->waitCmdEmpty();
     hwCtrl->flushBuffer();
 
     /* Read back pixel registers */
@@ -409,14 +415,11 @@ int main(int argc, char *argv[])
                     rd53b.writeRegister(&Rd53b::PixRegionCol, dc);
                     rd53b.writeRegister(&Rd53b::PixRegionRow, row);
                     rd53b.sendRdReg(rd53b.getChipId(), rd53b.PixPortal.addr());
-                    while (!hwCtrl->isCmdEmpty())
-                        ;
+                    hwCtrl->waitCmdEmpty();
                     rd53b.sendRdReg(rd53b.getChipId(), rd53b.PixRegionCol.addr());
-                    while (!hwCtrl->isCmdEmpty())
-                        ;
+                    hwCtrl->waitCmdEmpty();
                     rd53b.sendRdReg(rd53b.getChipId(), rd53b.PixRegionRow.addr());
-                    while (!hwCtrl->isCmdEmpty())
-                        ;
+                    hwCtrl->waitCmdEmpty();
 
                     address.push_back(std::make_pair(dc, row));
                     counter++;
@@ -443,8 +446,7 @@ int main(int argc, char *argv[])
             for (unsigned addr = 0; addr < 138; addr++)
             {
                 rd53b.sendRdReg(rd53b.getChipId(), addr);
-                while (!hwCtrl->isCmdEmpty())
-                    ;
+                hwCtrl->waitCmdEmpty();
                 std::vector<RawData> dataList = processDataPackets(hwCtrl.get());
                 rd53b_readback[stage][idx][addr] = decodeGlob(dataList, addr);
             }
@@ -454,8 +456,7 @@ int main(int argc, char *argv[])
             {
                 std::string regName = addr < 202 ? ("SEU" + std::to_string(addr - 138) + "_notmr") : ("SEU" + std::to_string(addr - 202));
                 rd53b.sendRdReg(rd53b.getChipId(), addr);
-                while (!hwCtrl->isCmdEmpty())
-                    ;
+                hwCtrl->waitCmdEmpty();
                 std::vector<RawData> dataList = processDataPackets(hwCtrl.get());
                 j_glob_seu[regName] = decodeGlob(dataList, addr);
             }
@@ -479,8 +480,7 @@ int main(int argc, char *argv[])
     rd53b.writeRegister(&Rd53b::PixRegionRow, 0xffff); /* 16 bit */
     rd53b.writeRegister(&Rd53b::PixAutoRow, 0x0); /* 1 bit */
     rd53b.writeRegister(&Rd53b::AiRegionRow, 0x1ff); /* 9 bit */
-    while (!hwCtrl->isCmdEmpty())
-        ;
+    hwCtrl->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     std::ofstream ftime(outputPrefix + "_time.txt");

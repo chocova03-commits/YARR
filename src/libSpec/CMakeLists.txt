@@ -20,7 +20,8 @@ target_include_directories(Spec PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-target_link_libraries(Spec PRIVATE Util_interface Yarr_interface)
+find_package(Threads REQUIRED)
+target_link_libraries(Spec PRIVATE Util_interface Yarr_interface Threads::Threads)
 
 LIST(APPEND apps
 	specReadWriteReg
@@ -30,6 +31,7 @@ LIST(APPEND apps
         specComTest
         switchLPM
         eyeDiagram
+        cmlBiasScan
         dataMergingCheck
         specErrorCheckDma
         specErrorCheckSingle

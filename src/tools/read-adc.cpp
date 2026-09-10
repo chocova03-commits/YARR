@@ -210,16 +210,16 @@ int main(int argc, char* argv[]) {
             hw->initRxChannels({cfg->getRegRxChannel()});
             hw->setRxEnable(cfg->getRegRxChannel());
             hw->checkRxSync(); // Must be done per fe (Aurora link) and after setRxEnable().
-            while(!hw->isCmdEmpty());
+            hw->waitCmdEmpty();
             std::this_thread::sleep_for(std::chrono::microseconds(100));
 
             if (fe->readUpdateWriteNamedRegister("MonitorV", high_z) != yarrSuccess) {
                 std::cerr << "ERROR: failed to readUpdateWrite register for " << ichip << "!" << std::endl;
                 error_cnt++;
             }
-            while(!hw->isCmdEmpty());
+            hw->waitCmdEmpty();
             fe->writeNamedRegister("MonitorV", high_z);
-            while(!hw->isCmdEmpty());
+            hw->waitCmdEmpty();
 	    }
         fes.push_back(std::make_pair(ichip, std::move(fe)));
     }
@@ -235,20 +235,20 @@ int main(int argc, char* argv[]) {
                 hw->initRxChannels({cfg->getRegRxChannel()});
                 hw->setRxEnable(cfg->getRegRxChannel());
                 hw->checkRxSync(); // Must be done per fe (Aurora link) and after setRxEnable().
-                while(!hw->isCmdEmpty());
+                hw->waitCmdEmpty();
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                 if (fe->confAdc(monitorV, meas_curr) != yarrSuccess) {
                     std::cerr << "ERROR: failed to configure ADC for " << current_chip_name << "!" << std::endl;
                     error_cnt++;
                 }
-                while(!hw->isCmdEmpty());
+                hw->waitCmdEmpty();
                 uint16_t res = 0;
                 if (fe->readNamedRegister("MonitoringDataAdc", res) != yarrSuccess) {
                     std::cerr << "ERROR: failed to read register for " << current_chip_name << "!" << std::endl;
                     error_cnt++;
                 }
-                while(!hw->isCmdEmpty());
+                hw->waitCmdEmpty();
                 if (return_count) std::cout << res << std::endl;
                 else{
                     std::pair<float, std::string> convertedAdc = cfg->convertAdc(res, meas_curr);
@@ -261,20 +261,20 @@ int main(int argc, char* argv[]) {
                 hw->initRxChannels({cfg->getRegRxChannel()});
                 hw->setRxEnable(cfg->getRegRxChannel());
                 hw->checkRxSync(); // Must be done per fe (Aurora link) and after setRxEnable().
-                while(!hw->isCmdEmpty());
+                hw->waitCmdEmpty();
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
 
                 if (fe->confAdc(monitorV, meas_curr) != yarrSuccess) {
                     std::cerr << "ERROR: failed to configure ADC for " << current_chip_name << "!" << std::endl;
                     error_cnt++;
                 }
-                while(!hw->isCmdEmpty());
+                hw->waitCmdEmpty();
                 uint16_t res = 0;
                 if (fe->readNamedRegister("MonitoringDataAdc", res) != yarrSuccess) {
                     std::cerr << "ERROR: failed to read register for " << current_chip_name << "!" << std::endl;
                     error_cnt++;
                 }
-                while(!hw->isCmdEmpty());
+                hw->waitCmdEmpty();
                 if (return_count) std::cout << res << std::endl;
                 else{
                     std::pair<float, std::string> convertedAdc = cfg->convertAdc(res, meas_curr);

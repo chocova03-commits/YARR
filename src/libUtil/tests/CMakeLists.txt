@@ -12,10 +12,12 @@ target_compile_definitions(
 )
 
 add_executable(testUtil
+        test_logging.cpp
         test_misc.cpp
         test_histo1d.cpp
         test_histo2d.cpp
         test_histo3d.cpp
+        test_grapherrors.cpp
 )
 
 

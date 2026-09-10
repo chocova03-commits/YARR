@@ -57,20 +57,17 @@ public:
     void loadConfig(const json &config) override;
 
 private:
-    unsigned buildIdent(const LoopStatus &ls);
     void endBin(const LoopStatus &ls);
 
-    /// Indices of loops to use in ident
-    std::vector<unsigned> ident_loops;
-    /// Sizes of loops to use in ident
-    std::vector<unsigned> loopMax;
+    /// Indices of loops (parameters of interest) to use in the unique ID
+    std::vector<size_t> loops;
 
     //!< Occupancy maps concatenating all bunches of triggers, indexed by an identifier of the set of scan parameter values
-    std::map<unsigned, std::unique_ptr<Histo2d>> m_occMapAllBunches;
+    std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> m_occMapAllBunches;
     //!< Occupancy maps for channels that are close to saturation (i.e. counter reaching max value -255- in a given bunch of triggers), indexed by an identifier of the set of scan parameter values
-    std::map<unsigned, std::unique_ptr<Histo2d>> m_occMapSaturatedChannels;
+    std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> m_occMapSaturatedChannels;
     //!< Total number of triggers used so far for each set of scan parameter values
-    std::map<unsigned, unsigned long>  m_totNbTriggersSoFar;
+    std::map<LoopStatus::UID, unsigned long>  m_totNbTriggersSoFar;
 
     /// The target (average) occupancy to reach
     unsigned m_target_occ=Star::StripsPerABCRow;

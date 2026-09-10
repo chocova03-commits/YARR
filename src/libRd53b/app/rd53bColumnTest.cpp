@@ -17,6 +17,7 @@ namespace fs = std::filesystem;
 #include "storage.hpp"
 #include "logging.h"
 #include "LoggingConfig.h"
+#include "spdlog/fmt/bundled/color.h"
 
 #include "ScanHelper.h"
 #include "HwController.h"
@@ -283,9 +284,12 @@ int main (int argc, char *argv[]) {
       return -1;
     }
 
-    logger->info("\033[1;31m#################\033[0m");
-    logger->info("\033[1;31m# Init Hardware #\033[0m");
-    logger->info("\033[1;31m#################\033[0m");
+    {
+        auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
+        logger->info(fmt::format(style, "#################"));
+        logger->info(fmt::format(style, "# Init Hardware #"));
+        logger->info(fmt::format(style, "#################"));
+    }
 
     logger->info("-> Opening controller config: {}", ctrlFilePath);
 
@@ -303,9 +307,12 @@ int main (int argc, char *argv[]) {
     hwCtrl->setCmdEnable(0);
     hwCtrl->setTrigEnable(0x0);
     
-    logger->info("\033[1;31m###########################\033[0m");
-    logger->info("\033[1;31m##  Connectivity Config  ##\033[0m");
-    logger->info("\033[1;31m###########################\033[0m");
+    {
+        auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
+        logger->info(fmt::format(style, "###########################"));
+        logger->info(fmt::format(style, "##  Connectivity Config  ##"));
+        logger->info(fmt::format(style, "###########################"));
+    }
 
     std::ifstream connFile(connFilePath);
     json conn;
@@ -386,10 +393,7 @@ int main (int argc, char *argv[]) {
       rd53b->configurePixels(allPixels);
       //logger->info("Done");
 
-      
-      
-
-      while(!hwCtrl->isCmdEmpty());
+      hwCtrl->waitCmdEmpty();
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       hwCtrl->flushBuffer();
 
@@ -465,7 +469,7 @@ int main (int argc, char *argv[]) {
 	      hwCtrl->writeFifo(trigger1 | trigger2);
 	      hwCtrl->releaseFifo();
 
-	      while(!hwCtrl->isCmdEmpty());
+              hwCtrl->waitCmdEmpty();
 	      std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
 	    
@@ -502,9 +506,12 @@ int main (int argc, char *argv[]) {
 
     }//End loop over chips
 
-    logger->info("\033[1;31m#####################\033[0m");
-    logger->info("\033[1;31m##  <3 Results <3  ##\033[0m");
-    logger->info("\033[1;31m#####################\033[0m");
+    {
+        auto style = fmt::fg(fmt::terminal_color::red) | fmt::emphasis::bold;
+        logger->info(fmt::format(style, "#####################"));
+        logger->info(fmt::format(style, "##  <3 Results <3  ##"));
+        logger->info(fmt::format(style, "#####################"));
+    }
 
     int r_count = 0;
     for (size_t ichip = 0; ichip < n_chips; ichip++){

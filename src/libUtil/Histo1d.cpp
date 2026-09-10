@@ -179,7 +179,12 @@ void Histo1d::toJson(json &j) const {
 }
 
 void Histo1d::toFile(const std::string &prefix, const std::string &dir, bool jsonType) const{
-    std::string filename = createFilename(prefix, dir, jsonType);
+    std::string ext = "";
+    if (jsonType) 
+        ext = "json";
+    else
+        ext = "dat";
+    std::string filename = createFilename(prefix, dir, ext);
     std::fstream file(filename, std::fstream::out | std::fstream::trunc);
 
     // jsonType
@@ -265,12 +270,15 @@ bool Histo1d::fromJson(const json &j) {
 void Histo1d::plot(const std::string &prefix, const std::string &dir) const {
     hlog->info("Plotting {}", HistogramBase::name);
 
-    std::string output = dir + prefix + "_" + HistogramBase::name;
-    for (unsigned i=0; i<lStat.size(); i++)
-        output += "_" + std::to_string(lStat.get(i));
-    output += ".png";
+    auto check_terminal = getenv("YARR_GNUPLOT_TERMINAL");
+    std::string term_name = "png";
+    if(check_terminal != nullptr) {
+      term_name = check_terminal;
+    }
+
+    std::string output = createFilename(prefix, dir, term_name);
     std::string input;
-    input+="\"set terminal png size 1280, 1024;";
+    input+="\"set terminal " + term_name + " size 1280, 1024;";
     input+="unset key;";
     input+="set xlabel '"  +HistogramBase::xAxisTitle+"';";
     input+="set ylabel '"  +HistogramBase::yAxisTitle+"';";

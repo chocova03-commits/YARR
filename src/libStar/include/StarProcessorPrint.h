@@ -54,6 +54,7 @@ struct PrintProc : public EmptyProc {
   void data_header(bool pr_not_lp, uint8_t bcid, bool parity, uint8_t l0id, int flag) {
     os << "Packet info: BCID " << (int)bcid << " (" << parity << "), L0ID "
               << (int)l0id << "\n";
+    cluster_count = 0;
   }
 
   void data_no_cluster(int ic) {

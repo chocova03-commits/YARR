@@ -143,6 +143,10 @@ void StarCfg::writeConfig(json &j) {
 
     j["name"] = name;
 
+    if (m_run_check_com) {
+        j["RunCheckCom"] = true;
+    }
+
     j["HCC"]["ID"] = getHCCchipID();
 
     auto &hccRegs = m_hcc_info->hccregisterMap;
@@ -296,6 +300,10 @@ void StarCfg::loadConfig(const json &j) {
 
     if (j.contains("name")) {
         name = j["name"];
+    }
+
+    if (j.contains("RunCheckCom")) {
+        m_run_check_com = j["RunCheckCom"];
     }
 
     if (j.find("HCC") == j.end()) {

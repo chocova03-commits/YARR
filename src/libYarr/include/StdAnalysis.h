@@ -38,7 +38,7 @@ class OccupancyAnalysis : public AnalysisAlgorithm {
         void end() override {}
         void loadConfig(const json &config) override;
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         bool createMask;
         bool coreColMask;
@@ -46,8 +46,8 @@ class OccupancyAnalysis : public AnalysisAlgorithm {
         unsigned n_count;
         unsigned injections;
         double LowThr, HighThr;
-        std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
-        std::map<unsigned, unsigned> innerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
 };
 
 class HistogramArchiver : public AnalysisAlgorithm {
@@ -85,16 +85,16 @@ class TotAnalysis : public AnalysisAlgorithm {
         void setParams(int tot, int _charge) override { target_tot = tot; }
 
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         double injections;
-        std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
-        std::map<unsigned, unsigned> occInnerCnt;
-        std::map<unsigned, std::unique_ptr<Histo2d>> totMaps;
-        std::map<unsigned, unsigned> totInnerCnt;
-        std::map<unsigned, std::unique_ptr<Histo2d>> tot2Maps;
-        std::map<unsigned, unsigned> tot2InnerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, unsigned> occInnerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> totMaps;
+        std::map<LoopStatus::UID, unsigned> totInnerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> tot2Maps;
+        std::map<LoopStatus::UID, unsigned> tot2InnerCnt;
         std::unique_ptr<GlobalFeedbackSender> globalFb;
         std::unique_ptr<PixelFeedbackSender> pixelFb;
         bool useScap;
@@ -104,6 +104,7 @@ class TotAnalysis : public AnalysisAlgorithm {
         unsigned vcalMax;
         unsigned vcalStep;
         unsigned vcalBins;
+        unsigned vcalLoopIndex;
 
         int target_tot;
 
@@ -140,9 +141,10 @@ class ScurveFitter : public AnalysisAlgorithm {
     private:
         const static unsigned n_fit_params = 4;
         bool fitSuccess(const double (&fit_params)[n_fit_params], const double &chi2) const;
-        void createFitResultHistograms(const unsigned long& outerIdent, const LoopStatus& loopStatus);
+        void createFitResultHistograms(LoopStatus::UID uid, const LoopStatus& loopStatus);
 
         unsigned vcalLoop;
+        unsigned pixelFeedbackLoop{};
         unsigned vcalMin;
         unsigned vcalMax;
         unsigned vcalStep;
@@ -156,29 +158,28 @@ class ScurveFitter : public AnalysisAlgorithm {
         double maxBaselineDifference = 0.1;
 
         std::vector<double> x;
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
 
-        std::map<unsigned, std::unique_ptr<Histo1d>> histos;
-        std::map<unsigned, std::unique_ptr<Histo2d>> thrMap;
-        std::map<unsigned, std::unique_ptr<Histo1d>> thrDist;
-        std::map<unsigned, std::unique_ptr<Histo2d>> sigMap;
-        std::map<unsigned, std::unique_ptr<Histo1d>> sigDist;
-        std::map<unsigned, std::unique_ptr<Histo1d>> chiDist;
-        std::map<unsigned, std::unique_ptr<Histo1d>> timeDist;
+        std::map<std::pair<LoopStatus::UID, unsigned>, std::unique_ptr<Histo1d>> histos;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> thrMap;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> thrDist;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> sigMap;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> sigDist;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> chiDist;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> timeDist;
 
-        std::map<unsigned, std::unique_ptr<Histo2d>> chi2Map;
-        std::map<unsigned, std::unique_ptr<Histo2d>> statusMap;
-        std::map<unsigned, std::unique_ptr<Histo1d>> statusDist;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> chi2Map;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> statusMap;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> statusDist;
 
         std::unique_ptr<PixelFeedbackSender> fb;
-        std::map<unsigned, std::unique_ptr<Histo2d>> step;
-        std::map<unsigned, std::unique_ptr<Histo2d>> deltaThr;
-        unsigned prevOuter;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> step;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> deltaThr;
+        LoopStatus::UID prevUid{};
         double thrTarget;
 
-        std::map<unsigned, unsigned> innerCnt;
-        std::map<unsigned, unsigned> medCnt;
+        std::map<LoopStatus::UID, unsigned> medCnt;
         std::map<unsigned, unsigned> vcalCnt;
         bool useScap;
         bool useLcap;
@@ -304,12 +305,12 @@ class OccGlobalThresholdTune : public AnalysisAlgorithm {
         void end() override {}
         void loadConfig(const json &config) override{}
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
-        std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
-        std::map<unsigned, std::unique_ptr<Histo1d>> occDists;
-        std::map<unsigned, unsigned> innerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> occDists;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
         unsigned injections;
         std::unique_ptr<GlobalFeedbackSender> fb;
 
@@ -317,6 +318,31 @@ class OccGlobalThresholdTune : public AnalysisAlgorithm {
         double m_sign = -1;
         double m_entries = 0;
         double m_oldEntries = -1;
+};
+
+class InjDelayTune : public AnalysisAlgorithm {
+    public:
+        InjDelayTune() : AnalysisAlgorithm()  {}
+        ~InjDelayTune() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override;
+        void loadConfig(const json &config) override{}
+    private:
+        std::vector<unsigned> loops;
+        std::vector<unsigned> loopMax;
+        unsigned n_count = 0;
+        unsigned n_param_loop = 0;
+        unsigned n_filled_bins = 0;
+        unsigned param_loop_max = 0;
+        unsigned step = 0;
+        bool finishedFeedback = false;
+        std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
+        std::unique_ptr<Histo1d> delayDist;
+        std::map<unsigned, unsigned> innerCnt;
+        unsigned injections = 0;
+        std::unique_ptr<GlobalFeedbackSender> fb;
 };
 
 class GlobalPreampTune : public AnalysisAlgorithm {
@@ -330,13 +356,13 @@ class GlobalPreampTune : public AnalysisAlgorithm {
         void loadConfig(const json &config) override{}
 
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
-        std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
-        std::map<unsigned, std::unique_ptr<Histo2d>> totMaps;
-        std::map<unsigned, std::unique_ptr<Histo1d>> occDists;
-        std::map<unsigned, unsigned> innerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> totMaps;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> occDists;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
         unsigned injections;
         std::unique_ptr<GlobalFeedbackSender> fb;
 
@@ -356,14 +382,14 @@ class OccPixelThresholdTune : public AnalysisAlgorithm {
         void loadConfig(const json &config) override;
 
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         std::vector<float> m_occLowCut;
         std::vector<float> m_occHighCut;
         unsigned int m_cutIndex = 0;
-        std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
-        std::map<unsigned, unsigned> innerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
         unsigned injections;
         std::unique_ptr<PixelFeedbackSender> fb;
 
@@ -379,12 +405,12 @@ class L1Analysis : public AnalysisAlgorithm {
         void end() override;
         void loadConfig(const json &config) override{}
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         unsigned injections;
-        std::map<unsigned, std::unique_ptr<Histo1d>> l1Histos;
-        std::map<unsigned, unsigned> innerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> l1Histos;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
 
 };
 
@@ -398,16 +424,16 @@ class TagAnalysis : public AnalysisAlgorithm {
         void end() override;
         void loadConfig(const json &config) override{}
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         unsigned injections;
-        std::map<unsigned, std::unique_ptr<Histo1d>> tagHistos;
-        std::map<unsigned, std::unique_ptr<Histo2d>> tagMaps;
-        std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
-        std::map<unsigned, unsigned> tagDistInnerCnt;
-        std::map<unsigned, unsigned> tagMapInnerCnt;
-        std::map<unsigned, unsigned> occInnerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> tagHistos;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> tagMaps;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, unsigned> tagDistInnerCnt;
+        std::map<LoopStatus::UID, unsigned> tagMapInnerCnt;
+        std::map<LoopStatus::UID, unsigned> occInnerCnt;
 
 };
 
@@ -421,12 +447,12 @@ class TotDistPlotter : public AnalysisAlgorithm {
         void end() override {}
         void loadConfig(const json &config) override{}
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         unsigned injections;
-        std::map<unsigned, std::unique_ptr<Histo1d>> tot;
-        std::map<unsigned, unsigned> innerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> tot;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
 };
 
 class NoiseAnalysis : public AnalysisAlgorithm {
@@ -463,11 +489,11 @@ class NoiseTuning : public AnalysisAlgorithm {
         void end() override;
         void loadConfig(const json &config) override{}
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
-        std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
-        std::map<unsigned, unsigned> innerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
         std::unique_ptr<GlobalFeedbackSender> globalFb;
         std::unique_ptr<PixelFeedbackSender> pixelFb;
 };
@@ -483,7 +509,7 @@ class DelayAnalysis : public AnalysisAlgorithm {
         void loadConfig(const json &config) override{}
 
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned n_count;
         std::map<unsigned, std::unique_ptr<Histo3d>> occMaps;
@@ -511,7 +537,7 @@ class ParameterAnalysis : public AnalysisAlgorithm {
         void end() override;
         void loadConfig(const json &config) override;
     private:
-        std::vector<unsigned> loops;
+        std::vector<size_t> loops;
         std::vector<unsigned> loopMax;
         unsigned injections;
         unsigned paramLoopNo{0xffffffff};
@@ -520,9 +546,9 @@ class ParameterAnalysis : public AnalysisAlgorithm {
         unsigned paramStep;
         unsigned paramBins;
         std::string paramName;
-        std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
-        std::map<unsigned, std::unique_ptr<Histo2d>> paramCurves;
-        std::map<unsigned, std::unique_ptr<Histo2d>> paramMaps;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> paramCurves;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> paramMaps;
 
         bool m_createMap = false;
 };

@@ -321,7 +321,12 @@ void Histo3dT<DataT>::toJson(json &j) const {
 
 template<typename DataT>
 void Histo3dT<DataT>::toFile(const std::string &prefix, const std::string &dir, bool jsonType) const {
-    std::string filename = createFilename(prefix, dir, jsonType);
+    std::string ext = "";
+    if (jsonType) 
+        ext = "json";
+    else
+        ext = "dat";
+    std::string filename = createFilename(prefix, dir, ext);
     std::fstream file(filename, std::fstream::out | std::fstream::trunc);
 
     json j;
@@ -418,13 +423,19 @@ void Histo3dT<DataT>::plot(const std::string &prefix, const std::string &dir) co
     hlog->info("Plotting {}", HistogramBase::name);
     // Put raw histo data in tmp file
     std::string tmp_name = std::string(getenv("USER")) + "/tmp_yarr_histo2d_" + prefix;
-    std::string output = dir + prefix + "_" + HistogramBase::name + "_" + lStat.toString() + ".png";
+    auto check_terminal = getenv("YARR_GNUPLOT_TERMINAL");
+    std::string term_name = "png";
+    if(check_terminal != nullptr) {
+      term_name = check_terminal;
+    }
+
+    std::string output = createFilename(prefix, dir, term_name);
 
     // Open gnuplot as file and pipe commands
 
     std::string input;
 
-    input+="\"set terminal png size 1280, 1024;";
+    input+="\"set terminal " + term_name + " size 1280, 1024;";
     input+="set palette negative defined ( 0 '#D53E4F', 1 '#F46D43', 2 '#FDAE61', 3 '#FEE08B', 4 '#E6F598', 5 '#ABDDA4', 6 '#66C2A5', 7 '#3288BD');";
     input+="unset key;";
     input+="set title '"  +HistogramBase::name+"';";

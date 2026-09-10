@@ -40,6 +40,9 @@ The string key is what appears in JSON config files (`"type": "spec"`, `"chipTyp
 | `src/libYarr/AllStdActions.cpp` | Loop actions (`StdDict::registerLoopAction`) |
 | `src/libYarr/AllAnalyses.cpp` | Analysis algorithms |
 | `src/libYarr/AllHistogrammers.cpp` | Histogrammer algorithms |
+| `src/libYarr/AllProcessors.cpp` | `DataProcessor` implementations (`StdDict::registerDataProcessor`) |
+| `src/libYarr/AllConfigurations.cpp` | Chip configuration classes (`StdDict::registerConfiguration`) |
+| `src/libYarr/AllPlotters.cpp` | Plotting backends (`StdDict::registerPlotter`) |
 
 Each chip library is linked into the monolithic `libYarr.so` via `-Wl,--no-as-needed` to ensure the static initialisers run even if no symbol is directly referenced.
 
@@ -88,8 +91,7 @@ ClipBoard<RawData>  →  DataProcessor threads  →  ClipBoard<HistData>  →  A
 
 | Path | Contents |
 |---|---|
-| `src/libYarr/` | Core interfaces: `HwController`, `FrontEnd`, `LoopActionBase`, `Bookkeeper`, `ClipBoard`, `DataProcessor`, `ScanBase`, `LoopEngine` |
+| `src/libYarr/` | Core interfaces (`HwController`, `FrontEnd`, `LoopActionBase`, `Bookkeeper`, `ClipBoard`, `DataProcessor`, `ScanBase`, `LoopEngine`), plus `ScanConsole` and the `AllXxx` registries. This one directory builds two separate libraries: `libYarr.so` (just `yarr.cpp`, linked against every controller/front-end lib) and `libScan.so` (the scan engine and registries) |
 | `src/libUtil/` | Histograms (`Histo1d`/`2d`/`3d`), JSON (nlohmann), logging (spdlog) |
-| `src/libScan/` | `ScanConsole`, `AllXxx` registries |
 | `src/lib{Rd53b,Itkpixv2,Star,Rd53a,Fei4}/` | Chip-specific FrontEnd, loop actions, data processors |
-| `src/lib{Spec,Emu,Bdaq,FelixClient}/` | Controller implementations |
+| `src/lib{Spec,Emu,Bdaq,FelixClient,ItsdaqFW}/` | Controller implementations |

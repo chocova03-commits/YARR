@@ -26,7 +26,7 @@ bin/test_star -r 0 2 4 configs/controller/emuCfg_star.json
 By default, the full suite of tests will be run. Parts of tests can also be run individually:
 
 ```bash
-bin/test_star -r 0 2 4 -s checkHPRs configs/controller/emuCfg_star.json
+bin/test_star -r 0 2 4 -s checkHCCHPRs configs/controller/emuCfg_star.json
 ```
 
 For more information (and a list of available tests) see the help message:
@@ -230,7 +230,7 @@ An example of occupancy map after a successful trim tuning for a hybrid module i
 
 To run a strobe delay scan execute the following command:
 ```bash
-bin/scanConsole -r configs/controller/itsdaq.json -c configs/connectivity/daqload_setup.json -s configs/scans/star/std_strobe_delay.json -p 
+bin/scanConsole -r configs/controller/itsdaq.json -c configs/connectivity/daqload_setup.json -s configs/scans/star/std_strobeDelayScan.json -p 
 ```
 An example of the occupancy map after a successful strobe delay scan for a hybrid module for which the optimal strobe delay value is 21 is given below.
 ![Occupancy map Strobe Delay](images/MGF_star_strobedelay_OccupancyMap-21.png)

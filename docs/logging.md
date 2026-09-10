@@ -72,3 +72,43 @@ sink.
 
 For debugging logger files, the "report_loggers" flag can be set
 which reports information on the logger and sink setup.
+
+### Per-logger configuration
+
+The "log_config" property is an array of dictionaries used to set the level
+and/or sink of individual loggers (as opposed to "level"/"pattern" at the
+top level, which only affect the default console sink). Each item has:
+
+* "name": the logger name to configure (as reported by ``scanConsole -k``),
+  or the special value "all" to apply to every registered logger.
+* "level" (optional): the level to set for this logger.
+* "sink" (optional): the name of a sink defined in the "sinks" array to
+  route this logger's output to, in addition to the default console sink.
+  If omitted, the default sink is used.
+
+For example, to trace messages from just the ``SpecRx`` logger:
+
+```json
+{
+    "pattern": "[%n] %! %v",
+    "log_config": [
+        { "name": "SpecRx", "level": "trace" }
+    ]
+}
+```
+
+Or to send all loggers' output to a file in addition to the console:
+
+```json
+{
+    "sinks": [
+        { "name": "file", "level": "info", "file_name": "console.log" }
+    ],
+    "log_config": [
+        { "name": "all", "sink": "file" }
+    ]
+}
+```
+
+See `configs/logging/` for further worked examples (`trace_spec.json`,
+`default_to_file.json`, `trace_all.json`, etc).

@@ -175,10 +175,10 @@ $ lspci
 
 ### Check if the DMA transfers works correctly
 
-- You can check the DMA transfer with the PCIe card with ``test`` program:
+- You can check the DMA transfer with the PCIe card with the ``specComTest`` program:
 
 ```bash
-$ cd Yarr/src
+$ cd Yarr
 $ bin/specComTest
 [15:17:55:415][  info  ][  specComTest  ]: Init spec
 [15:17:55:415][  info  ][    SpecCom    ]: Opening SPEC with id #0

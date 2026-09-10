@@ -64,6 +64,13 @@ void Itkpixv2GlobalFeedback::loadConfig(const json &j) {
     }
 }
 
+void Itkpixv2GlobalFeedback::feedbackFinal(unsigned channel, double value, bool last) {
+  m_values[channel] = value;
+  if (last) {
+    fbDoneMap[channel] = true;
+  }
+}
+
 void Itkpixv2GlobalFeedback::feedback(unsigned channel, double sign, bool last) {
     // Calculate new step and val
     logger->debug("[{}] Received feedback {} (old: {})", channel, sign, m_oldSign[channel]);
@@ -118,7 +125,7 @@ void Itkpixv2GlobalFeedback::writePar() {
             g_tx->setCmdEnable(feCfg->getTxChannel());
             // Write parameter
             dynamic_cast<Itkpixv2*>(fe)->writeRegister(parPtr, m_values[id]);
-            while(!g_tx->isCmdEmpty()){}
+            g_tx->waitCmdEmpty();
         }
     }
     // Reset CMD mask
@@ -155,7 +162,7 @@ void Itkpixv2GlobalFeedback::init() {
                 }
                 itkpixv2->configurePixels();
             }
-            while(!g_tx->isCmdEmpty()){}
+            g_tx->waitCmdEmpty();
         }
     }
     g_tx->setCmdEnable(keeper->getTxMask());

@@ -224,12 +224,12 @@ bin/testFelixClient configs/controller/felix_client.json -r 0 2 -w 5
 
 To read FELIX registers:
 ```
-bin/felixRgister configs/controller/felix_client.json REGISTER_NAME [OPTIONS...]
+bin/felixRegister configs/controller/felix_client.json REGISTER_NAME [OPTIONS...]
 ```
 
 To write FELIX registers:
 ```
-bin/felixRgister configs/controller/felix_client.json REGISTER_NAME REGISTER_VALUE [OPTIONS...]
+bin/felixRegister configs/controller/felix_client.json REGISTER_NAME REGISTER_VALUE [OPTIONS...]
 ```
 
 Available options:
@@ -319,9 +319,9 @@ Available options:
  -h : Display a help message to print out options and usage information.
 ```
 
-## TODO
+## Status
 
-Support for Pixel readout chips.
+Readout of ITkPixV1, ITkPixV2, and STAR chips is fully supported.
 
 ## Felix Client Bridge
 

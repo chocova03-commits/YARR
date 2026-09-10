@@ -35,6 +35,10 @@ given in the scan configuration.
 
 This builds the standard occupancy histogram.
 
+## RawData
+
+Build a histogram of event data interpreted from raw bits.
+
 ## TagDist
 
 Build a histogram of the distribution of hits L0tags.
@@ -42,6 +46,12 @@ Build a histogram of the distribution of hits L0tags.
 ## TagMap
 
 Build a histogram of the average L0tag for each FrontEnd channel.
+
+## TagOccupancyMap
+
+Build a 3D occupancy histogram distributed by L0tag. The tag axis can be
+limited by setting `tag_count` in the scan configuration to avoid requiring
+a large amount of memory unnecessarily.
 
 ## Tot2Map
 

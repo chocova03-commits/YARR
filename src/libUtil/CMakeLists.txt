@@ -11,6 +11,8 @@ add_library(Util SHARED
         scurvegauss.cpp
         LoadJson.cpp
         LoggingConfig.cpp
+        ProgressBar.cpp
+        PirateSpeak.cpp
         SerialCom.cpp
         ItkpixEncoder.cpp
         HitMapGenerator.cpp)

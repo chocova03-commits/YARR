@@ -11,7 +11,14 @@ target_include_directories(Yarr PUBLIC
 target_link_libraries(Yarr ${CONTROLLERS})
 target_link_libraries(Yarr ${FRONT_ENDS})
 target_link_libraries(Yarr Util_interface)
-target_link_options(Yarr PUBLIC -Wl,--no-as-needed)
+if(NOT APPLE)
+    # Forces the linker to keep DT_NEEDED entries for the controller/front-end libraries even
+    # though Yarr itself doesn't call into them directly - required so their static
+    # initializers (registry registration) run when libYarr.so is loaded. Not needed on macOS:
+    # ld64 always keeps LC_LOAD_DYLIB entries for explicitly linked libraries, it has no
+    # ELF-style "as-needed" elision to disable, and GNU ld's --no-as-needed flag doesn't exist there.
+    target_link_options(Yarr PUBLIC -Wl,--no-as-needed)
+endif()
 
 post_build_debug_library(Yarr)
 
@@ -85,6 +92,7 @@ add_library(Scan SHARED
         ScanConsoleImpl.cpp
         ScanFactory.cpp
         ScanHelper.cpp
+        ScanProgress.cpp
         StdAnalysis.cpp
         StdDataGatherer.cpp
         StdDataLoop.cpp

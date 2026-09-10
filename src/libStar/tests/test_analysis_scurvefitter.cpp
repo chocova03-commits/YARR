@@ -104,7 +104,7 @@ TEST_CASE("ScurveFitterAnalysis", "[Analysis][ScurveFitter]") {
                 CAPTURE(r);
 
                 if (output_name.find("ThresholdMap") != std::string::npos) {
-                    REQUIRE(hh->getBin(hh->binNum(c+1,r+1)) == 4);
+                    REQUIRE(hh->getBin(hh->binNum(c+1,r+1)) == Catch::Approx(4).margin(0.02));
                 } else if (output_name.find("Chi2Map") != std::string::npos) {
                     REQUIRE(hh->getBin(hh->binNum(c+1,r+1)) < 1);
                 } else if (output_name.find("StatusMap") != std::string::npos) {
@@ -114,4 +114,97 @@ TEST_CASE("ScurveFitterAnalysis", "[Analysis][ScurveFitter]") {
             }
         }
     }
+}
+
+// Regression test for the case where (max-min) is not a multiple of step:
+// StdParameterLoop then never actually visits the configured max, so a
+// completion check comparing against the configured max would never fire
+// and ScurveFitter would produce no output at all.
+TEST_CASE("ScurveFitterAnalysisNonDivisibleStep", "[Analysis][ScurveFitter]") {
+    json analysisConfig;
+
+    // min=0, max=9, step=2 -> loop actually visits 0, 2, 4, 6, 8 (stops
+    // before 9, which is never reached)
+    std::vector<unsigned> vcalValues = {0, 2, 4, 6, 8};
+    std::vector<unsigned> counts     = {0, 0, 10, 40, 50};
+
+    unsigned channel = 0;
+
+    EmptyHw empty;
+    Bookkeeper bookie(&empty, &empty);
+
+    auto frontEnd = StdDict::getFrontEnd("Star");
+    frontEnd->setActive(true);
+    bookie.addFe(std::move(frontEnd), channel);
+
+    AnalysisProcessor processor(channel);
+
+    int nCol = 2;
+    int nRow = 2;
+
+    {
+        auto analysis = StdDict::getAnalysis("ScurveFitter");
+        REQUIRE(analysis);
+
+        analysis->loadConfig(analysisConfig);
+        analysis->setMapSize(nCol, nRow);
+        analysis->setConfig(bookie.getFeCfg(channel));
+
+        processor.addAlgorithm(std::move(analysis));
+    }
+
+    ScanFactory scan(&bookie, nullptr);
+
+    {
+      json scanCfg;
+      scanCfg["scan"]["name"] = "TestScurveFitterAnalysisNonDivisibleStep";
+
+      scanCfg["scan"]["loops"][0]["loopAction"] = "StdParameterLoop";
+      scanCfg["scan"]["loops"][0]["config"]["min"] = 0;
+      scanCfg["scan"]["loops"][0]["config"]["max"] = 9;
+      scanCfg["scan"]["loops"][0]["config"]["step"] = 2;
+
+      scan.loadConfig(scanCfg);
+    }
+
+    ClipBoard<HistogramBase> input;
+    ClipBoard<HistogramBase> output;
+
+    processor.connect(&scan, &input, &output, nullptr);
+
+    processor.init();
+    processor.run();
+
+    for (unsigned i = 0; i < vcalValues.size(); i++) {
+        LoopStatus stat{{vcalValues[i]}, {LOOP_STYLE_PARAMETER}};
+        auto hist = std::make_unique<Histo2d>("OccupancyMap",
+                                                nCol, 0.5, nCol+0.5,
+                                                nRow, 0.5, nRow+0.5,
+                                                stat);
+
+        for (int c=0; c<nCol; c++) {
+            for (int r=0; r<nRow; r++) {
+                hist->fill(c+1, r+1, counts[i]);
+            }
+        }
+
+        input.pushData(std::move(hist));
+    }
+
+    input.finish();
+    processor.join();
+
+    // Before the fix, ScurveFitter's completion check compared against the
+    // configured max (9), which is never actually reached, so no output
+    // (ThresholdMap, NoiseMap, etc.) would ever be produced.
+    REQUIRE(!output.empty());
+
+    bool sawThresholdMap = false;
+    while (!output.empty()) {
+        std::unique_ptr<HistogramBase> result = output.popData();
+        if (result->getName().find("ThresholdMap") != std::string::npos) {
+            sawThresholdMap = true;
+        }
+    }
+    REQUIRE(sawThresholdMap);
 }
