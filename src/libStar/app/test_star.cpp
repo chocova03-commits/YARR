@@ -691,14 +691,7 @@ void configureHCC_FullTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned 
   setOpMode(3, mode640, txCore, cfg);
 }
 
-void configureABC(TxCore& txCore, StarCfg& cfg, bool reset) {
-
-  if (reset) {
-    logger->info("Sending ABCStar register reset commands");
-    sendCommand(LCB::fast_command(LCB::ABC_REG_RESET, 0), txCore);
-    sendCommand(LCB::fast_command(LCB::ABC_SLOW_COMMAND_RESET, 0), txCore);
-  }
-
+void configureABCOnly(TxCore& txCore, StarCfg& cfg) {
   logger->info("Broadcast ABCStar configurations");
 
   // Need a non-zero drive current to see data from ABC
@@ -725,6 +718,16 @@ void configureABC(TxCore& txCore, StarCfg& cfg, bool reset) {
   uint32_t val_mask7 = 0xff000000;
   uint32_t addr_mask7 = updateABCRegister(ABCStarRegister::MaskInput7, val_mask7, cfg);
   sendCommand(star.write_abc_register(addr_mask7, val_mask7), txCore);
+}
+
+void configureABCMaybeReset(TxCore& txCore, StarCfg& cfg, bool reset) {
+  if (reset) {
+    logger->info("Sending ABCStar register reset commands");
+    sendCommand(LCB::fast_command(LCB::ABC_REG_RESET, 0), txCore);
+    sendCommand(LCB::fast_command(LCB::ABC_SLOW_COMMAND_RESET, 0), txCore);
+  }
+
+  configureABCOnly(txCore, cfg);
 }
 
 // Test steps
@@ -1969,10 +1972,10 @@ FunctionMap &TestData::buildTests () {
       {"testABCRegister", [&](auto &t, auto &r) {return testABCRegisterAccess(t, r, *starCfg, hccStars, timeout_ms);}},
 
       // Configure ABCs
-      {"configureABC", [&](auto &t, auto &r) {configureABC(t, *starCfg, doResets); return true;}},
-      {"configureABC_NoReset", [&](auto &t, auto &r) {configureABC(t, *starCfg, true); return true;}},
-      {"configureABC_WithReset", [&](auto &t, auto &r) {configureABC(t, *starCfg, false); return true;}},
-      {"configureABCIfReset", [&](auto &t, auto &r) {if(doResets) configureABC(t, *starCfg, doResets); return true;}},
+      {"configureABC", [&](auto &t, auto &r) {configureABCMaybeReset(t, *starCfg, doResets); return true;}},
+      {"configureABC_NoReset", [&](auto &t, auto &r) {configureABCOnly(t, *starCfg); return true;}},
+      {"configureABC_WithReset", [&](auto &t, auto &r) {configureABCMaybeReset(t, *starCfg, false); return true;}},
+      {"configureABCIfReset", [&](auto &t, auto &r) {if(doResets) configureABCMaybeReset(t, *starCfg, doResets); return true;}},
 
       {"resetABC", [&](auto &t, auto &r) {resetABC(t, *starCfg); return true;}},
 
