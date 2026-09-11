@@ -663,18 +663,20 @@ void configureHCCMaybeReset(TxCore& txCore, StarCfg& cfg, bool reset, uint32_t i
   }
 }
 
-void configureHCC_PacketTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned icEnablesMask, bool mode640) {
-  configureHCCMaybeReset(txCore, cfg, reset, icEnablesMask, mode640);
-
+void setPacketTransp(TxCore& txCore, StarCfg& cfg, unsigned icEnablesMask, bool mode640) {
   // Set to packet transparent mode
   logger->info("Set HCCs to Packet Transparent mode");
 
   setOpMode(2, mode640, txCore, cfg);
 }
 
-void configureHCC_FullTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned inChn, unsigned icEnablesMask, bool mode640) {
+void configureHCC_PacketTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned icEnablesMask, bool mode640) {
   configureHCCMaybeReset(txCore, cfg, reset, icEnablesMask, mode640);
 
+  setPacketTransp(txCore, cfg, icEnablesMask, mode640);
+}
+
+void setFullTransp(TxCore& txCore, StarCfg& cfg, unsigned inChn, unsigned icEnablesMask, bool mode640) {
   // Select the input channel: IC_transSelect
   // Register ICenable
   inChn = inChn & 0xf;
@@ -689,6 +691,12 @@ void configureHCC_FullTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned 
   logger->info("Set HCCs to Full Transparent mode");
 
   setOpMode(3, mode640, txCore, cfg);
+}
+
+void configureHCC_FullTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned inChn, unsigned icEnablesMask, bool mode640) {
+  configureHCCMaybeReset(txCore, cfg, reset, icEnablesMask, mode640);
+
+  setFullTransp(txCore, cfg, inChn, icEnablesMask, mode640);
 }
 
 void configureABCOnly(TxCore& txCore, StarCfg& cfg) {
@@ -1956,7 +1964,9 @@ FunctionMap &TestData::buildTests () {
       {"configureHCCIfReset", [&](auto &t, auto &_) {if(doResets) configureHCCMaybeReset(t, *starCfg, doResets, icEnablesMask, mode640); return true;}},
       // configure HCC into the Packet Transparent mode
       {"configureHCCForPacketTransp", [&](auto &t, auto &r) {configureHCC_PacketTransp(t, *starCfg, doResets, icEnablesMask, mode640); return true; }},
+      {"setPacketTransp", [&](auto &t, auto &r) {setPacketTransp(t, *starCfg, icEnablesMask, mode640); return true; }},
       {"configureHCCForFullTransp", [&](auto &t, auto &r) {configureHCC_FullTransp(t, *starCfg, doResets, inChannel, icEnablesMask, mode640); return true; }},
+      {"setFullTransp", [&](auto &t, auto &r) {setFullTransp(t, *starCfg, inChannel, icEnablesMask, mode640); return true; }},
 
       {"resetHCC", [&](auto &t, auto &r) {resetHCC(t, *starCfg); return true;}},
       {"resetABCFromHCC", [&](auto &t, auto &r) {resetABCFromHCC(t, *starCfg); return true;}},
