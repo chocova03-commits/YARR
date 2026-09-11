@@ -728,14 +728,10 @@ void configureABC(TxCore& txCore, StarCfg& cfg, bool reset) {
 }
 
 // Test steps
-bool checkHCCHPRs(TxCore& txCore, RxCore& rxCore,
-                  const std::vector<uint32_t>& rxChannels,
-                  bool reset, unsigned timeout_ms)
+bool checkHCCHPRsOnly(TxCore& txCore, RxCore& rxCore,
+                      const std::vector<uint32_t>& rxChannels,
+                      unsigned timeout_ms)
 {
-  if (reset) {
-    sendCommand( LCB::fast_command(LCB::HCC_REG_RESET, 0), txCore );
-  }
-
   bool hprOK = false;
 
   for (auto rx : rxChannels) {
@@ -780,6 +776,17 @@ bool checkHCCHPRs(TxCore& txCore, RxCore& rxCore,
   } // for (auto rx : rxChannels)
 
   return hprOK;
+}
+
+bool checkHCCHPRsMaybeReset(TxCore& txCore, RxCore& rxCore,
+                            const std::vector<uint32_t>& rxChannels,
+                            bool reset, unsigned timeout_ms)
+{
+  if (reset) {
+    sendCommand( LCB::fast_command(LCB::HCC_REG_RESET, 0), txCore );
+  }
+
+  return checkHCCHPRsOnly(txCore, rxCore, rxChannels, timeout_ms);
 }
 
 bool probeHCCs(
@@ -1929,9 +1936,9 @@ int main(int argc, char *argv[]) {
 FunctionMap &TestData::buildTests () {
   static FunctionMap tests = {
       // Read HCCStar HPRs
-      {"checkHCCHPRs", [&](auto &t, auto &r) {return checkHCCHPRs(t, r, rxChannels, doResets, timeout_ms);}},
-      {"checkHCCHPRs_NoReset", [&](auto &t, auto &r) {return checkHCCHPRs(t, r, rxChannels, false, timeout_ms);}},
-      {"checkHCCHPRs_WithReset", [&](auto &t, auto &r) {return checkHCCHPRs(t, r, rxChannels, true, timeout_ms);}},
+      {"checkHCCHPRs", [&](auto &t, auto &r) {return checkHCCHPRsMaybeReset(t, r, rxChannels, doResets, timeout_ms);}},
+      {"checkHCCHPRs_NoReset", [&](auto &t, auto &r) {return checkHCCHPRsOnly(t, r, rxChannels, timeout_ms);}},
+      {"checkHCCHPRs_WithReset", [&](auto &t, auto &r) {return checkHCCHPRsMaybeReset(t, r, rxChannels, true, timeout_ms);}},
       // Probe HCCs
       {"probeHCCs", [&](auto &t, auto &r) {return probeHCCs(t, r, hccStars, txChannels, rxChannels, setHccId, timeout_ms, setNotBroadcastIds);}},
       // Read many HCC registers
