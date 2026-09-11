@@ -20,6 +20,7 @@
 #include <getopt.h>
 
 #include "spdlog/fmt/fmt.h"
+#include "spdlog/fmt/ranges.h"
 
 namespace {
   auto logger = logging::make_log("test_star");
@@ -237,6 +238,8 @@ namespace {
     std::unique_ptr<StarCfg> starCfg;
     bool setHccId = false;
     bool doResets = false;
+    bool checkSequence { false };
+
     /// Default to 640
     bool mode640 = true;
 
@@ -309,6 +312,7 @@ void printHelp() {
   std::cout << " -b : Always use broadcast for read/write (default is to update map based on HPR).\n";
   std::cout << " -k : Keep going in sequence after error.\n";
   std::cout << " -R : Send reset commands.\n";
+  std::cout << " -q : Only report individual test actions as part of a sequence.\n";
   std::cout << " -v : Report carried data between actions (diagnostic).\n";
   std::cout << " -w <timeout_ms> : General timeout in milliseconds.\n";
   std::cout << " -s <test_preset> : Type of test (lower case), or sequence (UpperCase) to run, use bad to list. Default: Full\n";
@@ -1693,6 +1697,48 @@ bool runSingleTest(std::string testName, TxCore& txCore, RxCore& rxCore, TestDat
   return success;
 }
 
+std::vector<std::string> buildTestSequence(std::string test_desc)
+{
+  std::vector<std::string> test_list;
+    if(test_desc.find(":") != std::string::npos) {
+      while(test_desc.size() > 0) {
+        auto firstColon = test_desc.find(":");
+        auto next_test = test_desc.substr(0, firstColon);
+
+        if(isupper(next_test[0])) {
+          auto test_seq = buildTestSequence(next_test);
+          test_list.insert(test_list.end(), test_seq.begin(), test_seq.end());
+        } else {
+          test_list.push_back(next_test);
+        }
+
+        if(firstColon == std::string::npos) {
+          test_desc.clear();
+        } else {
+          test_desc = test_desc.substr(firstColon + 1);
+        }
+      }
+    } else if(isupper(test_desc[0])) {
+      if(sequenceMap.find(test_desc) != sequenceMap.end()) {
+        for(auto &t: sequenceMap[test_desc]) {
+          test_list.push_back(t);
+        }
+      } else {
+        logger->error("Unknown test sequence: {}", test_desc);
+
+        logger->info("Available preset test sequences:");
+
+        for(auto &s: sequenceMap) {
+          logger->info("  {}", s.first);
+        }
+      }
+    } else {
+      test_list.push_back(test_desc);
+    }
+
+    return test_list;
+}
+
 } // end of unnamed namespace
 
 //////////
@@ -1717,7 +1763,7 @@ int main(int argc, char *argv[]) {
         {nullptr, 0, nullptr, 0}};
 
     int c;
-    while ((c = getopt_long(argc, argv, "3hbkvTi:l:r:t:dRs:c:w:V:", long_options, nullptr)) != -1) {
+    while ((c = getopt_long(argc, argv, "3hbkqvTi:l:r:t:dRs:c:w:V:", long_options, nullptr)) != -1) {
       switch(c) {
       case 'h':
         printHelp();
@@ -1731,6 +1777,9 @@ int main(int argc, char *argv[]) {
       case 'k':
         testData.keepGoing = true;
         return 0;
+      case 'q':
+        testData.checkSequence = true;
+        break;
       case 'i':
         try {
           // Allow hex
@@ -1876,6 +1925,12 @@ int main(int argc, char *argv[]) {
     if (optind != argc) {
       // First positional parameter (optind is first not parsed by getopt)
       controller = argv[optind];
+    }
+
+    if(testData.checkSequence) {
+      auto test_list = buildTestSequence(testSequence);
+      logger->info("Skip running tests: {}", fmt::join(test_list, ":"));
+      return 0;
     }
 
     std::unique_ptr<HwController> hwCtrl = nullptr;
