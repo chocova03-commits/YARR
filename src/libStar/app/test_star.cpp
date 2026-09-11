@@ -1638,40 +1638,6 @@ bool diagnosticsReport(RxCore &rxCore, unsigned timeout_ms) {
   return true;
 }
 
-bool runTestSequence(std::string testSequence, TxCore& txCore, RxCore& rxCore, TestData &testData, bool doReport)
-{
-  bool success = true;
-
-  auto &tests = testData.buildTests();
-
-  if(sequenceMap.find(testSequence) != sequenceMap.end()) {
-    logger->info("Running test sequence {}", testSequence);
-    for(auto &t: sequenceMap[testSequence]) {
-      if(doReport) {
-        testData.report();
-      }
-      logger->info("Running test {}", t);
-      success &= tests[t](txCore, rxCore);
-
-      if(!testData.keepGoing && !success) {
-        logger->info("Aborting test sequence due to failure");
-        break;
-      }
-    }
-  } else {
-    logger->error("Unknown test sequence: {}", testSequence);
-
-    logger->info("Available preset test sequences:");
-
-    for(auto &s: sequenceMap) {
-      logger->info("  {}", s.first);
-    }
-
-    success = false;
-  }
-  return success;
-}
-
 bool runSingleTest(std::string testName, TxCore& txCore, RxCore& rxCore, TestData &testData, bool doReport)
 {
   bool success = true;
@@ -1982,37 +1948,23 @@ int main(int argc, char *argv[]) {
 
     testData.validate();
 
-    if(testSequence.find(":") != std::string::npos) {
-      logger->info("Run custom sequence: {}", testSequence);
-      while(testSequence.size() > 0) {
-        auto firstColon = testSequence.find(":");
-        auto next_test = testSequence.substr(0, firstColon);
-        logger->info(" Run action in custom sequence: {}", next_test);
+    logger->info("Sequence description: {}", testSequence);
 
-        if(isupper(next_test[0])) {
-          success &= runTestSequence(next_test, txCore, rxCore, testData, doReport);
-        } else {
-          success &= runSingleTest(next_test, txCore, rxCore, testData, doReport);
-        }
+    auto test_list = buildTestSequence(testSequence);
 
-        if(firstColon == std::string::npos) {
-          testSequence.clear();
-        } else {
-          testSequence = testSequence.substr(firstColon + 1);
-        }
-        logger->trace(" Remaining custom sequence: '{}'", testSequence);
+    if(test_list.size() > 1) {
+      logger->info("Expanded sequence: {}", fmt::join(test_list, ":"));
+    }
 
-        if(!testData.keepGoing && !success) {
-          logger->info("Stopping test sequence due to failure");
-          break;
-        }
+    for(auto &next_test: test_list) {
+      logger->info(" Running test action: {}", next_test);
+
+      success &= runSingleTest(next_test, txCore, rxCore, testData, doReport);
+
+      if(!testData.keepGoing && !success) {
+        logger->info("Stopping test sequence due to failure");
+        break;
       }
-    } else if(isupper(testSequence[0])) {
-      logger->info("Run test sequence: {}", testSequence);
-      success &= runTestSequence(testSequence, txCore, rxCore, testData, doReport);
-    } else {
-      logger->info("Run single sequence: {}", testSequence);
-      success &= runSingleTest(testSequence, txCore, rxCore, testData, doReport);
     }
 
     if(doReport) {
