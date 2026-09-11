@@ -110,6 +110,26 @@ namespace {
           "testDataPacketsPulse",
         }},
 
+      {"Full_WithReset", {
+          "checkHCCHPRs_WithReset", "probeHCCs", "testHCCRegister",
+          "configureHCC_WithReset",
+          "checkABCHPRs", "probeABCs", "testABCRegister",
+          "configureABC_WithReset",
+          "testHitCounts",
+          "testDataPacketsStatic",
+          "testDataPacketsPulse",
+        }},
+
+      {"Full_NoReset", {
+          "checkHCCHPRs_NoReset", "probeHCCs", "testHCCRegister",
+          "configureHCC_NoReset",
+          "checkABCHPRs", "probeABCs", "testABCRegister",
+          "configureABC_NoReset",
+          "testHitCounts",
+          "testDataPacketsStatic",
+          "testDataPacketsPulse",
+        }},
+
       /*
         Just test register read and write
       */
@@ -163,6 +183,13 @@ namespace {
           "testDataPacketsStatic",
         }},
 
+      {"PacketTransp_NoReset", {
+          "setPacketTransp",
+          "configureABC_NoReset",
+          "readABCRegisters",
+          "testDataPacketsStatic",
+        }},
+
       /*
         Run some tests in full transparent mode
       */
@@ -173,6 +200,13 @@ namespace {
           "testDataPacketsStatic",
 
           // "diagnosticsReport",
+        }},
+
+      {"FullTransp_NoReset", {
+          "setFullTransp",
+          "configureABC_NoReset",
+          "readABCRegisters",
+          "testDataPacketsStatic",
         }},
 
       // Read all data (partly here so diagnosticsReport has somewhere to live)
