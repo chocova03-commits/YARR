@@ -618,13 +618,8 @@ void resetABC(TxCore& txCore, StarCfg& cfg) {
 
 // Configure chips
 // Different register values for different HCCStar versions?
-void configureHCC(TxCore& txCore, StarCfg& cfg, bool reset, uint32_t ic_enables, bool mode640) {
+void configureHCCOnly(TxCore& txCore, StarCfg& cfg, uint32_t ic_enables, bool mode640) {
   // Configure HCCStars to enable communications with ABCStars
-  if (reset) {
-    logger->info("Sending HCCStar register reset command");
-    sendCommand(LCB::fast_command(LCB::HCC_REG_RESET, 0), txCore);
-  }
-
   logger->info("Broadcast HCCStar configurations");
 
   // Register Delay1: delays for signals to ABCStars
@@ -653,21 +648,23 @@ void configureHCC(TxCore& txCore, StarCfg& cfg, bool reset, uint32_t ic_enables,
 
   // Set normal readout using OPmode/OPmodeC
   setOpMode(0, mode640, txCore, cfg);
+}
+
+void configureHCCMaybeReset(TxCore& txCore, StarCfg& cfg, bool reset, uint32_t ic_enables, bool mode640) {
+  if (reset) {
+    logger->info("Sending HCCStar register reset command");
+    resetHCC(txCore, cfg);
+  }
+
+  configureHCCOnly(txCore, cfg, ic_enables, mode640);
 
   if (reset) {
-    // Register ExtRst/ExtRstC: external reset for ABCStars
-    uint32_t val_extrst = 0x00000001;
-
-    uint32_t addr_extrst = updateHCCRegister(HCCStarRegister::ExtRst, val_extrst, cfg);
-    uint32_t addr_extrstc = updateHCCRegister(HCCStarRegister::ExtRstC, val_extrst, cfg);
-
-    sendCommand(star.write_hcc_register(addr_extrst, val_extrst), txCore);
-    sendCommand(star.write_hcc_register(addr_extrstc, val_extrst), txCore);
+    resetABCFromHCC(txCore, cfg);
   }
 }
 
 void configureHCC_PacketTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned icEnablesMask, bool mode640) {
-  configureHCC(txCore, cfg, reset, icEnablesMask, mode640);
+  configureHCCMaybeReset(txCore, cfg, reset, icEnablesMask, mode640);
 
   // Set to packet transparent mode
   logger->info("Set HCCs to Packet Transparent mode");
@@ -676,7 +673,7 @@ void configureHCC_PacketTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigne
 }
 
 void configureHCC_FullTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned inChn, unsigned icEnablesMask, bool mode640) {
-  configureHCC(txCore, cfg, reset, icEnablesMask, mode640);
+  configureHCCMaybeReset(txCore, cfg, reset, icEnablesMask, mode640);
 
   // Select the input channel: IC_transSelect
   // Register ICenable
@@ -1943,10 +1940,10 @@ FunctionMap &TestData::buildTests () {
       {"testHCCRegister", [&](auto &t, auto &r) {return testHCCRegisterAccess(t, r, hccStars, timeout_ms);}},
 
       // Configure HCCs to enable communications with ABCs
-      {"configureHCC", [&](auto &t, auto &_) {configureHCC(t, *starCfg, doResets, icEnablesMask, mode640); return true;}},
-      {"configureHCC_NoReset", [&](auto &t, auto &_) {configureHCC(t, *starCfg, false, icEnablesMask, mode640); return true;}},
-      {"configureHCC_WithReset", [&](auto &t, auto &_) {configureHCC(t, *starCfg, true, icEnablesMask, mode640); return true;}},
-      {"configureHCCIfReset", [&](auto &t, auto &_) {if(doResets) configureHCC(t, *starCfg, doResets, icEnablesMask, mode640); return true;}},
+      {"configureHCC", [&](auto &t, auto &_) {configureHCCMaybeReset(t, *starCfg, doResets, icEnablesMask, mode640); return true;}},
+      {"configureHCC_NoReset", [&](auto &t, auto &_) {configureHCCOnly(t, *starCfg, icEnablesMask, mode640); return true;}},
+      {"configureHCC_WithReset", [&](auto &t, auto &_) {configureHCCMaybeReset(t, *starCfg, true, icEnablesMask, mode640); return true;}},
+      {"configureHCCIfReset", [&](auto &t, auto &_) {if(doResets) configureHCCMaybeReset(t, *starCfg, doResets, icEnablesMask, mode640); return true;}},
       // configure HCC into the Packet Transparent mode
       {"configureHCCForPacketTransp", [&](auto &t, auto &r) {configureHCC_PacketTransp(t, *starCfg, doResets, icEnablesMask, mode640); return true; }},
       {"configureHCCForFullTransp", [&](auto &t, auto &r) {configureHCC_FullTransp(t, *starCfg, doResets, inChannel, icEnablesMask, mode640); return true; }},
