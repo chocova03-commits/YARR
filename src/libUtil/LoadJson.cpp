@@ -1,5 +1,6 @@
 #include "LoadJson.h"
 
+#include <filesystem>
 #include <fstream>
 
 namespace JsonHelper {
@@ -11,6 +12,13 @@ json openJsonFile(const std::string& file_location) {
   if (frag_p != std::string::npos) {
     frag = filepath.substr(frag_p + 1);
     filepath = filepath.substr(0, frag_p);
+  }
+
+  if (!std::filesystem::exists(filepath)) {
+      auto *yarr_root = getenv("YARR_CONFIG_PATH");
+      if(yarr_root) {
+          filepath = std::string(yarr_root) + filepath;
+      }
   }
 
   std::ifstream file(filepath);
