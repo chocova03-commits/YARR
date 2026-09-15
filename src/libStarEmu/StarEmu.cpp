@@ -196,6 +196,8 @@ void StarEmu::executeLoop() {
         if (m_txRingBuffer2) decodeR3L1(d1_r3l1);
         decodeLCB(d1_lcb);
     }
+
+    logger->info("Ending emulator loop");
 }
 
 // Have to do this specialisation before instantiation in EmuController.h!
