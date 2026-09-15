@@ -156,8 +156,9 @@ private:
 
   // Clock counter for HPR packets
   unsigned hpr_clkcnt; // unit: BC (25 ns)
-  // Flag indicating if at least one HPR packet has been sent
-  std::vector<bool> hpr_sent;
+  // Flag indicating if at least one HPR packet has been sent.
+  // 1 HCCStar + nABCs ABCStar chips
+  std::bitset<12> hpr_sent;
   const unsigned HPRPERIOD; // HPR packet period
 
   int m_abc_version;
