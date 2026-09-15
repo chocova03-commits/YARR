@@ -120,8 +120,8 @@ int ScanConsoleImpl::init(ScanOpts options) {
     scanOpts=std::move(options);
     runCounter = ScanHelper::newRunCounter();
     if(!scanOpts.logCfgPath.empty()) {
-        loggerConfig = ScanHelper::openJsonFile(scanOpts.logCfgPath);
-        loggerConfig["outputDir"]=scanOpts.outputDir;
+        loggerConfig = ScanHelper::openJsonFile(scanOpts.logCfgPath).get<logging::LoggingConfig>();
+        // loggerConfig["outputDir"]=scanOpts.outputDir;
     } else {
         // default log setting
         loggerConfig = logging::defaultConfig();

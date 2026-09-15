@@ -51,7 +51,7 @@ constexpr const char *defaultLogPattern = "[%T:%e]%^[%=8l][%=15n][%t]:%$ %v";
 LoggingConfig defaultConfig();
 
 /// Setup loggers according to configuration in json file
-void setupLoggers(const json &j, const std::string &path="");
+void setupLoggers(const LoggingConfig &j, const std::string &path="");
 
 /// Add a stdout.log file sink to every logger, using the same level and
 /// pattern as the terminal sink, writing into outputDir (must already

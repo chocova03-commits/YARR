@@ -22,6 +22,7 @@
 
 #include "storage.hpp"
 #include "logging.h"
+#include "LoggingConfig.h"
 
 class ScanConsoleImpl {
 public:
@@ -72,7 +73,7 @@ private:
     std::string chipType{};
     std::string timestampStr{};
     std::time_t now{};
-    json loggerConfig;
+    logging::LoggingConfig loggerConfig;
     json chipConfig;
     json dbCfg;
     json ctrlCfg;
