@@ -228,11 +228,13 @@ LoggingConfig defaultConfig() {
 spdlog::sink_ptr default_sink;
 std::string default_pattern_used = defaultLogPattern;
 
-void setupLoggers(const LoggingConfig &j, const std::string &path) {
+void setupLoggers(const LoggingConfig &j) {
     static bool initialized = false;
 
     // initialized logger only once
     if(initialized) return;
+
+    std::string path = j.output_dir;
 
     if(j.default_sink == "ringbuffer") {
         std::size_t ringbuffer_size = 1000;

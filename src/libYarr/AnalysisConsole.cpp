@@ -592,15 +592,14 @@ void printHelp() {
 int AnalysisConsoleImpl::init() {
     start_time = clk::now();
 
-    logging::LoggerConfig loggerConfig;
+    logging::LoggingConfig loggerConfig;
 
     if(!options.logCfgPath.empty()) {
-        loggerConfig = ScanHelper::openJsonFile(options.logCfgPath).get<logging::LoggerConfig>();
-        // loggerConfig["outputDir"] = options.outputDir;
+        loggerConfig = ScanHelper::openJsonFile(options.logCfgPath).get<logging::LoggingConfig>();
+        loggerConfig.output_dir = options.outputDir;
     } else {
         // default log setting
         loggerConfig = logging::defaultConfig();
-        // loggerConfig["outputDir"]="";
     }
     spdlog::info("Configuring logger ...");
     logging::setupLoggers(loggerConfig);
