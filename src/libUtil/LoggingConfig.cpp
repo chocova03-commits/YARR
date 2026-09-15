@@ -214,16 +214,15 @@ static std::string_view level_string(int lvl) {
 
 namespace logging {
 
-json defaultConfig() {
+LoggingConfig defaultConfig() {
     std::string default_name = "configs/logging/default.json";
     if(std::filesystem::exists(default_name)) {
       return JsonHelper::openJsonFile(default_name);
     }
-    json j;
-    j["pattern"] = defaultLogPattern;
-    j["log_config"][0]["name"] = "all";
-    j["log_config"][0]["level"] = "info";
-    return j;
+    LoggingConfig lc;
+    lc.pattern = defaultLogPattern;
+    lc.log_config.push_back(LoggingLoggersConfig{.name = "all", .level = "info"});
+    return lc;
 }
 
 spdlog::sink_ptr default_sink;

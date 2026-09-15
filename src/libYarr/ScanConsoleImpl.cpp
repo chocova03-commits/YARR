@@ -714,10 +714,10 @@ void ScanConsoleImpl::dump() {
 }
 
 void ScanConsoleImpl::setupLogger(const char *config) {
-    json loggerConfig = logging::defaultConfig();
+    logging::LoggingConfig loggerConfig = logging::defaultConfig();
     if (config) {
         try {
-            loggerConfig = json::parse(config);
+            loggerConfig = json::parse(config).get<logging::LoggingConfig>();
         } catch (...) {}
     }
     logging::setupLoggers(loggerConfig);
