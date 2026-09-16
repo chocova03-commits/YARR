@@ -378,17 +378,6 @@ void addOutputFileSink(const std::string &outputDir) {
     });
 }
 
-void setupLoggers(const json &j, const std::string &path) {
-    try {
-      LoggingConfig ll = j.get<LoggingConfig>();
-      setupLoggers(ll, path);
-    } catch(std::exception &ex) {
-      std::cerr << "Failed to load configuration from json\n";
-      std::cerr << " -> " << ex.what() << "\n";
-      return;
-    }
-}
-
 void listLoggers(bool print_details) {
     std::string_view def_name = "(default)";
     std::vector<std::string> log_list;
