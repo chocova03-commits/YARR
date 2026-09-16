@@ -596,11 +596,16 @@ int AnalysisConsoleImpl::init() {
 
     if(!options.logCfgPath.empty()) {
         loggerConfig = ScanHelper::openJsonFile(options.logCfgPath).get<logging::LoggingConfig>();
-        loggerConfig.output_dir = options.outputDir;
     } else {
         // default log setting
         loggerConfig = logging::defaultConfig();
     }
+
+    // Only override output dir if not set in the file
+    if(loggerConfig.output_dir.empty()) {
+        loggerConfig.output_dir = options.outputDir;
+    }
+
     spdlog::info("Configuring logger ...");
     logging::setupLoggers(loggerConfig);
     return 0;

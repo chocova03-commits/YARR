@@ -121,11 +121,16 @@ int ScanConsoleImpl::init(ScanOpts options) {
     runCounter = ScanHelper::newRunCounter();
     if(!scanOpts.logCfgPath.empty()) {
         loggerConfig = ScanHelper::openJsonFile(scanOpts.logCfgPath).get<logging::LoggingConfig>();
-        loggerConfig.output_dir = scanOpts.outputDir;
     } else {
         // default log setting
         loggerConfig = logging::defaultConfig();
     }
+
+    // Only override output dir if not set in the file
+    if(loggerConfig.output_dir.empty()) {
+        loggerConfig.output_dir = scanOpts.outputDir;
+    }
+
     spdlog::info("Configuring logger ...");
     logging::setPirateMode(scanOpts.pirateMode);
     logging::setupLoggers(loggerConfig);

@@ -136,6 +136,9 @@ void to_json(json& j, const LoggingConfig& c) {
   if(c.ringbuffer_size != 0) {
     j["ringbuffer_size"] = c.ringbuffer_size;
   }
+  if(!c.output_dir.empty()) {
+    j["output_dir"] = c.output_dir;
+  }
   if(c.simple) {
     j["simple"] = c.simple;
   }
@@ -162,6 +165,9 @@ void from_json(const json& j, LoggingConfig& c) {
   }
   if(j.contains("ringbuffer_size")) {
     j.at("ringbuffer_size").get_to(c.ringbuffer_size);
+  }
+  if(j.contains("output_dir")) {
+    j.at("output_dir").get_to(c.output_dir);
   }
   if(j.contains("simple")) {
     j.at("simple").get_to(c.simple);
