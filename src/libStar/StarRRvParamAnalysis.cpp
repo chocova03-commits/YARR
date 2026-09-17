@@ -322,9 +322,9 @@ void StarRRvParamAnalysis::end() {
 
 std::tuple<int, int, int> StarRRvParamAnalysis::getHistogramSettings(std::vector<std::vector<int> > map){
 
-    int paramMin;
-    int paramMax;
-    int paramNBin;
+    int paramMin{0};
+    int paramMax{2};
+    int paramNBin{2};
     if (readOnly){
         paramMin = 0;
         paramMax = 0;

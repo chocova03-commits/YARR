@@ -43,7 +43,7 @@ void print_usage(char* argv[]) {
     std::cerr << std::endl;
 }
 
-std::unique_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, json &jconn, int fe_num) {
+std::unique_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, json &jconn, unsigned fe_num) {
     std::string chip_type = jconn["chipType"];
     auto fe = StdDict::getFrontEnd(chip_type);
     auto cfg = dynamic_cast<FrontEndCfg*>(fe.get());

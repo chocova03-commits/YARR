@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
 
         unsigned eventCnt = 0;
         unsigned m_curBlock = 0;
-        int i = 0;
+        unsigned i = 0;
         int basetag = 0, exttag = 0, prev_basetag = 0;
 
         while(inputFile) {
