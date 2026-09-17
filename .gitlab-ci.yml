@@ -221,6 +221,12 @@ job_build_test_gcc_9:
   stage: build
   image: registry.cern.ch/docker.io/library/gcc:9
   script:
+    # bullseye is EOL: debian-security's index still lists point releases
+    # (e.g. libarchive13_...+deb11u5) whose .deb files have already been
+    # pruned from the mirror, causing 404s. We only need cmake/make, which
+    # are in the plain (non-security) suite, so drop debian-security entirely
+    # rather than relying on whatever stale/missing packages it still offers.
+    - sed -i '/deb.debian.org\/debian-security/d' /etc/apt/sources.list
     - apt-get -o Acquire::Check-Valid-Until=false update
     - apt-get install -y cmake make
     - mkdir build
