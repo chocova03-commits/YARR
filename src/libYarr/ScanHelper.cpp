@@ -23,6 +23,7 @@ namespace fs = std::filesystem;
 #include "FrontEndCfg.h"
 #include "FrontEndClipBoards.h"
 #include "HistogramProcessor.h"
+#include "RawDataArchiver.h"
 #include "StdHistogrammer.h" // needed for special handling of DataArchiver
 #include "StdAnalysis.h" // needed for special handling of HistogramArchiver
 #include "ScanFactory.h"
@@ -311,6 +312,38 @@ namespace ScanHelper {
             procs[id]->connect(dynamic_cast<FrontEndCfg*>(fe), &cp.clipRawData, &cp.clipData);
             procs[id]->connect(&cp.clipProcFeedback);
             // TODO load chip specific config
+        }
+    }
+
+    bool scanRequestsRawDataArchive(const json &scanCfg) {
+        for (unsigned int i=0; i<scanCfg["scan"]["loops"].size(); i++) {
+            const json &loop = scanCfg["scan"]["loops"][i];
+            std::string loopAction = loop["loopAction"];
+            if (loopAction != "StdDataLoop" && loopAction != "StdDataGatherer") continue;
+            if (!loop.contains("config")) continue;
+            if (loop["config"].contains("archiveRawData") && loop["config"]["archiveRawData"]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void buildRawDataArchivers( std::map<unsigned, std::unique_ptr<RawDataArchiver>> &archivers,
+                           Bookkeeper &bookie,
+                           const std::string &outputDir) {
+        bhlog->info("Loading RawDataArchivers ..");
+        for (unsigned id = 0; id<bookie.getNumOfEntries(); id++) {
+            auto fe = bookie.getFe(id);
+            if (!fe->isActive()) continue;
+            archivers[id] = std::make_unique<RawDataArchiver>();
+            auto &cp = fe->clipboards();
+            archivers[id]->connect(&cp.clipRawDataArchive);
+            std::string output_filename = (outputDir + dynamic_cast<FrontEndCfg*>(fe)->getName() + "_rawdata.bin");
+            bool status = archivers[id]->open(output_filename);
+            if (!status) {
+                bhlog->error("Unable to open RawDataArchiver output file \"{}\"", output_filename);
+                throw std::runtime_error("Can't open requested output data file \"" + output_filename + "\"");
+            }
         }
     }
 

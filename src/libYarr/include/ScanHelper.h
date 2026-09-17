@@ -28,6 +28,7 @@ class FrontEndCfg;
 struct FrontEndGeometry;
 class HistoDataProcessor;
 class HwController;
+class RawDataArchiver;
 class ScanBase;
 
 namespace ScanHelper {
@@ -78,6 +79,14 @@ namespace ScanHelper {
                                 const json& scanCfg,
                            Bookkeeper &bookie,
                            const std::string &chipType);
+
+        /// Check the scan's StdDataLoop/StdDataGatherer loop config for "archiveRawData": true
+        bool scanRequestsRawDataArchive(const json &scanCfg);
+
+        /// Build one RawDataArchiver per active FE, connected to clipRawDataArchive
+        void buildRawDataArchivers( std::map<unsigned, std::unique_ptr<RawDataArchiver>> &archivers,
+                           Bookkeeper &bookie,
+                           const std::string &outputDir);
 
         /// Setup analysis for one front end
         /**

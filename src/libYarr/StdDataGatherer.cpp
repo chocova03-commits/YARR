@@ -110,11 +110,17 @@ void StdDataGatherer::execPart2() {
                         // Push data out
                         rdc->stat.is_end_of_iteration = false;
                         auto &cp = keeper->getFe(id)->clipboards();
+                        if (m_doArchiveRawData) {
+                            cp.clipRawDataArchive.pushData(std::make_unique<RawDataContainer>(*rdc));
+                        }
                         cp.clipRawData.pushData(std::move(rdc));
                         // Create EoI
                         LoopStatus loopStatusIterationEnd({0}, {LoopStyle::LOOP_STYLE_GLOBAL_FEEDBACK});
                         loopStatusIterationEnd.is_end_of_iteration = true;
                         // Send EoI
+                        if (m_doArchiveRawData) {
+                            cp.clipRawDataArchive.pushData(std::make_unique<RawDataContainer>(loopStatusIterationEnd));
+                        }
                         std::unique_ptr<RawDataContainer> cIterEnd = std::make_unique<RawDataContainer>(loopStatusIterationEnd);
                         cp.clipRawData.pushData(std::move(cIterEnd));
                         cp.clipProcFeedback.clearData();
@@ -152,7 +158,11 @@ void StdDataGatherer::execPart2() {
         for (auto &[id, rdc] : rdcMap) {
             if (rdc->size() > 0) {
                 rdc->stat.is_end_of_iteration = false;
-                keeper->getFe(id)->clipboards().clipRawData.pushData(std::move(rdc));
+                auto &cp = keeper->getFe(id)->clipboards();
+                if (m_doArchiveRawData) {
+                    cp.clipRawDataArchive.pushData(std::make_unique<RawDataContainer>(*rdc));
+                }
+                cp.clipRawData.pushData(std::move(rdc));
             }
         }
         rdcMap.clear();
@@ -161,8 +171,11 @@ void StdDataGatherer::execPart2() {
         for (unsigned id=0; id<keeper->getNumOfEntries(); id++) {
             LoopStatus loopStatusIterationEnd({0}, {LoopStyle::LOOP_STYLE_GLOBAL_FEEDBACK});
             loopStatusIterationEnd.is_end_of_iteration = true;
-            std::unique_ptr<RawDataContainer> cIterEnd = std::make_unique<RawDataContainer>(loopStatusIterationEnd);
             auto &cp = keeper->getEntry(id).fe->clipboards();
+            if (m_doArchiveRawData) {
+                cp.clipRawDataArchive.pushData(std::make_unique<RawDataContainer>(loopStatusIterationEnd));
+            }
+            std::unique_ptr<RawDataContainer> cIterEnd = std::make_unique<RawDataContainer>(loopStatusIterationEnd);
             cp.clipRawData.pushData(std::move(cIterEnd));
             cp.clipProcFeedback.clearData();
         }
@@ -201,4 +214,8 @@ void StdDataGatherer::loadConfig(const json &config) {
     }
     else
         m_passData = true;
+    if (config.contains("archiveRawData")) {
+        m_doArchiveRawData = config["archiveRawData"];
+        SPDLOG_LOGGER_INFO(sdglog, "Configured StdDataGatherer: archiveRawData: {}", m_doArchiveRawData);
+    }
 }

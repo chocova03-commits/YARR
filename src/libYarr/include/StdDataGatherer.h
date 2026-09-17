@@ -40,6 +40,8 @@ class StdDataGatherer: public LoopActionBase, public StdDataAction {
         bool m_passData = false;
         uint32_t m_maxConsecutiveRxReads = 2048;
         uint32_t m_maxRxReadSize = 10*1024*1024/4; // 100MB
+        /// If set, duplicate raw data into clipRawDataArchive for RawDataArchiver
+        bool m_doArchiveRawData = false;
 };
 
 #endif

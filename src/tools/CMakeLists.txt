@@ -12,6 +12,7 @@ list(APPEND tools
         scurve_test
         test_json
         dumpRawDataToText
+        dumpRawDataArchive
         checkTriggerTags
         )
 

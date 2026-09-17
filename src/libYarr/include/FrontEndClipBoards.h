@@ -11,6 +11,8 @@
 /// Clipboards to buffer data between processors
 struct FrontEndClipBoards {
     ClipBoard<RawDataContainer> clipRawData;
+    /// Optional tap of clipRawData for RawDataArchiver, only fed when archiveRawData is enabled
+    ClipBoard<RawDataContainer> clipRawDataArchive;
     ClipBoard<EventDataBase> clipData;
     ClipBoard<HistogramBase> clipHisto;
     ClipBoard<FeedbackProcessingInfo> clipProcFeedback;
