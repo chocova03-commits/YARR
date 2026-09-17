@@ -93,6 +93,7 @@ std::string ScanConsoleImpl::parseConfig(const std::vector<std::string> &args) {
     }
     result["config"] = scanConsoleConfig;
     result["runCounter"] = ScanHelper::newRunCounter();
+    result["mask_opt"] = options.mask_opt;
     std::string str = result.dump();
     return str;
 }
@@ -189,6 +190,7 @@ int ScanConsoleImpl::loadConfig(const char *config){
     json j = json::parse(config);
     scanConsoleConfig = j["config"];
     runCounter=j["runCounter"];
+    scanOpts.mask_opt = j.value("mask_opt", -1);
     ctrlCfg=scanConsoleConfig["ctrlConfig"];
     chipConfig=scanConsoleConfig["chipConfig"];
     scanCfg=scanConsoleConfig["scanCfg"];
