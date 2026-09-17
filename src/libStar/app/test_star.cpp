@@ -20,6 +20,7 @@
 #include <getopt.h>
 
 #include "spdlog/fmt/fmt.h"
+#include "spdlog/fmt/ranges.h"
 
 namespace {
   auto logger = logging::make_log("test_star");
@@ -110,6 +111,26 @@ namespace {
           "testDataPacketsPulse",
         }},
 
+      {"Full_WithReset", {
+          "checkHCCHPRs_WithReset", "probeHCCs", "testHCCRegister",
+          "configureHCC_WithReset",
+          "checkABCHPRs", "probeABCs", "testABCRegister",
+          "configureABC_WithReset",
+          "testHitCounts",
+          "testDataPacketsStatic",
+          "testDataPacketsPulse",
+        }},
+
+      {"Full_NoReset", {
+          "checkHCCHPRs_NoReset", "probeHCCs", "testHCCRegister",
+          "configureHCC_NoReset",
+          "checkABCHPRs", "probeABCs", "testABCRegister",
+          "configureABC_NoReset",
+          "testHitCounts",
+          "testDataPacketsStatic",
+          "testDataPacketsPulse",
+        }},
+
       /*
         Just test register read and write
       */
@@ -163,6 +184,13 @@ namespace {
           "testDataPacketsStatic",
         }},
 
+      {"PacketTransp_NoReset", {
+          "setPacketTransp",
+          "configureABC_NoReset",
+          "readABCRegisters",
+          "testDataPacketsStatic",
+        }},
+
       /*
         Run some tests in full transparent mode
       */
@@ -173,6 +201,13 @@ namespace {
           "testDataPacketsStatic",
 
           // "diagnosticsReport",
+        }},
+
+      {"FullTransp_NoReset", {
+          "setFullTransp",
+          "configureABC_NoReset",
+          "readABCRegisters",
+          "testDataPacketsStatic",
         }},
 
       // Read all data (partly here so diagnosticsReport has somewhere to live)
@@ -203,11 +238,16 @@ namespace {
     std::unique_ptr<StarCfg> starCfg;
     bool setHccId = false;
     bool doResets = false;
+    bool checkSequence { false };
+
     /// Default to 640
     bool mode640 = true;
 
     /// Default to updating IDs once readout success
     bool setNotBroadcastIds = true;
+
+    /// By default stop on the first failed sub-test
+    bool keepGoing = false;
 
     // Original Spec version
     std::vector<uint32_t> rxChannels = {6};
@@ -270,7 +310,9 @@ void printHelp() {
   std::cout << " -i : All expected ICs (default all: 0x7ff).\n";
   std::cout << " -3 : Configure HCC for 320 instead of 640 (default).\n";
   std::cout << " -b : Always use broadcast for read/write (default is to update map based on HPR).\n";
+  std::cout << " -k : Keep going in sequence after error.\n";
   std::cout << " -R : Send reset commands.\n";
+  std::cout << " -q : Only report individual test actions as part of a sequence.\n";
   std::cout << " -v : Report carried data between actions (diagnostic).\n";
   std::cout << " -w <timeout_ms> : General timeout in milliseconds.\n";
   std::cout << " -s <test_preset> : Type of test (lower case), or sequence (UpperCase) to run, use bad to list. Default: Full\n";
@@ -614,13 +656,8 @@ void resetABC(TxCore& txCore, StarCfg& cfg) {
 
 // Configure chips
 // Different register values for different HCCStar versions?
-void configureHCC(TxCore& txCore, StarCfg& cfg, bool reset, uint32_t ic_enables, bool mode640) {
+void configureHCCOnly(TxCore& txCore, StarCfg& cfg, uint32_t ic_enables, bool mode640) {
   // Configure HCCStars to enable communications with ABCStars
-  if (reset) {
-    logger->info("Sending HCCStar register reset command");
-    sendCommand(LCB::fast_command(LCB::HCC_REG_RESET, 0), txCore);
-  }
-
   logger->info("Broadcast HCCStar configurations");
 
   // Register Delay1: delays for signals to ABCStars
@@ -649,31 +686,35 @@ void configureHCC(TxCore& txCore, StarCfg& cfg, bool reset, uint32_t ic_enables,
 
   // Set normal readout using OPmode/OPmodeC
   setOpMode(0, mode640, txCore, cfg);
+}
+
+void configureHCCMaybeReset(TxCore& txCore, StarCfg& cfg, bool reset, uint32_t ic_enables, bool mode640) {
+  if (reset) {
+    logger->info("Sending HCCStar register reset command");
+    resetHCC(txCore, cfg);
+  }
+
+  configureHCCOnly(txCore, cfg, ic_enables, mode640);
 
   if (reset) {
-    // Register ExtRst/ExtRstC: external reset for ABCStars
-    uint32_t val_extrst = 0x00000001;
-
-    uint32_t addr_extrst = updateHCCRegister(HCCStarRegister::ExtRst, val_extrst, cfg);
-    uint32_t addr_extrstc = updateHCCRegister(HCCStarRegister::ExtRstC, val_extrst, cfg);
-
-    sendCommand(star.write_hcc_register(addr_extrst, val_extrst), txCore);
-    sendCommand(star.write_hcc_register(addr_extrstc, val_extrst), txCore);
+    resetABCFromHCC(txCore, cfg);
   }
 }
 
-void configureHCC_PacketTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned icEnablesMask, bool mode640) {
-  configureHCC(txCore, cfg, reset, icEnablesMask, mode640);
-
+void setPacketTransp(TxCore& txCore, StarCfg& cfg, unsigned icEnablesMask, bool mode640) {
   // Set to packet transparent mode
   logger->info("Set HCCs to Packet Transparent mode");
 
   setOpMode(2, mode640, txCore, cfg);
 }
 
-void configureHCC_FullTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned inChn, unsigned icEnablesMask, bool mode640) {
-  configureHCC(txCore, cfg, reset, icEnablesMask, mode640);
+void configureHCC_PacketTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned icEnablesMask, bool mode640) {
+  configureHCCMaybeReset(txCore, cfg, reset, icEnablesMask, mode640);
 
+  setPacketTransp(txCore, cfg, icEnablesMask, mode640);
+}
+
+void setFullTransp(TxCore& txCore, StarCfg& cfg, unsigned inChn, unsigned icEnablesMask, bool mode640) {
   // Select the input channel: IC_transSelect
   // Register ICenable
   inChn = inChn & 0xf;
@@ -690,14 +731,13 @@ void configureHCC_FullTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned 
   setOpMode(3, mode640, txCore, cfg);
 }
 
-void configureABC(TxCore& txCore, StarCfg& cfg, bool reset) {
+void configureHCC_FullTransp(TxCore& txCore, StarCfg& cfg, bool reset, unsigned inChn, unsigned icEnablesMask, bool mode640) {
+  configureHCCMaybeReset(txCore, cfg, reset, icEnablesMask, mode640);
 
-  if (reset) {
-    logger->info("Sending ABCStar register reset commands");
-    sendCommand(LCB::fast_command(LCB::ABC_REG_RESET, 0), txCore);
-    sendCommand(LCB::fast_command(LCB::ABC_SLOW_COMMAND_RESET, 0), txCore);
-  }
+  setFullTransp(txCore, cfg, inChn, icEnablesMask, mode640);
+}
 
+void configureABCOnly(TxCore& txCore, StarCfg& cfg) {
   logger->info("Broadcast ABCStar configurations");
 
   // Need a non-zero drive current to see data from ABC
@@ -726,15 +766,21 @@ void configureABC(TxCore& txCore, StarCfg& cfg, bool reset) {
   sendCommand(star.write_abc_register(addr_mask7, val_mask7), txCore);
 }
 
-// Test steps
-bool checkHCCHPRs(TxCore& txCore, RxCore& rxCore,
-                  const std::vector<uint32_t>& rxChannels,
-                  bool reset, unsigned timeout_ms)
-{
+void configureABCMaybeReset(TxCore& txCore, StarCfg& cfg, bool reset) {
   if (reset) {
-    sendCommand( LCB::fast_command(LCB::HCC_REG_RESET, 0), txCore );
+    logger->info("Sending ABCStar register reset commands");
+    sendCommand(LCB::fast_command(LCB::ABC_REG_RESET, 0), txCore);
+    sendCommand(LCB::fast_command(LCB::ABC_SLOW_COMMAND_RESET, 0), txCore);
   }
 
+  configureABCOnly(txCore, cfg);
+}
+
+// Test steps
+bool checkHCCHPRsOnly(TxCore& txCore, RxCore& rxCore,
+                      const std::vector<uint32_t>& rxChannels,
+                      unsigned timeout_ms)
+{
   bool hprOK = false;
 
   for (auto rx : rxChannels) {
@@ -779,6 +825,17 @@ bool checkHCCHPRs(TxCore& txCore, RxCore& rxCore,
   } // for (auto rx : rxChannels)
 
   return hprOK;
+}
+
+bool checkHCCHPRsMaybeReset(TxCore& txCore, RxCore& rxCore,
+                            const std::vector<uint32_t>& rxChannels,
+                            bool reset, unsigned timeout_ms)
+{
+  if (reset) {
+    sendCommand( LCB::fast_command(LCB::HCC_REG_RESET, 0), txCore );
+  }
+
+  return checkHCCHPRsOnly(txCore, rxCore, rxChannels, timeout_ms);
 }
 
 bool probeHCCs(
@@ -1581,35 +1638,6 @@ bool diagnosticsReport(RxCore &rxCore, unsigned timeout_ms) {
   return true;
 }
 
-bool runTestSequence(std::string testSequence, TxCore& txCore, RxCore& rxCore, TestData &testData, bool doReport)
-{
-  bool success = true;
-
-  auto &tests = testData.buildTests();
-
-  if(sequenceMap.find(testSequence) != sequenceMap.end()) {
-    logger->info("Running test sequence {}", testSequence);
-    for(auto &t: sequenceMap[testSequence]) {
-      if(doReport) {
-        testData.report();
-      }
-      logger->info("Running test {}", t);
-      success &= tests[t](txCore, rxCore);
-    }
-  } else {
-    logger->error("Unknown test sequence: {}", testSequence);
-
-    logger->info("Available preset test sequences:");
-
-    for(auto &s: sequenceMap) {
-      logger->info("  {}", s.first);
-    }
-
-    success = false;
-  }
-  return success;
-}
-
 bool runSingleTest(std::string testName, TxCore& txCore, RxCore& rxCore, TestData &testData, bool doReport)
 {
   bool success = true;
@@ -1633,6 +1661,48 @@ bool runSingleTest(std::string testName, TxCore& txCore, RxCore& rxCore, TestDat
     success = false;
   }
   return success;
+}
+
+std::vector<std::string> buildTestSequence(std::string test_desc)
+{
+  std::vector<std::string> test_list;
+    if(test_desc.find(":") != std::string::npos) {
+      while(test_desc.size() > 0) {
+        auto firstColon = test_desc.find(":");
+        auto next_test = test_desc.substr(0, firstColon);
+
+        if(isupper(next_test[0])) {
+          auto test_seq = buildTestSequence(next_test);
+          test_list.insert(test_list.end(), test_seq.begin(), test_seq.end());
+        } else {
+          test_list.push_back(next_test);
+        }
+
+        if(firstColon == std::string::npos) {
+          test_desc.clear();
+        } else {
+          test_desc = test_desc.substr(firstColon + 1);
+        }
+      }
+    } else if(isupper(test_desc[0])) {
+      if(sequenceMap.find(test_desc) != sequenceMap.end()) {
+        for(auto &t: sequenceMap[test_desc]) {
+          test_list.push_back(t);
+        }
+      } else {
+        logger->error("Unknown test sequence: {}", test_desc);
+
+        logger->info("Available preset test sequences:");
+
+        for(auto &s: sequenceMap) {
+          logger->info("  {}", s.first);
+        }
+      }
+    } else {
+      test_list.push_back(test_desc);
+    }
+
+    return test_list;
 }
 
 } // end of unnamed namespace
@@ -1659,7 +1729,7 @@ int main(int argc, char *argv[]) {
         {nullptr, 0, nullptr, 0}};
 
     int c;
-    while ((c = getopt_long(argc, argv, "3hbvTi:l:r:t:dRs:c:w:V:", long_options, nullptr)) != -1) {
+    while ((c = getopt_long(argc, argv, "3hbkqvTi:l:r:t:dRs:c:w:V:", long_options, nullptr)) != -1) {
       switch(c) {
       case 'h':
         printHelp();
@@ -1669,6 +1739,12 @@ int main(int argc, char *argv[]) {
         break;
       case 'b':
         testData.setNotBroadcastIds = false;
+        break;
+      case 'k':
+        testData.keepGoing = true;
+        return 0;
+      case 'q':
+        testData.checkSequence = true;
         break;
       case 'i':
         try {
@@ -1817,6 +1893,12 @@ int main(int argc, char *argv[]) {
       controller = argv[optind];
     }
 
+    if(testData.checkSequence) {
+      auto test_list = buildTestSequence(testSequence);
+      logger->info("Skip running tests: {}", fmt::join(test_list, ":"));
+      return 0;
+    }
+
     std::unique_ptr<HwController> hwCtrl = nullptr;
     if(controller.empty()) {
       logger->error("No controller specified");
@@ -1866,32 +1948,23 @@ int main(int argc, char *argv[]) {
 
     testData.validate();
 
-    if(testSequence.find(":") != std::string::npos) {
-      logger->info("Run custom sequence: {}", testSequence);
-      while(testSequence.size() > 0) {
-        auto firstColon = testSequence.find(":");
-        auto next_test = testSequence.substr(0, firstColon);
-        logger->info(" Run action in custom sequence: {}", next_test);
+    logger->info("Sequence description: {}", testSequence);
 
-        if(isupper(next_test[0])) {
-          success &= runTestSequence(next_test, txCore, rxCore, testData, doReport);
-        } else {
-          success &= runSingleTest(next_test, txCore, rxCore, testData, doReport);
-        }
+    auto test_list = buildTestSequence(testSequence);
 
-        if(firstColon == std::string::npos) {
-          testSequence.clear();
-        } else {
-          testSequence = testSequence.substr(firstColon + 1);
-        }
-        logger->trace(" Remaining custom sequence: '{}'", testSequence);
+    if(test_list.size() > 1) {
+      logger->info("Expanded sequence: {}", fmt::join(test_list, ":"));
+    }
+
+    for(auto &next_test: test_list) {
+      logger->info(" Running test action: {}", next_test);
+
+      success &= runSingleTest(next_test, txCore, rxCore, testData, doReport);
+
+      if(!testData.keepGoing && !success) {
+        logger->info("Stopping test sequence due to failure");
+        break;
       }
-    } else if(isupper(testSequence[0])) {
-      logger->info("Run test sequence: {}", testSequence);
-      success &= runTestSequence(testSequence, txCore, rxCore, testData, doReport);
-    } else {
-      logger->info("Run single sequence: {}", testSequence);
-      success &= runSingleTest(testSequence, txCore, rxCore, testData, doReport);
     }
 
     if(doReport) {
@@ -1915,7 +1988,9 @@ int main(int argc, char *argv[]) {
 FunctionMap &TestData::buildTests () {
   static FunctionMap tests = {
       // Read HCCStar HPRs
-      {"checkHCCHPRs", [&](auto &t, auto &r) {return checkHCCHPRs(t, r, rxChannels, doResets, timeout_ms);}},
+      {"checkHCCHPRs", [&](auto &t, auto &r) {return checkHCCHPRsMaybeReset(t, r, rxChannels, doResets, timeout_ms);}},
+      {"checkHCCHPRs_NoReset", [&](auto &t, auto &r) {return checkHCCHPRsOnly(t, r, rxChannels, timeout_ms);}},
+      {"checkHCCHPRs_WithReset", [&](auto &t, auto &r) {return checkHCCHPRsMaybeReset(t, r, rxChannels, true, timeout_ms);}},
       // Probe HCCs
       {"probeHCCs", [&](auto &t, auto &r) {return probeHCCs(t, r, hccStars, txChannels, rxChannels, setHccId, timeout_ms, setNotBroadcastIds);}},
       // Read many HCC registers
@@ -1924,11 +1999,15 @@ FunctionMap &TestData::buildTests () {
       {"testHCCRegister", [&](auto &t, auto &r) {return testHCCRegisterAccess(t, r, hccStars, timeout_ms);}},
 
       // Configure HCCs to enable communications with ABCs
-      {"configureHCC", [&](auto &t, auto &_) {configureHCC(t, *starCfg, doResets, icEnablesMask, mode640); return true;}},
-      {"configureHCCIfReset", [&](auto &t, auto &_) {if(doResets) configureHCC(t, *starCfg, doResets, icEnablesMask, mode640); return true;}},
+      {"configureHCC", [&](auto &t, auto &_) {configureHCCMaybeReset(t, *starCfg, doResets, icEnablesMask, mode640); return true;}},
+      {"configureHCC_NoReset", [&](auto &t, auto &_) {configureHCCOnly(t, *starCfg, icEnablesMask, mode640); return true;}},
+      {"configureHCC_WithReset", [&](auto &t, auto &_) {configureHCCMaybeReset(t, *starCfg, true, icEnablesMask, mode640); return true;}},
+      {"configureHCCIfReset", [&](auto &t, auto &_) {if(doResets) configureHCCMaybeReset(t, *starCfg, doResets, icEnablesMask, mode640); return true;}},
       // configure HCC into the Packet Transparent mode
       {"configureHCCForPacketTransp", [&](auto &t, auto &r) {configureHCC_PacketTransp(t, *starCfg, doResets, icEnablesMask, mode640); return true; }},
+      {"setPacketTransp", [&](auto &t, auto &r) {setPacketTransp(t, *starCfg, icEnablesMask, mode640); return true; }},
       {"configureHCCForFullTransp", [&](auto &t, auto &r) {configureHCC_FullTransp(t, *starCfg, doResets, inChannel, icEnablesMask, mode640); return true; }},
+      {"setFullTransp", [&](auto &t, auto &r) {setFullTransp(t, *starCfg, inChannel, icEnablesMask, mode640); return true; }},
 
       {"resetHCC", [&](auto &t, auto &r) {resetHCC(t, *starCfg); return true;}},
       {"resetABCFromHCC", [&](auto &t, auto &r) {resetABCFromHCC(t, *starCfg); return true;}},
@@ -1944,8 +2023,10 @@ FunctionMap &TestData::buildTests () {
       {"testABCRegister", [&](auto &t, auto &r) {return testABCRegisterAccess(t, r, *starCfg, hccStars, timeout_ms);}},
 
       // Configure ABCs
-      {"configureABC", [&](auto &t, auto &r) {configureABC(t, *starCfg, doResets); return true;}},
-      {"configureABCIfReset", [&](auto &t, auto &r) {if(doResets) configureABC(t, *starCfg, doResets); return true;}},
+      {"configureABC", [&](auto &t, auto &r) {configureABCMaybeReset(t, *starCfg, doResets); return true;}},
+      {"configureABC_NoReset", [&](auto &t, auto &r) {configureABCOnly(t, *starCfg); return true;}},
+      {"configureABC_WithReset", [&](auto &t, auto &r) {configureABCMaybeReset(t, *starCfg, false); return true;}},
+      {"configureABCIfReset", [&](auto &t, auto &r) {if(doResets) configureABCMaybeReset(t, *starCfg, doResets); return true;}},
 
       {"resetABC", [&](auto &t, auto &r) {resetABC(t, *starCfg); return true;}},
 
