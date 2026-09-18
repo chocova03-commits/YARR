@@ -21,6 +21,23 @@ received.
 The normal data loop collects data until the appropriate number of events
 have been collected.
 
+### archiveRawData
+
+Both `StdDataLoop` and `StdDataGatherer` accept an opt-in `"archiveRawData":
+true` config flag. When set, the loop duplicates each `RawDataContainer` it
+produces — the raw, pre-decode hardware words, before any chip-specific
+`FeDataProcessor` touches them — onto a separate `RawDataArchiver`
+(`src/libYarr/RawDataArchiver.cpp`), which writes them to
+`<feName>_rawdata.bin` in the scan's output directory. This is independent
+of the normal decode path (which is unaffected) and off by default with
+negligible cost when disabled. It is useful for diagnosing decode failures
+against what the hardware actually sent, rather than only the decoded
+result.
+
+Use the `dumpRawDataArchive` tool (see [tools.md](tools.md)) to inspect the
+resulting file offline, or the ITkPixV2-specific `itkpixv2DecodeTool` to
+decode it into per-pixel hits.
+
 ## StdParameterLoop
 
 The parameter loop provides a way to iterate over any variable.

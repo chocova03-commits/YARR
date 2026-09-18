@@ -21,6 +21,7 @@ documentation link to that page instead of repeating it here.
 | ``scurve_test`` | Standalone closure test of the s-curve fit routine, no hardware needed |
 | ``test_json`` | Validate/parse a connectivity, controller, front-end, or scan config JSON without touching hardware |
 | ``dumpRawDataToText`` | Dump the raw event data blocks of one or more scan output files as human-readable text |
+| ``dumpRawDataArchive`` | Inspect a pre-decode ``RawDataArchiver`` binary dump (``<feName>_rawdata.bin``), see [Scan Loops](scan_loops.md#archiveRawData) |
 | ``checkTriggerTags`` | Check trigger-tag continuity/ordering in raw scan output files |
 | ``analyseRawData`` | Run analysis/histogramming on saved raw data files without a live scan |
 | ``write-register`` | Write a named chip register directly, without running a scan |
@@ -71,6 +72,7 @@ are only built on non-ARM targets.
 | ``Itkpixv2CheckPulse`` | Send a global pulse to two SCCs and check communication status (data-merging test) |
 | ``Itkpixv2ColumnTest`` | Check for stuck/faulty core columns |
 | ``Itkpixv2EncodeRawData`` | Re-encode decoded raw data back into ITkPixV2 event data words |
+| ``itkpixv2DecodeTool`` | Decode raw ITkPixV2 hit-data from a ``RawDataArchiver`` binary dump, with optional colorized terminal output |
 | ``Itkpixv2ReadRingosc`` | Send a global pulse and read ring-oscillator registers only, without a full configuration (Module QC) |
 
 ## SPEC (`src/libSpec/app`)
