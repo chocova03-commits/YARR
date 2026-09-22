@@ -136,6 +136,9 @@ void to_json(json& j, const LoggingConfig& c) {
   if(c.ringbuffer_size != 0) {
     j["ringbuffer_size"] = c.ringbuffer_size;
   }
+  if(!c.output_dir.empty()) {
+    j["output_dir"] = c.output_dir;
+  }
   if(c.simple) {
     j["simple"] = c.simple;
   }
@@ -162,6 +165,9 @@ void from_json(const json& j, LoggingConfig& c) {
   }
   if(j.contains("ringbuffer_size")) {
     j.at("ringbuffer_size").get_to(c.ringbuffer_size);
+  }
+  if(j.contains("output_dir")) {
+    j.at("output_dir").get_to(c.output_dir);
   }
   if(j.contains("simple")) {
     j.at("simple").get_to(c.simple);
@@ -214,26 +220,27 @@ static std::string_view level_string(int lvl) {
 
 namespace logging {
 
-json defaultConfig() {
+LoggingConfig defaultConfig() {
     std::string default_name = "configs/logging/default.json";
     if(std::filesystem::exists(default_name)) {
       return JsonHelper::openJsonFile(default_name);
     }
-    json j;
-    j["pattern"] = defaultLogPattern;
-    j["log_config"][0]["name"] = "all";
-    j["log_config"][0]["level"] = "info";
-    return j;
+    LoggingConfig lc;
+    lc.pattern = defaultLogPattern;
+    lc.log_config.push_back(LoggingLoggersConfig{.name = "all", .level = "info"});
+    return lc;
 }
 
 spdlog::sink_ptr default_sink;
 std::string default_pattern_used = defaultLogPattern;
 
-void setupLoggers(const LoggingConfig &j, const std::string &path) {
+void setupLoggers(const LoggingConfig &j) {
     static bool initialized = false;
 
     // initialized logger only once
     if(initialized) return;
+
+    std::string path = j.output_dir;
 
     if(j.default_sink == "ringbuffer") {
         std::size_t ringbuffer_size = 1000;
@@ -369,17 +376,6 @@ void addOutputFileSink(const std::string &outputDir) {
     spdlog::apply_all([&](const std::shared_ptr<spdlog::logger>& l) {
         l->sinks().push_back(file_sink);
     });
-}
-
-void setupLoggers(const json &j, const std::string &path) {
-    try {
-      LoggingConfig ll = j.get<LoggingConfig>();
-      setupLoggers(ll, path);
-    } catch(std::exception &ex) {
-      std::cerr << "Failed to load configuration from json\n";
-      std::cerr << " -> " << ex.what() << "\n";
-      return;
-    }
 }
 
 void listLoggers(bool print_details) {

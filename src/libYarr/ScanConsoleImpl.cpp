@@ -120,12 +120,17 @@ int ScanConsoleImpl::init(ScanOpts options) {
     scanOpts=std::move(options);
     runCounter = ScanHelper::newRunCounter();
     if(!scanOpts.logCfgPath.empty()) {
-        loggerConfig = ScanHelper::openJsonFile(scanOpts.logCfgPath);
-        loggerConfig["outputDir"]=scanOpts.outputDir;
+        loggerConfig = ScanHelper::openJsonFile(scanOpts.logCfgPath).get<logging::LoggingConfig>();
     } else {
         // default log setting
         loggerConfig = logging::defaultConfig();
     }
+
+    // Only override output dir if not set in the file
+    if(loggerConfig.output_dir.empty()) {
+        loggerConfig.output_dir = scanOpts.outputDir;
+    }
+
     spdlog::info("Configuring logger ...");
     logging::setPirateMode(scanOpts.pirateMode);
     logging::setupLoggers(loggerConfig);
@@ -714,10 +719,10 @@ void ScanConsoleImpl::dump() {
 }
 
 void ScanConsoleImpl::setupLogger(const char *config) {
-    json loggerConfig = logging::defaultConfig();
+    logging::LoggingConfig loggerConfig = logging::defaultConfig();
     if (config) {
         try {
-            loggerConfig = json::parse(config);
+            loggerConfig = json::parse(config).get<logging::LoggingConfig>();
         } catch (...) {}
     }
     logging::setupLoggers(loggerConfig);
