@@ -196,13 +196,14 @@ void OccupancyAnalysis::processHistogram(HistogramBase *h) {
 
         // Core Column Mask:
         const unsigned nColsInCCol = 8;
-        const unsigned totalPixelsPerCCol = nColsInCCol * nRow;
+        const unsigned totalPixelsPerCCol = nColsInCCol * fe_geom.nRow;
         if (coreColMask){
             feCfg->enableAll();
 
             struct CColStat { unsigned coreCol; unsigned nBad; bool masked; };
             std::vector<CColStat> ccolStats;
 
+            unsigned nRow = fe_geom.nRow;
             for (unsigned coreCol = 0; coreCol < 50; coreCol++){
                 unsigned nBad = 0;
                 for (unsigned col = 1; col <= nColsInCCol; col++){
