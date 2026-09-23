@@ -184,8 +184,10 @@ TEST_CASE("AnalysisChainUID", "[Analysis]") {
   EmptyHw hwCtrl;
   Bookkeeper bookie(&hwCtrl, &hwCtrl);
 
-  unsigned nCol = 4, nRow = 4;
-  auto fe = std::make_unique<EmptyFrontEnd>(FrontEndGeometry{nCol, nRow});
+  FrontEndGeometry geom{4, 4};
+  unsigned nCol = geom.nCol;
+  unsigned nRow = geom.nRow;
+  auto fe = std::make_unique<EmptyFrontEnd>(geom);
   fe->setActive(true);
   unsigned last_id = bookie.addFe(std::move(fe), 42);
 

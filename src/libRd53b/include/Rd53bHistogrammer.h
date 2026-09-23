@@ -22,6 +22,9 @@ class ToaMap : public HistogramAlgorithm {
         ~ToaMap() override = default;
 
         void create(const LoopStatus& stat) override {
+            unsigned nCol = fe_geom.nCol;
+            unsigned nRow = fe_geom.nRow;
+            
             h = new Histo2d(outputName(), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5, stat);
             h->setXaxisTitle("Column");
             h->setYaxisTitle("Row");
@@ -44,6 +47,9 @@ class Toa2Map : public HistogramAlgorithm {
         ~Toa2Map() override = default;
 
         void create(const LoopStatus& stat) override {
+            unsigned nCol = fe_geom.nCol;
+            unsigned nRow = fe_geom.nRow;
+
             h = new Histo2d(outputName(), nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5, stat);
             h->setXaxisTitle("Column");
             h->setYaxisTitle("Row");
