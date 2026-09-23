@@ -15,9 +15,8 @@ TEST_CASE("HistogramTagOccupancyMap", "[Histogrammer][TagOccupancyMap]") {
 
     algo->loadConfig(json{{"tag_count", tag_limit}});
 
-    int r = 5;
-    int c = 5;
-    algo->setMapSize(c, r);
+    FrontEndGeometry geom{5, 5};
+    algo->setMapSize(geom);
 
     unsigned tag1 = 2;
     data->newEvent(tag1, 2, 3);

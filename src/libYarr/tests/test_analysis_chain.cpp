@@ -209,7 +209,7 @@ TEST_CASE("AnalysisChainUID", "[Analysis]") {
   auto analysis = StdDict::getAnalysis("OccupancyAnalysis");
   REQUIRE (analysis);
   analysis->setConfig(bookie.getFeCfg(last_id));
-  analysis->setMapSize(nCol, nRow);
+  analysis->setMapSize(geom);
   analysis->loadConfig(json::object());
 
   AnalysisProcessor proc(last_id);
