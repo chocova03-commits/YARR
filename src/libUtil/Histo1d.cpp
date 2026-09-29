@@ -21,36 +21,22 @@ namespace {
     auto hlog = logging::make_log("Histo1d");
 }
 
-Histo1d::Histo1d(const std::string &arg_name, unsigned arg_bins, double arg_xlow, double arg_xhigh) : HistogramBase(arg_name) {
-    bins = arg_bins;
-    xlow = arg_xlow;
-    xhigh = arg_xhigh;
-    binWidth = (xhigh - xlow)/bins;
-    data =  std::vector<double>(bins,0);
-    min = 0;
-    max = 0;
 
-    underflow = 0;
-    overflow = 0;
-    entries = 0;
-    sum = 0;
-}
+Histo1d::Histo1d(const std::string &arg_name, unsigned arg_bins, double arg_xlow, double arg_xhigh, const LoopStatus &stat) : HistogramBase(arg_name, stat), 
+    data(arg_bins,0),
+    underflow(0),
+    overflow(0),
+    
+    bins(arg_bins),
+    xlow(arg_xlow),
+    xhigh(arg_xhigh),
+    binWidth((xhigh - xlow)/bins),
 
-Histo1d::Histo1d(const std::string &arg_name, unsigned arg_bins, double arg_xlow, double arg_xhigh, const LoopStatus &stat) : HistogramBase(arg_name, stat) {
-    bins = arg_bins;
-    xlow = arg_xlow;
-    xhigh = arg_xhigh;
-    binWidth = (xhigh - xlow)/bins;
-    data = std::vector<double>(bins,0);
-
-    min = 0;
-    max = 0;
-
-    underflow = 0;
-    overflow = 0;
-    entries = 0;
-    sum = 0;
-}
+    max(0),
+    min(0),
+    entries(0),
+    sum(0)
+{}
 
 Histo1d::~Histo1d() = default;
 
