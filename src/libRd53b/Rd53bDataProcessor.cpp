@@ -475,7 +475,7 @@ void Rd53bDataProcessor::process_core()
                     if (!retrieve(_ToT, _LUT_PlainHMap_To_ColRow_ArrSize[_hitmap] << 2))
                         return;
 
-                    if (_LUT_PlainHMap_To_ColRow_ArrSize[_hitmap] > 0 && _curOut->curEvent->hits.empty())
+                    if (_events > 0 && _LUT_PlainHMap_To_ColRow_ArrSize[_hitmap] > 0 && _curOut->curEvent->hits.empty())
                         _curOut->curEvent->hits.reserve(std::max(16u, static_cast<unsigned>(_LUT_PlainHMap_To_ColRow_ArrSize[_hitmap])));
                     int idx = 0;
                     for (unsigned ibus = 0; ibus < 4; ibus++)
@@ -544,7 +544,7 @@ void Rd53bDataProcessor::process_core()
                     {
                         logger->warn("Received fragment with no ToT! ({} , {})", _ccol, _qrow[_ccol]);
                     }
-                    if (_LUT_PlainHMap_To_ColRow_ArrSize[_hitmap] > 0 && _curOut->curEvent->hits.empty())
+                    if (_events > 0 && _LUT_PlainHMap_To_ColRow_ArrSize[_hitmap] > 0 && _curOut->curEvent->hits.empty())
                         _curOut->curEvent->hits.reserve(std::max(16u, static_cast<unsigned>(_LUT_PlainHMap_To_ColRow_ArrSize[_hitmap])));
                     for (unsigned ihit = 0; ihit < _LUT_PlainHMap_To_ColRow_ArrSize[_hitmap]; ++ihit)
                     {
