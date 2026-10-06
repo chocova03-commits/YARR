@@ -180,33 +180,18 @@ void SpecRxCore::checkRxSync() {
 
 
 bool SpecRxCore::resetLinkErrorCounters() {
-    if (!m_linkErrorCounters)
-        return false;
-
-    // Invalid sync header counting (mode 3) only exists since firmware v1.6.0; v1.4.0 and v1.5.0
-    // have the counter but would silently always report 0 in this mode
-    auto fw = specIdentFw.find(fw_vers);
-    bool noMode3 = fw != specIdentFw.end() && (fw->second == "v1.4.0" || fw->second == "v1.5.0");
-    if (m_linkErrorCounterMode == 3 && noMode3) {
-        srxlog->warn("Firmware {} does not support link error counter mode 3, disabling link error counters", fw->second);
-        m_linkErrorCounters = false;
-        return false;
-    }
-
-    // Free running (bit 31 of the stop value), then reset and restart
+    // Count invalid sync headers (mode 3), free running (bit 31 of the stop value), then reset and restart
     SpecCom::writeSingle(RX_ADDR | RX_ERROR_COUNTER_STOP_VALUE, 0x80000000);
-    SpecCom::writeSingle(RX_ADDR | RX_ERROR_COUNTER_MODE, m_linkErrorCounterMode);
+    SpecCom::writeSingle(RX_ADDR | RX_ERROR_COUNTER_MODE, 3);
     SpecCom::writeSingle(RX_ADDR | RX_ERROR_COUNTER_RESET_READ, 1);
     SpecCom::writeSingle(RX_ADDR | RX_ERROR_COUNTER_RESET_READ, 0);
 
     // Firmware without error counters answers with 0xDEADBEEF
     SpecCom::writeSingle(RX_ADDR | RX_ERROR_COUNTER_TARGET, 0);
-    if (SpecCom::readSingle(RX_ADDR | RX_ERROR_COUNTER_RESET_READ) == 0xDEADBEEF) {
-        srxlog->warn("Firmware does not provide link error counters, disabling them");
-        m_linkErrorCounters = false;
-        return false;
-    }
-    return true;
+    m_linkErrorCounters = SpecCom::readSingle(RX_ADDR | RX_ERROR_COUNTER_RESET_READ) != 0xDEADBEEF;
+    if (!m_linkErrorCounters)
+        srxlog->warn("Link error counters not available in this firmware, skipping them");
+    return m_linkErrorCounters;
 }
 
 std::vector<uint64_t> SpecRxCore::readLinkErrorCounters(uint32_t channel) {
@@ -222,7 +207,10 @@ std::vector<uint64_t> SpecRxCore::readLinkErrorCounters(uint32_t channel) {
         if (!((1 << l) & m_rxActiveLanes))
             continue;
         SpecCom::writeSingle(RX_ADDR | RX_ERROR_COUNTER_TARGET, channel*numOfLanes + l);
-        errors.push_back(SpecCom::readSingle(RX_ADDR | RX_ERROR_COUNTER_RESET_READ) & 0x7FFFFFFF);
+        uint32_t value = SpecCom::readSingle(RX_ADDR | RX_ERROR_COUNTER_RESET_READ);
+        if (value == 0xDEADBEEF)
+            return {};
+        errors.push_back(value & 0x7FFFFFFF);
     }
     return errors;
 }

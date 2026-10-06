@@ -153,14 +153,6 @@ class SpecController : public HwController, public SpecTxCore, public SpecRxCore
                 SpecRxCore::m_rxActiveLanes = j["rxActiveLanes"];
             }
 
-            // Link error counters, read out after every scan
-            if (j.contains("linkErrorCounters")) {
-                SpecRxCore::m_linkErrorCounters = j["linkErrorCounters"];
-            }
-            if (j.contains("linkErrorCounterMode")) {
-                SpecRxCore::m_linkErrorCounterMode = j["linkErrorCounterMode"];
-            }
-
             // Configure RX delay
             SpecCom::writeSingle(RX_ADDR | RX_MANUAL_DELAY, 0xFFFF);    
             if (j.contains("delay")) {
