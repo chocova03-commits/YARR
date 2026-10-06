@@ -28,6 +28,7 @@ LIST(APPEND apps
         Itkpixv2ReadRingosc
         Itkpixv2ColumnTest
         Itkpixv2EncodeRawData
+        itkpixv2DecodeTool
         )
 
 if(TARGET Spec)

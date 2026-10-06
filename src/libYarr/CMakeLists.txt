@@ -86,6 +86,7 @@ add_library(Scan SHARED
 	JsonData.cpp
         LoopActionBase.cpp
         LoopEngine.cpp
+        RawDataArchiver.cpp
         ResultBase.cpp
         ScanBase.cpp
         ScanConsole.cpp

@@ -23,6 +23,7 @@ namespace fs = std::filesystem;
 #include "FrontEndCfg.h"
 #include "FrontEndClipBoards.h"
 #include "HistogramProcessor.h"
+#include "RawDataArchiver.h"
 #include "StdHistogrammer.h" // needed for special handling of DataArchiver
 #include "StdAnalysis.h" // needed for special handling of HistogramArchiver
 #include "ScanFactory.h"
@@ -300,7 +301,7 @@ namespace ScanHelper {
             const std::string &chipType) {
         bhlog->info("Loading RawData processors ..");
         json procConfig;
-        if(scanCfg["scan"].contains("processor")) {
+        if(scanCfg["scan"].contains("processor") && scanCfg["scan"]["processor"].contains("config")) {
             procConfig = scanCfg["scan"]["processor"]["config"];
         }
         for (unsigned id = 0; id<bookie.getNumOfEntries(); id++) {
@@ -311,6 +312,29 @@ namespace ScanHelper {
             procs[id]->connect(dynamic_cast<FrontEndCfg*>(fe), &cp.clipRawData, &cp.clipData);
             procs[id]->connect(&cp.clipProcFeedback);
             // TODO load chip specific config
+        }
+    }
+
+    void buildRawDataArchivers( std::map<unsigned, std::unique_ptr<RawDataArchiver>> &archivers,
+                           const json &scanCfg,
+                           Bookkeeper &bookie,
+                           const std::string &outputDir) {
+        if (!scanCfg["scan"].contains("processor") || !scanCfg["scan"]["processor"].value("archiveRawData", false))
+            return;
+        bhlog->info("Loading RawDataArchivers ..");
+        for (unsigned id = 0; id<bookie.getNumOfEntries(); id++) {
+            auto fe = bookie.getFe(id);
+            if (!fe->isActive()) continue;
+            archivers[id] = std::make_unique<RawDataArchiver>();
+            auto &cp = fe->clipboards();
+            archivers[id]->connect(&cp.clipRawDataArchive);
+            cp.archiveRawData = true;
+            std::string output_filename = (outputDir + dynamic_cast<FrontEndCfg*>(fe)->getName() + "_rawdata.bin");
+            bool status = archivers[id]->open(output_filename);
+            if (!status) {
+                bhlog->error("Unable to open RawDataArchiver output file \"{}\"", output_filename);
+                throw std::runtime_error("Can't open requested output data file \"" + output_filename + "\"");
+            }
         }
     }
 

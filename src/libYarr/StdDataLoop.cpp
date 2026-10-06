@@ -146,7 +146,7 @@ void StdDataLoop::execPart2() {
                 if (nReadsInCurrentRxCycle > m_maxConsecutiveRxReads) {
                     for (auto &[id, rdc] : rdcMap) {
                         rdc->stat.is_end_of_iteration = false;
-                        keeper->getFe(id)->clipboards().clipRawData.pushData(std::move(rdc));
+                        keeper->getFe(id)->clipboards().pushRawData(std::move(rdc));
                         activeChannels.insert(id);
                     }
                     nReadsInCurrentRxCycle = 0; rdcMap.clear();
@@ -158,7 +158,7 @@ void StdDataLoop::execPart2() {
         // if there is anything left to process -- push it
         for (auto &[id, rdc] : rdcMap) {
             rdc->stat.is_end_of_iteration = false;
-            keeper->getEntry(id).fe->clipboards().clipRawData.pushData(std::move(rdc));
+            keeper->getEntry(id).fe->clipboards().pushRawData(std::move(rdc));
             activeChannels.insert(id);
         }
 
@@ -285,7 +285,7 @@ void StdDataLoop::execPart2() {
     for (unsigned id=0; id<keeper->getNumOfEntries(); id++) {
         std::unique_ptr<RawDataContainer> cIterEnd = std::make_unique<RawDataContainer>(loopStatusIterationEnd);
         auto &cp = keeper->getEntry(id).fe->clipboards();
-        cp.clipRawData.pushData(std::move(cIterEnd));
+        cp.pushRawData(std::move(cIterEnd));
         cp.clipProcFeedback.reset();
     }
 

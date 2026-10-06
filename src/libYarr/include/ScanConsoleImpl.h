@@ -11,6 +11,7 @@
 
 #include "AnalysisDataProcessor.h"
 #include "AllPlotters.h"
+#include "RawDataArchiver.h"
 #include "ThreadPool.h"
 #include "ScanOpts.h"
 #include "ScanBase.h"
@@ -68,6 +69,7 @@ private:
     std::unique_ptr<ScanBase> scanBase{};
     std::map<unsigned, std::unique_ptr<FeDataProcessor> > procs{};
     std::map<unsigned, std::unique_ptr<HistoDataProcessor> > histogrammers{};
+    std::map<unsigned, std::unique_ptr<RawDataArchiver> > rawArchivers{};
     std::map<unsigned, std::vector<std::unique_ptr<AnalysisDataProcessor>> > analyses{};
     FeedbackClipboardMap fbData;
     std::string chipType{};
