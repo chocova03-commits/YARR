@@ -49,6 +49,12 @@ class RxCore {
         virtual bool readFwRegister(const std::string& name, uint64_t& value) { return false; }
         virtual bool writeFwRegister(const std::string& name, const uint64_t& value) { return false; }
 
+        // Link error counters (e.g. invalid Aurora sync headers)
+        /// Reset and start the counters; returns false if not supported or disabled
+        virtual bool resetLinkErrorCounters() { return false; }
+        /// Errors per active lane of an rx channel since the last reset; empty if not supported
+        virtual std::vector<uint64_t> readLinkErrorCounters(uint32_t channel) { return {}; }
+
     protected:
         RxCore()=default;
         virtual ~RxCore()=default;
