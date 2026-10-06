@@ -100,8 +100,10 @@ TEST_CASE("StarTriggerThrottleAnalysis", "[Analysis][Star][Throttle]")
     AnalysisProcessor analysis(RX_CHANNEL);
 
     int chip_count = 1;
-    int nCol = Star::StripsPerABCRow * chip_count;
-    int nRow = Star::RowsPerABC;
+
+    FrontEndGeometry geom{Star::RowsPerABC, Star::StripsPerABCRow * chip_count};
+    int nCol = geom.nCol;
+    int nRow = geom.nRow;
 
     {
       auto ana = StdDict::getAnalysis("StarTriggerThrottleAnalysis");
@@ -110,7 +112,7 @@ TEST_CASE("StarTriggerThrottleAnalysis", "[Analysis][Star][Throttle]")
 
       ana->loadConfig(info.analysisCfg);
 
-      ana->setMapSize(nCol, nRow);
+      ana->setMapSize(geom);
 
       analysis.addAlgorithm(std::move(ana));
     }

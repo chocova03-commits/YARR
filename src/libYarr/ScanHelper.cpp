@@ -525,7 +525,7 @@ namespace ScanHelper {
                         add_histo(algo_name, histoCfg[j]["config"]);
                     }
                 }
-                histogrammer.setMapSize(fe->geo.nCol, fe->geo.nRow);
+                histogrammer.setMapSize(fe->geo);
             }
         }
         bhlog->info("... done!");
@@ -629,7 +629,7 @@ namespace ScanHelper {
                 balog->info("Disabling masking for this scan!");
                 ana.setMasking(false);
             }
-            ana.setMapSize(geo.nCol, geo.nRow);
+            ana.setMapSize(geo);
         } // for (unsigned t=0; t<algoIndexTiers.size(); t++)
     }
 

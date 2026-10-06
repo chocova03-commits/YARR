@@ -64,7 +64,7 @@ void StarNPointGainAnalysis::loadConfig(const json &j) {
 
 std::vector<std::vector<double>> StarNPointGainAnalysis::createAverageResponseCurves() {
 
-    unsigned nChips = nCol / Star::StripsPerABCRow;
+    unsigned nChips = fe_geom.nCol / Star::StripsPerABCRow;
     unsigned nInj = m_injections.size();
     std::vector<std::vector<double>> averages(nChips, std::vector<double>(nInj));
 
@@ -72,14 +72,14 @@ std::vector<std::vector<double>> StarNPointGainAnalysis::createAverageResponseCu
         double inj = m_injections[injIdx];
         for (unsigned chip = 0; chip < nChips; chip++) {
             double sum = 0.;
-            for (unsigned row = 0; row < nRow; row++) {
+            for (unsigned row = 0; row < fe_geom.nRow; row++) {
                 for (unsigned strip = 0; strip < Star::StripsPerABCRow; strip++) {
                     unsigned col = (chip * Star::StripsPerABCRow) + strip;
                     sum += m_thresholdMap[inj][col][row];
                 }
             }
 
-            averages[chip][injIdx] = sum / (nRow*Star::StripsPerABCRow);
+            averages[chip][injIdx] = sum / (fe_geom.nRow*Star::StripsPerABCRow);
         }
     }
 
@@ -91,7 +91,7 @@ void StarNPointGainAnalysis::end() {
     NPointGain::end();
 
     auto respCurvesByChip = createAverageResponseCurves();
-    for (unsigned chip = 0; chip < (nCol/Star::StripsPerABCRow); chip++) {
+    for (unsigned chip = 0; chip < (fe_geom.nCol/Star::StripsPerABCRow); chip++) {
         // fit chip-avg response curve and fill output configuration
         const auto& thresholds = respCurvesByChip[chip];
         std::vector<double> fitParams = guessInitialFitParams(thresholds);

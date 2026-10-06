@@ -64,8 +64,9 @@ TEST_CASE("StarStrobeDelayAnalysis", "[Analysis][Star][SD]") {
     // This is for one FE
     AnalysisProcessor analysis(rx_channel);
 
-    int nCol = Star::StripsPerABCRow * chip_count;
-    int nRow = Star::RowsPerABC;
+    FrontEndGeometry geom{Star::RowsPerABC, Star::StripsPerABCRow * chip_count};
+    int nCol = geom.nCol;
+    int nRow = geom.nRow;
 
     {
       auto ana = StdDict::getAnalysis("StarStrobeDelayAnalysis");
@@ -74,7 +75,7 @@ TEST_CASE("StarStrobeDelayAnalysis", "[Analysis][Star][SD]") {
 
       ana->loadConfig(analysisCfg);
 
-      ana->setMapSize(nCol, nRow);
+      ana->setMapSize(geom);
 
       analysis.addAlgorithm(std::move(ana));
     }

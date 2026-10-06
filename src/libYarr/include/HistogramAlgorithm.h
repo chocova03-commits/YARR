@@ -4,6 +4,7 @@
 #include <memory>
 #include <thread>
 
+#include "FrontEndGeometry.h"
 #include "HistogramBase.h"
 #include "LoopStatus.h"
 
@@ -16,9 +17,6 @@ class FrontEndData;
 class HistogramAlgorithm {
     public:
         HistogramAlgorithm() {
-            nCol = 80;
-            nRow = 336;
-        
         }
         virtual ~HistogramAlgorithm() = default;
 
@@ -31,14 +29,12 @@ class HistogramAlgorithm {
         virtual void processEvent(FrontEndData *data) {}
         virtual void loadConfig(const json &config) {}
         
-        void setMapSize(unsigned col, unsigned row) {
-            nCol = col;
-            nRow = row;
+        void setMapSize(const FrontEndGeometry &geom) {
+            fe_geom = geom;
         }
     protected:
         std::unique_ptr<HistogramBase> r;
-        unsigned nCol = 80;
-        unsigned nRow = 336;
+        FrontEndGeometry fe_geom{336, 80};
 };
 
 #endif

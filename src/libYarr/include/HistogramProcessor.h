@@ -24,9 +24,9 @@ class HistogrammerProcessor : public HistoDataProcessor {
             algorithms.push_back(std::move(a));
         }
 
-        void setMapSize(unsigned col, unsigned row) {
+        void setMapSize(const FrontEndGeometry &geom) {
             for (unsigned i=0; i<algorithms.size(); i++) {
-                algorithms[i]->setMapSize(col, row);
+                algorithms[i]->setMapSize(geom);
             }
         }
         

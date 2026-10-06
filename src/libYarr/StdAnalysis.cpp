@@ -160,6 +160,9 @@ void OccupancyAnalysis::processHistogram(HistogramBase *h) {
     //     hh->setZaxisTitle("Hits");
     //     occMaps[uid] = std::move(hh);
 
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     if (occMaps[uid] == nullptr) {
         std::unique_ptr<Histo2d> hh{createHistoMap(name, "Hits", nCol, nRow, loopStatus)};
         occMaps[uid] = std::move(hh);
@@ -196,13 +199,14 @@ void OccupancyAnalysis::processHistogram(HistogramBase *h) {
 
         // Core Column Mask:
         const unsigned nColsInCCol = 8;
-        const unsigned totalPixelsPerCCol = nColsInCCol * nRow;
+        const unsigned totalPixelsPerCCol = nColsInCCol * fe_geom.nRow;
         if (coreColMask){
             feCfg->enableAll();
 
             struct CColStat { unsigned coreCol; unsigned nBad; bool masked; };
             std::vector<CColStat> ccolStats;
 
+            unsigned nRow = fe_geom.nRow;
             for (unsigned coreCol = 0; coreCol < 50; coreCol++){
                 unsigned nBad = 0;
                 for (unsigned col = 1; col <= nColsInCCol; col++){
@@ -374,6 +378,8 @@ void TotAnalysis::processHistogram(HistogramBase *h) {
     std::string name2 = "TotMap";
     std::string name3 = "Tot2Map";
 
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
 
     // Check if Histogram exists
     // if (occMaps[uid] == nullptr) {
@@ -574,6 +580,9 @@ void TotAnalysis::processHistogram(HistogramBase *h) {
 }
 
 void TotAnalysis::end() {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     if (hasVcalLoop) {
         //replace these (the following?) with more dynamic conversions
         double injQMin = feCfg->toCharge(vcalMin, useScap, useLcap);
@@ -839,6 +848,9 @@ bool ScurveFitter::fitSuccess(const double (&fit_params)[n_fit_params], const do
 //     timeDist[uid] = std::move(hh1);
 
 void ScurveFitter::createFitResultHistograms(LoopStatus::UID uid, const LoopStatus& loopStatus) {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     thrMap[uid] = createHistoMap("ThresholdMap", "Threshold [e]", nCol, nRow, loopStatus);
     sigMap[uid] = createHistoMap("NoiseMap", "Noise [e]", nCol, nRow, loopStatus);
 
@@ -872,6 +884,9 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
     LoopStatus::UID uid = loopStatus.uniqueID();
 
     medCnt[uid]++;
+
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
 
     unsigned vcal = loopStatus.get(vcalLoop);
     for(unsigned col=1; col<=nCol; col++) {
@@ -1039,6 +1054,9 @@ void ScurveFitter::end() {
         alog->info("[{}] Tuned to ==> {}", this->id, thrTarget);
     }
 
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     for (auto &[uid, thrMapPtr] : thrMap) {
         if (thrMapPtr) {
 
@@ -1172,6 +1190,9 @@ void NPointGain::processHistogram(HistogramBase *h) {
     std::string hname = h->getName();
     std::string prefix = hname.substr(0, hname.find("_"));
 
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     // pick storage container based on input histogram
     InjectionDataContainer* container;
     if (prefix == "ThresholdMap") {
@@ -1245,6 +1266,9 @@ void NPointGain::fitResponseCurve(const std::vector<double>& thresholds, std::ve
 }
 
 void NPointGain::writeOutputHistograms() {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     auto injectionHisto = createHisto1d("InjectionValues",
         "x", m_injections.size(), -0.5, m_injections.size()-0.5, "y");
     auto fitParamsHisto = createHistoMap3d<float>("ResponseFitParams",
@@ -1294,6 +1318,9 @@ void NPointGain::writeOutputHistograms() {
 }
 
 void NPointGain::writeValidationHistograms() {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     // determine global min/max for histogram ranges
     double thresholdMax = -1e9, thresholdMin = 1e9;
     double outputNoiseMax = -1e9, outputNoiseMin = 1e9;
@@ -1353,6 +1380,9 @@ void NPointGain::writeValidationHistograms() {
 }
 
 void NPointGain::end() {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     // get injections vector for fitting, needs to be double for lmcurve
     // it is already sorted because it came from a map!
     // also might as well initialize storage maps here
@@ -1430,6 +1460,8 @@ void OccGlobalThresholdTune::processHistogram(HistogramBase *h) {
     std::string name = "OccupancyMap";
     std::string name2 = "OccupancyDist";
 
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
 
     // Check if Histogram exists
     // if (occMaps[uid] == nullptr) {
@@ -1559,6 +1591,9 @@ void OccPixelThresholdTune::processHistogram(HistogramBase *h) {
     std::string name = "OccupancyMap";
     std::string name2 = "OccupancyDist";
 
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     // Check if Histogram exists
     // if (occMaps[uid] == nullptr) {
     //     Histo2d *hh = new Histo2d("OccupancyMap", nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5, loopStatus);
@@ -1660,6 +1695,9 @@ void InjDelayTune::processHistogram(HistogramBase *h) {
     // Select correct output container
     unsigned long ident = 0;
     unsigned long offset = 1;
+
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
 
     // Determine identifier
     std::string name = "OccupancyMap";
@@ -1823,6 +1861,9 @@ void TagAnalysis::processHistogram(HistogramBase *h) {
     std::string name2 = "TagMap";
     std::string name3 = "OccMap";
 
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     // Check if Histogram exists
     // if (tagHistos[uid] == nullptr) {
     //     Histo1d *h = new Histo1d("TagDist", 257, -0.5, 256.5, loopStatus);
@@ -1957,6 +1998,9 @@ void TotDistPlotter::processHistogram(HistogramBase *h) {
 }
 
 void NoiseAnalysis::init(const ScanLoopInfo *s) {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     // We assume the nosie scan only has one trigger and data loop
     occ = createHistoMap("Occupancy", "Hits", nCol, nRow);
 
@@ -2003,6 +2047,9 @@ void NoiseAnalysis::loadConfig(const json &j){
 }
 
 void NoiseAnalysis::end() {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     auto noiseOcc = createHistoMap("NoiseOccupancy", "Noise Occupancy hits/bc", nCol, nRow);
 
     auto mask = createHistoMap(doAltMask ? "AltNoiseMask" : "NoiseMask",
@@ -2096,6 +2143,9 @@ void NoiseTuning::processHistogram(HistogramBase *h) {
     // Plot name
     std::string name = "OccMap";
 
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     // if (occMaps[uid] == nullptr) {
     //     Histo2d *hh = new Histo2d("OccMap", nCol, 0.5, nCol+0.5, nRow, 0.5, nRow+0.5, loopStatus);
     //     hh->setXaxisTitle("Column");
@@ -2156,6 +2206,9 @@ void NoiseTuning::end() {
 }
 
 void DelayAnalysis::init(const ScanLoopInfo *s) {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     n_count = nCol*nRow;
     injections = 50;
     for (unsigned n=0; n<s->size(); n++) {
@@ -2195,6 +2248,8 @@ void DelayAnalysis::processHistogram(HistogramBase *h) {
     if (h->getName() != L13d::outputName())
         return;
 
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
 
     Histo3d *hh = (Histo3d*) h;
     for(unsigned l1=0; l1<16; l1++) { //TODO hardcoded l1
@@ -2254,6 +2309,9 @@ void DelayAnalysis::processHistogram(HistogramBase *h) {
 }
 
 void DelayAnalysis::end() {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     output->pushData(std::move(delayMap));
     output->pushData(std::move(rmsMap));
     for(unsigned bin=0; bin<(nRow*nCol); bin++) {
@@ -2332,6 +2390,9 @@ void ParameterAnalysis::processHistogram(HistogramBase *h) {
     LoopStatus loopStatus = h->getStat();
     loopStatus.setEnabledLoops(loops);
     LoopStatus::UID uid = loopStatus.uniqueID();
+
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
 
     for(unsigned col=1; col<=nCol; col++) {
         for (unsigned row=1; row<=nRow; row++) {
@@ -2435,6 +2496,9 @@ void TriggerThrottleAnalysis::processHistogram(HistogramBase *h) {
     // Select correct output container
     unsigned ident = 0;
     unsigned offset = 0;
+
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
 
     // Determine identifier
     std::string name = "OccupancyMap";

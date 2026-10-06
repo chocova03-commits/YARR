@@ -132,6 +132,8 @@ void FrontEndScopeAnalysis::processHistogram(HistogramBase* h) {
         ptoa_name += "-" + std::to_string(h->getStat().get(m_loops.at(n)));
     }
 
+    unsigned nCol = fe_geom.nCol;
+    unsigned nRow = fe_geom.nRow;
 
     //
     // Initialize histograms for this ID
@@ -382,6 +384,9 @@ void ToaAnalysis::processHistogram(HistogramBase *h) {
         ptoa2Map_name += "-" + stat; 
         occ_name += "-" + stat;
     }
+
+    unsigned nCol = fe_geom.nCol;
+    unsigned nRow = fe_geom.nRow;
 
     //
     // initialize histograms

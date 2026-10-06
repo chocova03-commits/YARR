@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "AnalysisDataProcessor.h"
+#include "FrontEndGeometry.h"
 #include "FeedbackBase.h"
 #include "HistogramBase.h"
 #include "ScanLoopInfo.h"
@@ -17,9 +18,8 @@ class FrontEndCfg;
  */
 class AnalysisAlgorithm {
     public:
-        AnalysisAlgorithm() {
-            nCol = 80;
-            nRow = 336;
+        AnalysisAlgorithm()
+        {
             make_mask = true;
         }
         virtual ~AnalysisAlgorithm() = default;
@@ -40,9 +40,8 @@ class AnalysisAlgorithm {
 
         virtual bool requireDependency() {return false;}
 
-        void setMapSize(unsigned col,unsigned row) {
-            nCol = col;
-            nRow = row;
+        void setMapSize(const FrontEndGeometry &geom) {
+            fe_geom = geom;
         }
 
         void enMasking() {make_mask = true;}
@@ -55,7 +54,7 @@ class AnalysisAlgorithm {
         ClipBoard<HistogramBase> *output = nullptr;
         FeedbackClipboard *feedback = nullptr;
         bool make_mask = true;
-        unsigned nCol = 80, nRow = 336;
+        FrontEndGeometry fe_geom{336, 80};
 
         std::vector<std::string> m_parametersOfInterest;
         bool isPOILoop(const LoopActionBaseInfo *l);
@@ -91,9 +90,9 @@ class AnalysisProcessor : public AnalysisDataProcessor {
 
         bool empty() {return algorithms.empty();}
 
-        void setMapSize(unsigned col, unsigned row) {
+        void setMapSize(const FrontEndGeometry &geom) {
             for (unsigned i=0; i<algorithms.size(); i++) {
-                algorithms[i]->setMapSize(col, row);
+                algorithms[i]->setMapSize(geom);
             }
         }
 

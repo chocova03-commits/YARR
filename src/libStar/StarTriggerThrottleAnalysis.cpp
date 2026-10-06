@@ -70,6 +70,9 @@ void StarTriggerThrottleAnalysis::endBin(const LoopStatus &ls) {
 }
 
 void StarTriggerThrottleAnalysis::processHistogram(HistogramBase *h) {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     alog->debug("StarTriggerThrottleAnalysis::processHistogram({})", h->getName());
     // Only processing occupancy histograms
     if (h->getName() == "TriggerComplete") {

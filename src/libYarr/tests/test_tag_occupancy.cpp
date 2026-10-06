@@ -15,9 +15,10 @@ TEST_CASE("HistogramTagOccupancyMap", "[Histogrammer][TagOccupancyMap]") {
 
     algo->loadConfig(json{{"tag_count", tag_limit}});
 
-    int r = 5;
-    int c = 5;
-    algo->setMapSize(c, r);
+    FrontEndGeometry geom{5, 5};
+    auto nCol = geom.nCol;
+    auto nRow = geom.nRow;
+    algo->setMapSize(geom);
 
     unsigned tag1 = 2;
     data->newEvent(tag1, 2, 3);
@@ -47,8 +48,8 @@ TEST_CASE("HistogramTagOccupancyMap", "[Histogrammer][TagOccupancyMap]") {
 
     REQUIRE (histo_as_3d);
 
-    CHECK (histo_as_3d->getXbins() == c);
-    CHECK (histo_as_3d->getYbins() == r);
+    CHECK (histo_as_3d->getXbins() == nCol);
+    CHECK (histo_as_3d->getYbins() == nRow);
     CHECK (histo_as_3d->getZbins() == tag_limit);
 
     unsigned expect_overflow = 0;

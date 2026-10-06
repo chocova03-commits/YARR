@@ -69,15 +69,16 @@ TEST_CASE("NPointGain", "[Yarr][Analysis][NPointGain]") {
 
     AnalysisProcessor processor(channel);
 
-    int nCol = 256;
-    int nRow = 2;
+    FrontEndGeometry geom{2, 256};
+    int nCol = geom.nCol;
+    int nRow = geom.nRow;
 
     {
         auto analysis = StdDict::getAnalysis("NPointGain");
         REQUIRE(analysis);
 
         analysis->loadConfig(analysisConfig);
-        analysis->setMapSize(nCol, nRow);
+        analysis->setMapSize(geom);
         analysis->setConfig(bookie.getFeCfg(channel));
 
         processor.addAlgorithm(std::move(analysis));
