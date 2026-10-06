@@ -328,7 +328,6 @@ void Itkpixv2GlobalCfg::init() {
     GpLvdsPad1.init         ( 101, &m_cfg[ 101], 6,  6, 1); regMap["GpLvdsPad1"] = &Itkpixv2GlobalCfg::GpLvdsPad1;
     GpLvdsPad0.init         ( 101, &m_cfg[ 101], 0,  6, 0); regMap["GpLvdsPad0"] = &Itkpixv2GlobalCfg::GpLvdsPad0;
     //102
-    // Chip reset value is 40; 80 keeps the serializer clock stable while analog hits are read out
     CdrCp.init              ( 102, &m_cfg[ 102], 0, 10, 80); regMap["CdrCp"] = &Itkpixv2GlobalCfg::CdrCp;
     //103
     CdrCpFd.init            ( 103, &m_cfg[ 103], 0, 10, 400); regMap["CdrCpFd"] = &Itkpixv2GlobalCfg::CdrCpFd;
