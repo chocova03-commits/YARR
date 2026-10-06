@@ -180,7 +180,8 @@ void SpecRxCore::checkRxSync() {
 
 
 bool SpecRxCore::resetLinkErrorCounters() {
-    // Count invalid sync headers (mode 3), free running (bit 31 of the stop value), then reset and restart
+    // Count invalid sync headers (mode 3), free running (bit 31 of the stop value), then reset and restart.
+    // Note: this overwrites the counter settings used by eyeDiagram and cmlBiasScan.
     SpecCom::writeSingle(RX_ADDR | RX_ERROR_COUNTER_STOP_VALUE, 0x80000000);
     SpecCom::writeSingle(RX_ADDR | RX_ERROR_COUNTER_MODE, 3);
     SpecCom::writeSingle(RX_ADDR | RX_ERROR_COUNTER_RESET_READ, 1);
@@ -195,14 +196,15 @@ bool SpecRxCore::resetLinkErrorCounters() {
 }
 
 std::vector<uint64_t> SpecRxCore::readLinkErrorCounters(uint32_t channel) {
-    std::vector<uint64_t> errors;
     if (!m_linkErrorCounters)
-        return errors;
+        return {};
 
-    // Counters are indexed by channel*lanes_per_channel + lane
+    // One entry per lane of the channel, index = lane number; lanes not in rxActiveLanes are not read and stay 0.
+    // Counters are indexed by channel*lanes_per_channel + lane, as the status bits in checkRxSync()
     uint32_t numOfLanes = this->getSpecIdentLaneCfg(fw_ident);
     if (numOfLanes == 0 || numOfLanes > 4)
-        return errors;
+        return {};
+    std::vector<uint64_t> errors(numOfLanes, 0);
     for (unsigned l=0; l<numOfLanes; l++) {
         if (!((1 << l) & m_rxActiveLanes))
             continue;
@@ -210,7 +212,7 @@ std::vector<uint64_t> SpecRxCore::readLinkErrorCounters(uint32_t channel) {
         uint32_t value = SpecCom::readSingle(RX_ADDR | RX_ERROR_COUNTER_RESET_READ);
         if (value == 0xDEADBEEF)
             return {};
-        errors.push_back(value & 0x7FFFFFFF);
+        errors[l] = value & 0x7FFFFFFF;
     }
     return errors;
 }
