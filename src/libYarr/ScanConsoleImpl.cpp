@@ -625,7 +625,7 @@ void ScanConsoleImpl::readLinkErrorCounters() {
         uint64_t sum = 0;
         for (auto e : errors) sum += e;
         total += sum;
-        scanLog["linkErrors"][feCfg->getName()] = {{"rx", feCfg->getRxChannel()}, {"errors", sum}, {"perLane", errors}};
+        scanLog["Link errors"][feCfg->getName()] = {{"Rx channel", feCfg->getRxChannel()}, {"Errors", sum}, {"Errors per lane", errors}};
         if (sum > 0)
             logger->warn("Link errors during scan: {} (rx {}): {}", feCfg->getName(), feCfg->getRxChannel(), sum);
     }
