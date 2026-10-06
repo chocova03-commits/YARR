@@ -52,6 +52,8 @@ public:
     ~ScanConsoleImpl() = default;
 
 private:
+    /// Read link error counters of all active FEs into the scan log
+    void readLinkErrorCounters();
     ScanOpts scanOpts;
     unsigned runCounter{};
     std::string strippedScan{};

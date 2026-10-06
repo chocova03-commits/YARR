@@ -619,8 +619,30 @@ void ScanConsoleImpl::getResults(json &result) {
     result["scanLog"] = scanLog;
 }
 
+void ScanConsoleImpl::readLinkErrorCounters() {
+    uint64_t total = 0;
+    for (unsigned id=0; id<bookie->getNumOfEntries(); id++) {
+        auto feCfg = bookie->getFeCfg(id);
+        if (!bookie->getFe(id)->isActive())
+            continue;
+        auto errors = hwCtrl->readLinkErrorCounters(feCfg->getRxChannel());
+        if (errors.empty())
+            continue;
+        uint64_t sum = 0;
+        for (auto e : errors) sum += e;
+        total += sum;
+        scanLog["Link errors"][feCfg->getName()] = {{"Rx channel", feCfg->getRxChannel()}, {"Errors", sum}, {"Errors per lane", errors}};
+        if (sum > 0)
+            logger->warn("Link errors during scan: {} (rx {}): {}", feCfg->getName(), feCfg->getRxChannel(), sum);
+    }
+    if (total == 0)
+        logger->info("No link errors during scan");
+}
+
 void ScanConsoleImpl::run() {
     ScanHelper::banner(logger,"Run Scan");
+
+    bool linkErrorCounters = hwCtrl->resetLinkErrorCounters();
 
     scan_start = std::chrono::steady_clock::now();
     ScanProgress::instance().init(*scanBase);
@@ -628,6 +650,10 @@ void ScanConsoleImpl::run() {
     ScanProgress::instance().finish();
     scanBase->postScan();
     logger->info("Scan done!");
+
+    if (linkErrorCounters) {
+        this->readLinkErrorCounters();
+    }
 
     // Join from upstream to downstream.
     for (unsigned id=0; id<bookie->getNumOfEntries(); id++) {
