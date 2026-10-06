@@ -1,12 +1,14 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <set>
 
 // This is where getopt is defined
 #include <unistd.h>
 
 #include "AllHwControllers.h"
 #include "AllChips.h"
+#include "LoggingConfig.h"
 #include "FrontEndCfg.h"
 #include "Bookkeeper.h"
 #include "AnalysisDataProcessor.h"
@@ -24,9 +26,96 @@ enum class ConfigType {
   CONNECTIVITY,
   CONTROLLER,
   FRONT_END,
+  LOGGING,
   SCAN_CONFIG,
   UNKNOWN
 };
+
+bool compareJson(const json &left, const json &right, const std::vector<std::string> ignore = {})
+{
+  if(left.type() != right.type()) {
+    if(verbose) {
+      std::cout << "Failed compare, inconsistent types\n";
+    }
+    return false;
+  }
+  switch(left.type()) {
+  case nlohmann::json::value_t::array:
+    if(left.size() != right.size()) {
+      if(verbose) {
+	std::cout << "Failed array compare, size " << left.size() << " vs " << right.size() << "\n";
+      }
+      return false;
+    }
+    for(unsigned i=0; i<left.size(); i++) {
+      if(!compareJson(left[i], right[i], ignore)) {
+	if(verbose) {
+	  std::cout << "Failed array compare, index " << i << "\n";
+	}
+	return false;
+      }
+    }
+    break;
+  case nlohmann::json::value_t::object:
+    {
+      // Compare keys, but ignore some things
+      std::set<std::string> left_filtered;
+      for(auto &l: left.items()) {
+	if(std::find(ignore.begin(), ignore.end(), l.key()) == ignore.end()) {
+	  left_filtered.insert(l.key());
+	} else {
+	  if(verbose) {
+	    std::cout << "Dictionary compare, ignoring (L) " << l.key() << "\n";
+	  }
+	}
+      }
+      std::set<std::string> right_filtered;
+      for(auto &r: right.items()) {
+	if(std::find(ignore.begin(), ignore.end(), r.key()) == ignore.end()) {
+	  right_filtered.insert(r.key());
+	} else {
+	  if(verbose) {
+	    std::cout << "Dictionary compare, ignoring (R) " << r.key() << "\n";
+	  }
+	}
+      }
+      if(left_filtered != right_filtered) {
+	if(verbose) {
+	  std::cout << "Failed dictionary compare, post-filter lists\n";
+	  std::cout << "L:";
+	  for(auto &l: left_filtered) {
+	    std::cout << " " << l;
+	  }
+	  std::cout << "\n";
+	  std::cout << "R:";
+	  for(auto &r: right_filtered) {
+	    std::cout << " " << r;
+	  }
+	  std::cout << "\n";
+	}
+	return false;
+      }
+      for(auto &k: left_filtered) {
+	if(!compareJson(left[k], right[k], ignore)) {
+	  if(verbose) {
+	    std::cout << "Failed dictionary compare, key " << k << "\n";
+	  }
+	  return false;
+	}
+      }
+    }
+    break;
+  default:
+    if(left != right) {
+      if(verbose) {
+	std::cout << "Failed basic item compare " << left << " vs " << right << "\n";
+      }
+      return false;
+    }
+    break;
+  }
+  return true;
+}
 
 /// Minimal FrontEnd needed, otherwise scan config not checked
 class MyFrontEnd : public FrontEnd {
@@ -45,6 +134,7 @@ std::ostream &operator <<(std::ostream &os, ConfigType &ct) {
   case ConfigType::CONNECTIVITY: os << "CONNECTIVITY"; break;
   case ConfigType::CONTROLLER: os << "CONTROLLER"; break;
   case ConfigType::FRONT_END: os << "FRONT_END"; break;
+  case ConfigType::LOGGING: os << "LOGGING"; break;
   case ConfigType::SCAN_CONFIG: os << "SCAN_CONFIG"; break;
   default: os << "UNKNOWN"; break;
   }
@@ -55,6 +145,7 @@ ConfigType fromString(const std::string& s) {
   if (s == "CONNECTIVITY") return ConfigType::CONNECTIVITY;
   if (s == "CONTROLLER") return ConfigType::CONTROLLER;
   if (s == "FRONT_END") return ConfigType::FRONT_END;
+  if (s == "LOGGING") return ConfigType::LOGGING;
   if (s == "SCAN_CONFIG") return ConfigType::SCAN_CONFIG;
   return ConfigType::UNKNOWN;
 }
@@ -154,6 +245,24 @@ bool testScanConfig(const json &scanConfig) {
   }
 }
 
+bool testLogging(const json &logConfig) {
+  try {
+    auto test_input = logConfig.get<logging::LoggingConfig>();
+    json test_output = test_input;
+    bool compare = compareJson(logConfig, test_output, {"remark"});
+    if(!compare) {
+      std::cout << "In/out don't match\n";
+      std::cout << logConfig.dump(2) << '\n';
+      std::cout << test_output.dump(2) << '\n';
+    }
+    return compare;
+  } catch(std::runtime_error &te) {
+    std::cout << "Logging config read failed: " << te.what() << "\n";
+    return false;
+  }
+  return true;
+}
+
 int checkJsonFE(json &jsonConfig, const std::string& fe_name) {
   auto fe = StdDict::getFrontEnd(fe_name);
   if (!fe) {
@@ -243,8 +352,15 @@ int checkJson(json &jsonConfig, ConfigType jsonFileType) {
       std::cout << "Failed to parse as controller config\n";
     }
     break;
+  case ConfigType::LOGGING:
+    if(!testLogging(jsonConfig)) {
+      std::cout << "Failed to parse as logging config\n";
+      return 1;
+    }
+    break;
   default:
-    std::cout << "Unspecified file type, top-level names are:\n";
+    std::cout << "Unspecified file type, specify using -t flag\n";
+    std::cout << "  JSON read OK, top-level names are:\n";
 
     {
       auto b = std::begin(jsonConfig);
@@ -266,7 +382,7 @@ void printHelp() {
     std::cout << " -h: Shows this help\n";
     std::cout << " -f <config_name> : Json file to examine\n";
     std::cout << " -t <config_type> : Type of config file, default to guessing\n";
-    std::cout << "                   CONNECTIVITY,CONTROLLER,SCAN_CONFIG,FRONT_END\n";
+    std::cout << "                   CONNECTIVITY,CONTROLLER,LOGGING,SCAN_CONFIG,FRONT_END\n";
     std::cout << " -K : Check controller file, which might talk to hardware\n";
     std::cout << " -v : Be more verbose\n";
 }
