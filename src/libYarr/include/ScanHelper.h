@@ -80,11 +80,9 @@ namespace ScanHelper {
                            Bookkeeper &bookie,
                            const std::string &chipType);
 
-        /// Check the scan's StdDataLoop/StdDataGatherer loop config for "archiveRawData": true
-        bool scanRequestsRawDataArchive(const json &scanCfg);
-
-        /// Build one RawDataArchiver per active FE, connected to clipRawDataArchive
+        /// Build one RawDataArchiver per active FE if "archiveRawData" is set in the scan's "processor" block
         void buildRawDataArchivers( std::map<unsigned, std::unique_ptr<RawDataArchiver>> &archivers,
+                           const json &scanCfg,
                            Bookkeeper &bookie,
                            const std::string &outputDir);
 

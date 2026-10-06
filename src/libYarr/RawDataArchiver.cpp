@@ -73,10 +73,17 @@ void RawDataArchiver::process_core() {
             chunkHeader.nWords = raw->getSize();
             fileHandle.write(reinterpret_cast<const char*>(&chunkHeader), sizeof(chunkHeader));
 
+            // Copy via get() rather than getBuf(): e.g. SpecRawData is a view into a larger DMA buffer
+            m_words.resize(chunkHeader.nWords);
             for (unsigned i = 0; i < chunkHeader.nWords; i++) {
-                uint32_t word = raw->get(i);
-                fileHandle.write(reinterpret_cast<const char*>(&word), sizeof(word));
+                m_words[i] = raw->get(i);
             }
+            fileHandle.write(reinterpret_cast<const char*>(m_words.data()), m_words.size()*sizeof(uint32_t));
+        }
+
+        if (!fileHandle.good()) {
+            rdalog->error("Failed writing raw data archive, stopping archiving");
+            fileHandle.close();
         }
     }
 }

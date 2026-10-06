@@ -80,6 +80,7 @@ struct option longopts[] = {
     {"input", required_argument, nullptr, 'i'},
     {"output", required_argument, nullptr, 'o'},
     {"ne", required_argument, nullptr, 'n'},
+    {"compressed", required_argument, nullptr, 'c'},
     {"chipid", required_argument, nullptr, 'C'},
     {"print", no_argument, nullptr, 'p'},
     {"color", required_argument, nullptr, 1000},
@@ -107,11 +108,13 @@ void printHelp(const std::string& exe)
     std::cout << " -i [ --input ] arg                 Input RawDataArchiver .bin file (required)" << std::endl;
     std::cout << " -o [ --output ] arg                Output file name (default decoded.txt, ignored with -p)" << std::endl;
     std::cout << " -n [ --ne ] arg                     Number of records to decode (default: all)" << std::endl;
-    std::cout << " -c arg                              Hit map compression enable (default: 1)" << std::endl;
-    std::cout << " -C [ --chipid ] arg                 Enable chip ID readout, given the expected chip ID (0-3)" << std::endl;
+    std::cout << " -c [ --compressed ] arg             Hit map compression enable (default: 1)" << std::endl;
+    std::cout << " -C [ --chipid ] arg                 Enable chip ID readout, warn on streams with a different chip ID (0-3)" << std::endl;
     std::cout << " -p [ --print ]                      Print decode trace to terminal instead of a file" << std::endl;
     std::cout << " --color arg                         Colorize -p output: always|auto|never (default: auto)" << std::endl;
     std::cout << " -h [ --help ]                       Produce help message" << std::endl;
+    std::cout << "Note: all records and rx channels of the file are decoded as one continuous stream;" << std::endl;
+    std::cout << "      use a file with a single FE and dumpRawDataArchive to see record boundaries." << std::endl;
 }
 
 // One decoded field, e.g. "ccol", "Hit map", "ToT3". Kept as a discrete
@@ -237,8 +240,12 @@ void startNewStream(Itkpixv2DecodeHelper *h, unsigned &nEvents)
 
     h->block((uint64_t(_data[0]) << 32) | _data[1]);
     h->fill(std::bitset<1>(_data[0] >> 31).to_string(), "", "ES", true);
-    if (_enChipId)
-        h->fill(std::bitset<2>((_data[0] >> 29) & 0x3).to_string(), "", "ChipID");
+    if (_enChipId) {
+        const unsigned chipId = (_data[0] >> 29) & 0x3;
+        h->fill(std::bitset<2>(chipId).to_string(), "", "ChipID");
+        if (chipId != _chipId)
+            std::cerr << "Stream in block " << _blockIdx - 1 << " has chip ID " << chipId << ", expected " << _chipId << std::endl;
+    }
     h->fill(std::bitset<8>(tag).to_string(), std::to_string(tag), "Tag");
     nEvents++;
 }
@@ -366,8 +373,8 @@ int readInData(const std::string& inputFileName, int nRecords = -1)
 
     RawDataArchiveHeader header;
     fstream.read(reinterpret_cast<char*>(&header), sizeof(header));
-    if (!fstream || std::string(header.magic, 7) != "YARRRAW") {
-        std::cerr << "Not a RawDataArchive file (bad magic): " << inputFileName << std::endl;
+    if (!fstream || !header.valid()) {
+        std::cerr << "Not a RawDataArchive file (format version " << RawDataArchiveHeader::currentVersion << "): " << inputFileName << std::endl;
         return 0;
     }
 
@@ -404,7 +411,7 @@ int readInData(const std::string& inputFileName, int nRecords = -1)
     words += 2;
 
     std::unique_ptr<RawData> data(new RawData(0, words));
-    std::copy(_buffer.data(), _buffer.data() + (words - 1), data->getBuf());
+    std::copy(_buffer.begin(), _buffer.end(), data->getBuf());
     _curIn = std::move(data);
     std::cout << "Done. (" << recordCnt << " records, " << (words - 2) << " words)" << std::endl;
     return words;
@@ -458,30 +465,31 @@ int main(int argc, char **argv)
             (void)fprintf(stderr, "%s: option `-%c' requires an argument\n",
                     argv[0], optopt);
             printHelp(argv[0]);
-            return 0;
+            return 1;
         case '?':
         default:
             (void)fprintf(stderr, "%s: option `-%c' is invalid: ignored\n",
                     argv[0], optopt);
             printHelp(argv[0]);
-            return 0;
+            return 1;
         }
     }
 
     if (inputFileName == "")
     {
         std::cerr << "Input file not provided" << std::endl;
-        return 0;
+        return 1;
     }
 
     if (colorMode != "always" && colorMode != "auto" && colorMode != "never")
     {
         std::cerr << "Invalid --color value `" << colorMode << "', expected always|auto|never" << std::endl;
-        return 0;
+        return 1;
     }
     const bool useColor = (colorMode == "always") || (colorMode == "auto" && isatty(fileno(stdout)));
 
-    Itkpixv2DecodeHelper *h = new Itkpixv2DecodeHelper();
+    auto helper = std::make_unique<Itkpixv2DecodeHelper>();
+    Itkpixv2DecodeHelper *h = helper.get();
 
     if (readInData(inputFileName, nRecords) == 0)
         return 1;

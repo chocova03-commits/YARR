@@ -146,11 +146,7 @@ void StdDataLoop::execPart2() {
                 if (nReadsInCurrentRxCycle > m_maxConsecutiveRxReads) {
                     for (auto &[id, rdc] : rdcMap) {
                         rdc->stat.is_end_of_iteration = false;
-                        auto &cp = keeper->getFe(id)->clipboards();
-                        if (m_doArchiveRawData) {
-                            cp.clipRawDataArchive.pushData(std::make_unique<RawDataContainer>(*rdc));
-                        }
-                        cp.clipRawData.pushData(std::move(rdc));
+                        keeper->getFe(id)->clipboards().pushRawData(std::move(rdc));
                         activeChannels.insert(id);
                     }
                     nReadsInCurrentRxCycle = 0; rdcMap.clear();
@@ -162,11 +158,7 @@ void StdDataLoop::execPart2() {
         // if there is anything left to process -- push it
         for (auto &[id, rdc] : rdcMap) {
             rdc->stat.is_end_of_iteration = false;
-            auto &cp = keeper->getEntry(id).fe->clipboards();
-            if (m_doArchiveRawData) {
-                cp.clipRawDataArchive.pushData(std::make_unique<RawDataContainer>(*rdc));
-            }
-            cp.clipRawData.pushData(std::move(rdc));
+            keeper->getEntry(id).fe->clipboards().pushRawData(std::move(rdc));
             activeChannels.insert(id);
         }
 
@@ -291,12 +283,9 @@ void StdDataLoop::execPart2() {
     LoopStatus loopStatusIterationEnd({0}, {LoopStyle::LOOP_STYLE_GLOBAL_FEEDBACK});
     loopStatusIterationEnd.is_end_of_iteration = true;
     for (unsigned id=0; id<keeper->getNumOfEntries(); id++) {
-        auto &cp = keeper->getEntry(id).fe->clipboards();
-        if (m_doArchiveRawData) {
-            cp.clipRawDataArchive.pushData(std::make_unique<RawDataContainer>(loopStatusIterationEnd));
-        }
         std::unique_ptr<RawDataContainer> cIterEnd = std::make_unique<RawDataContainer>(loopStatusIterationEnd);
-        cp.clipRawData.pushData(std::move(cIterEnd));
+        auto &cp = keeper->getEntry(id).fe->clipboards();
+        cp.pushRawData(std::move(cIterEnd));
         cp.clipProcFeedback.reset();
     }
 
@@ -336,11 +325,6 @@ void StdDataLoop::loadConfig(const json &config) {
 
     if (config.contains("reportHistograms")) {
         m_doReportHistograms = config["reportHistograms"];
-    }
-
-    if (config.contains("archiveRawData")) {
-        m_doArchiveRawData = config["archiveRawData"];
-        SPDLOG_LOGGER_INFO(sdllog, "Configured StdDataLoop: archiveRawData: {}", m_doArchiveRawData);
     }
 }
 

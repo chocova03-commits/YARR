@@ -5,6 +5,8 @@
 #include <vector>
 
 #include "ClipBoard.h"
+#include "FrontEnd.h"
+#include "FrontEndClipBoards.h"
 #include "LoopStatus.h"
 #include "RawData.h"
 #include "RawDataArchiver.h"
@@ -45,8 +47,8 @@ TEST_CASE("RawDataArchiverRoundTrip", "[raw_data_archiver]") {
     RawDataArchiveHeader header;
     in.read(reinterpret_cast<char*>(&header), sizeof(header));
     REQUIRE(in.good());
-    CHECK(std::string(header.magic, 7) == "YARRRAW");
-    CHECK(header.formatVersion == 1);
+    CHECK(header.valid());
+    CHECK(header.formatVersion == RawDataArchiveHeader::currentVersion);
 
     RawDataArchiveRecordHeader rec0;
     in.read(reinterpret_cast<char*>(&rec0), sizeof(rec0));
@@ -92,4 +94,29 @@ TEST_CASE("RawDataArchiverRoundTrip", "[raw_data_archiver]") {
 
     in.close();
     std::remove(filename.c_str());
+}
+
+TEST_CASE("RawDataArchiveCopyOnlyIfEnabled", "[raw_data_archiver]") {
+    FrontEndClipBoards cp;
+    LoopStatus stat({0}, {LOOP_STYLE_DATA});
+
+    auto rdc = std::make_unique<RawDataContainer>(stat);
+    rdc->add(std::make_shared<RawData>(0, std::vector<uint32_t>{1, 2, 3}));
+    cp.pushRawData(std::move(rdc));
+    CHECK(cp.clipRawData.size() == 1);
+    CHECK(cp.clipRawDataArchive.empty());
+
+    cp.archiveRawData = true;
+    rdc = std::make_unique<RawDataContainer>(stat);
+    rdc->add(std::make_shared<RawData>(0, std::vector<uint32_t>{4, 5}));
+    cp.pushRawData(std::move(rdc));
+    CHECK(cp.clipRawData.size() == 2);
+    REQUIRE(cp.clipRawDataArchive.size() == 1);
+
+    // The copy shares the raw data buffers
+    cp.clipRawData.popData();
+    auto orig = cp.clipRawData.popData();
+    auto copy = cp.clipRawDataArchive.popData();
+    REQUIRE(copy->size() == 1);
+    CHECK(copy->data[0].get() == orig->data[0].get());
 }

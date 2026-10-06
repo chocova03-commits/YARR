@@ -70,7 +70,6 @@ private:
     std::map<unsigned, std::unique_ptr<FeDataProcessor> > procs{};
     std::map<unsigned, std::unique_ptr<HistoDataProcessor> > histogrammers{};
     std::map<unsigned, std::unique_ptr<RawDataArchiver> > rawArchivers{};
-    bool m_doArchiveRawData{false};
     std::map<unsigned, std::vector<std::unique_ptr<AnalysisDataProcessor>> > analyses{};
     FeedbackClipboardMap fbData;
     std::string chipType{};

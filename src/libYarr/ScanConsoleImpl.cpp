@@ -247,10 +247,7 @@ int ScanConsoleImpl::setupScan() {
     // TODO not to use the raw pointer!
     try {
         ScanHelper::buildRawDataProcs(procs, scanCfg, *bookie, chipType);
-        m_doArchiveRawData = ScanHelper::scanRequestsRawDataArchive(scanCfg);
-        if (m_doArchiveRawData) {
-            ScanHelper::buildRawDataArchivers(rawArchivers, *bookie, scanOpts.outputDir);
-        }
+        ScanHelper::buildRawDataArchivers(rawArchivers, scanCfg, *bookie, scanOpts.outputDir);
         ScanHelper::buildHistogrammers(histogrammers, scanCfg, *bookie, scanOpts.outputDir);
         ScanHelper::buildAnalyses(analyses, scanCfg, *bookie, scanBase.get(),
                                   &fbData, scanOpts.mask_opt, scanOpts.outputDir,
@@ -283,9 +280,9 @@ int ScanConsoleImpl::setupScan() {
         procs[id]->init();
         procs[id]->run();
 
-        if (m_doArchiveRawData) {
-            rawArchivers[id]->init();
-            rawArchivers[id]->run();
+        if (auto it = rawArchivers.find(id); it != rawArchivers.end()) {
+            it->second->init();
+            it->second->run();
         }
 
         logger->info(" .. started threads of Fe {}", id);
@@ -637,9 +634,7 @@ void ScanConsoleImpl::run() {
         auto fe = bookie->getFe(id);
         if (fe->isActive()) {
             fe->clipboards().clipRawData.finish();
-            if (m_doArchiveRawData) {
-                fe->clipboards().clipRawDataArchive.finish();
-            }
+            fe->clipboards().clipRawDataArchive.finish();
         }
     }
 
@@ -649,10 +644,8 @@ void ScanConsoleImpl::run() {
     for( auto& proc : procs ) {
       proc.second->join();
     }
-    if (m_doArchiveRawData) {
-        for( auto& archiver : rawArchivers ) {
-            archiver.second->join();
-        }
+    for( auto& archiver : rawArchivers ) {
+      archiver.second->join();
     }
     processor_done = std::chrono::steady_clock::now();
     // Get logs

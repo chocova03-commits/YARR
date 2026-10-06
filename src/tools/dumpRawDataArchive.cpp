@@ -24,19 +24,18 @@ namespace {
     }
 }
 
-void usage(char* argv[])
+void usage(char* argv[], int status)
 {
     std::cout << "Usage: " << argv[0] << " [options] inputFile1 inputFile2 ...\n"
         " -n <int>: max number of words to print per chunk (default 16, 0 = all)\n"
         " -w <int>: words per line in hex dump (default 8)\n"
         " -q : quiet, only print running totals at the end" << std::endl;
-    exit(1);
+    exit(status);
 }
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        usage(argv);
-        return -1;
+        usage(argv, 1);
     }
 
     int c;
@@ -46,11 +45,11 @@ int main(int argc, char *argv[]) {
 
     while ((c = getopt(argc, argv, "hn:w:q")) != -1) {
         switch (c) {
-        case 'h': usage(argv); return 0;
+        case 'h': usage(argv, 0); break;
         case 'n': n_words = std::stoul(optarg); break;
         case 'w': words_per_line = std::stoul(optarg); break;
         case 'q': quiet = true; break;
-        default: usage(argv); return -1;
+        default: usage(argv, 1); break;
         }
     }
 
@@ -66,8 +65,9 @@ int main(int argc, char *argv[]) {
 
         RawDataArchiveHeader header;
         inputFile.read(reinterpret_cast<char*>(&header), sizeof(header));
-        if (!inputFile || std::string(header.magic, 7) != "YARRRAW") {
-            std::cout << "Not a RawDataArchive file (bad magic): " << argv[n] << std::endl;
+        if (!inputFile || !header.valid()) {
+            std::cout << "Not a RawDataArchive file (format version " << RawDataArchiveHeader::currentVersion
+                      << "): " << argv[n] << std::endl;
             continue;
         }
 
@@ -116,6 +116,7 @@ int main(int argc, char *argv[]) {
                 for (uint32_t w = 0; w < chunkHeader.nWords; w++) {
                     uint32_t word = 0;
                     inputFile.read(reinterpret_cast<char*>(&word), sizeof(word));
+                    if (!inputFile) break;
                     if (!quiet && w < toPrint) {
                         if (w % words_per_line == 0) std::cout << "    ";
                         std::cout << std::hex << std::setw(8) << std::setfill('0')
@@ -124,6 +125,10 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 if (!quiet && toPrint % words_per_line != 0) std::cout << std::endl;
+                if (!inputFile) {
+                    std::cout << "File truncated in the middle of a chunk: " << argv[n] << std::endl;
+                    break;
+                }
                 if (!quiet && toPrint < chunkHeader.nWords) {
                     std::cout << "    ... (" << (chunkHeader.nWords - toPrint) << " more words)" << std::endl;
                 }

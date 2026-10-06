@@ -301,7 +301,7 @@ namespace ScanHelper {
             const std::string &chipType) {
         bhlog->info("Loading RawData processors ..");
         json procConfig;
-        if(scanCfg["scan"].contains("processor")) {
+        if(scanCfg["scan"].contains("processor") && scanCfg["scan"]["processor"].contains("config")) {
             procConfig = scanCfg["scan"]["processor"]["config"];
         }
         for (unsigned id = 0; id<bookie.getNumOfEntries(); id++) {
@@ -315,22 +315,12 @@ namespace ScanHelper {
         }
     }
 
-    bool scanRequestsRawDataArchive(const json &scanCfg) {
-        for (unsigned int i=0; i<scanCfg["scan"]["loops"].size(); i++) {
-            const json &loop = scanCfg["scan"]["loops"][i];
-            std::string loopAction = loop["loopAction"];
-            if (loopAction != "StdDataLoop" && loopAction != "StdDataGatherer") continue;
-            if (!loop.contains("config")) continue;
-            if (loop["config"].contains("archiveRawData") && loop["config"]["archiveRawData"]) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     void buildRawDataArchivers( std::map<unsigned, std::unique_ptr<RawDataArchiver>> &archivers,
+                           const json &scanCfg,
                            Bookkeeper &bookie,
                            const std::string &outputDir) {
+        if (!scanCfg["scan"].contains("processor") || !scanCfg["scan"]["processor"].value("archiveRawData", false))
+            return;
         bhlog->info("Loading RawDataArchivers ..");
         for (unsigned id = 0; id<bookie.getNumOfEntries(); id++) {
             auto fe = bookie.getFe(id);
@@ -338,6 +328,7 @@ namespace ScanHelper {
             archivers[id] = std::make_unique<RawDataArchiver>();
             auto &cp = fe->clipboards();
             archivers[id]->connect(&cp.clipRawDataArchive);
+            cp.archiveRawData = true;
             std::string output_filename = (outputDir + dynamic_cast<FrontEndCfg*>(fe)->getName() + "_rawdata.bin");
             bool status = archivers[id]->open(output_filename);
             if (!status) {

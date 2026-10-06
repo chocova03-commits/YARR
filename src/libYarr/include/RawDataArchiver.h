@@ -11,6 +11,7 @@
 #include <fstream>
 #include <memory>
 #include <thread>
+#include <vector>
 
 #include "ClipBoard.h"
 #include "DataProcessor.h"
@@ -44,6 +45,7 @@ class RawDataArchiver : public DataProcessor {
         ClipBoard<RawDataContainer> *input = nullptr;
         std::fstream fileHandle;
         std::unique_ptr<std::thread> thread_ptr;
+        std::vector<uint32_t> m_words; // write buffer for one chunk
 };
 
 #endif

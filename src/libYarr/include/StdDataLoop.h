@@ -44,9 +44,6 @@ class StdDataLoop: public LoopActionBase, public StdDataAction {
         /// If set, publish histograms on data flow
         bool m_doReportHistograms{true};
 
-        /// If set, duplicate raw data into clipRawDataArchive for RawDataArchiver
-        bool m_doArchiveRawData{false};
-
         /// Record of stats per loop
         std::unique_ptr<StdDataLoopDetail::Stats> m_stats;
 };
