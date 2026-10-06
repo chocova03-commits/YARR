@@ -26,11 +26,10 @@ auto logger = logging::make_log("eyeDiagram");
 constexpr const char* COLOR_GREEN = "\033[32m";
 constexpr const char* COLOR_RESET = "\033[0m";
 
-// Bias the chosen delay towards the low edge of the eye rather than dead
-// center: the high edge has been observed to degrade faster than the low
-// edge, so centering leaves less margin than intended. The right bias point
-// is link/setup dependent, so it's exposed via -e rather than fixed here.
-constexpr double DEFAULT_EYE_LOW_EDGE_FRACTION = 0.4;
+// Place the delay at the centre of the eye: under data-taking load the error-free
+// region sits at ~0.56 of the quiet eye on average, so neither edge is safer.
+// The right point is link/setup dependent, so it's exposed via -e.
+constexpr double DEFAULT_EYE_LOW_EDGE_FRACTION = 0.5;
 
 void printHelp() {
     std::cout << "Usage: ./bin/eyeDiagram [-h] [-r <hw_controller_file>] [-c <connectivity_file>] [-t <test_size>] [-e <eye_low_edge_fraction>] [-s]\n\n"
