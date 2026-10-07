@@ -188,6 +188,8 @@ if(IS_IN_TDAQ_INSTALL)
     # Override gnu paths
     set(CMAKE_INSTALL_LIBDIR ${YARR_INSTALL_BIN_CONFIG}/lib)
     set(CMAKE_INSTALL_BINDIR ${YARR_INSTALL_BIN_CONFIG}/bin)
+    # Install headers into include/YARR rather than flat into include/
+    set(CMAKE_INSTALL_INCLUDEDIR include/YARR)
     set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/installed CACHE PATH "Install path" FORCE)
     message(STATUS "YARR will use binary tag: ${YARR_INSTALL_BIN_CONFIG}")
 endif()

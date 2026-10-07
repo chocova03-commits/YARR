@@ -241,8 +241,7 @@ StarChipsetEmu::StarChipsetEmu(ClipBoard<RawData>* rx,
 
   // HPR
   hpr_clkcnt = HPRPERIOD/2; // 20000 BCs or 500 us
-  hpr_sent.resize(m_starCfg->numABCs() + 1); // 1 HCCStar + nABCs ABCStar chips
-  std::fill(hpr_sent.begin(), hpr_sent.end(), false);
+  hpr_sent.reset();
 }
 
 StarChipsetEmu::~StarChipsetEmu() = default;
@@ -706,7 +705,7 @@ void StarChipsetEmu::doFastCommand(uint8_t data6) {
 
 void StarChipsetEmu::logicReset() {
   hpr_clkcnt = HPRPERIOD/2;
-  std::fill(hpr_sent.begin(), hpr_sent.end(), false);
+  hpr_sent.reset();
 
   (m_starCfg->hcc()).setSubRegisterValue(HCCStarSubRegister::TESTHPR, 0);
   (m_starCfg->hcc()).setSubRegisterValue(HCCStarSubRegister::STOPHPR, 0);

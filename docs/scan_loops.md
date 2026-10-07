@@ -21,6 +21,30 @@ received.
 The normal data loop collects data until the appropriate number of events
 have been collected.
 
+### Archiving raw data
+
+Setting `"archiveRawData": true` in the scan's `"processor"` block saves the
+raw, pre-decode hardware words of every FE to `<feName>_rawdata.bin` in the
+scan's output directory:
+
+```json
+"scan": {
+  "processor": { "archiveRawData": true },
+  ...
+}
+```
+
+Both `StdDataLoop` and `StdDataGatherer` then also pass a copy of each
+`RawDataContainer` to a `RawDataArchiver`
+(`src/libYarr/RawDataArchiver.cpp`), which writes it to disk on its own
+thread. The normal decode path is unaffected, and nothing is copied when the
+option is off. This is useful for diagnosing decode failures against what the
+hardware actually sent, rather than only the decoded result.
+
+Use the `dumpRawDataArchive` tool (see [tools.md](tools.md)) to inspect the
+resulting file offline, or the ITkPixV2-specific `itkpixv2DecodeTool` to
+decode it into per-pixel hits.
+
 ## StdParameterLoop
 
 The parameter loop provides a way to iterate over any variable.

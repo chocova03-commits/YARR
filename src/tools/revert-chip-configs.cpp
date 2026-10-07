@@ -37,7 +37,7 @@ void print_usage(char* argv[]) {
 int main(int argc, char* argv[]) {
     std::string connectivity_filename = "";
     std::string output_yarr_dir = "";
-    int chip_idx = -1;
+    unsigned int chip_idx = -1;
     std::string chip_name = "";
     bool use_chip_name = false;
     std::string suffix = ".before";
@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
  
         // Skip chips if they are not specified
         if (!use_chip_name) {
-            if ( (chip_idx >= 0) && (chip_idx != ichip) ) {
+            if ( (chip_idx != (unsigned)-1) && (chip_idx != ichip) ) {
                continue;
             }
         }

@@ -120,12 +120,17 @@ int ScanConsoleImpl::init(ScanOpts options) {
     scanOpts=std::move(options);
     runCounter = ScanHelper::newRunCounter();
     if(!scanOpts.logCfgPath.empty()) {
-        loggerConfig = ScanHelper::openJsonFile(scanOpts.logCfgPath);
-        loggerConfig["outputDir"]=scanOpts.outputDir;
+        loggerConfig = ScanHelper::openJsonFile(scanOpts.logCfgPath).get<logging::LoggingConfig>();
     } else {
         // default log setting
         loggerConfig = logging::defaultConfig();
     }
+
+    // Only override output dir if not set in the file
+    if(loggerConfig.output_dir.empty()) {
+        loggerConfig.output_dir = scanOpts.outputDir;
+    }
+
     spdlog::info("Configuring logger ...");
     logging::setPirateMode(scanOpts.pirateMode);
     logging::setupLoggers(loggerConfig);
@@ -242,6 +247,7 @@ int ScanConsoleImpl::setupScan() {
     // TODO not to use the raw pointer!
     try {
         ScanHelper::buildRawDataProcs(procs, scanCfg, *bookie, chipType);
+        ScanHelper::buildRawDataArchivers(rawArchivers, scanCfg, *bookie, scanOpts.outputDir);
         ScanHelper::buildHistogrammers(histogrammers, scanCfg, *bookie, scanOpts.outputDir);
         ScanHelper::buildAnalyses(analyses, scanCfg, *bookie, scanBase.get(),
                                   &fbData, scanOpts.mask_opt, scanOpts.outputDir,
@@ -273,7 +279,12 @@ int ScanConsoleImpl::setupScan() {
         
         procs[id]->init();
         procs[id]->run();
-     
+
+        if (auto it = rawArchivers.find(id); it != rawArchivers.end()) {
+            it->second->init();
+            it->second->run();
+        }
+
         logger->info(" .. started threads of Fe {}", id);
     }
     bookie->startFeClipboardMonitor();
@@ -608,8 +619,30 @@ void ScanConsoleImpl::getResults(json &result) {
     result["scanLog"] = scanLog;
 }
 
+void ScanConsoleImpl::readLinkErrorCounters() {
+    uint64_t total = 0;
+    for (unsigned id=0; id<bookie->getNumOfEntries(); id++) {
+        auto feCfg = bookie->getFeCfg(id);
+        if (!bookie->getFe(id)->isActive())
+            continue;
+        auto errors = hwCtrl->readLinkErrorCounters(feCfg->getRxChannel());
+        if (errors.empty())
+            continue;
+        uint64_t sum = 0;
+        for (auto e : errors) sum += e;
+        total += sum;
+        scanLog["Link errors"][feCfg->getName()] = {{"Rx channel", feCfg->getRxChannel()}, {"Errors", sum}, {"Errors per lane", errors}};
+        if (sum > 0)
+            logger->warn("Link errors during scan: {} (rx {}): {}", feCfg->getName(), feCfg->getRxChannel(), sum);
+    }
+    if (total == 0)
+        logger->info("No link errors during scan");
+}
+
 void ScanConsoleImpl::run() {
     ScanHelper::banner(logger,"Run Scan");
+
+    bool linkErrorCounters = hwCtrl->resetLinkErrorCounters();
 
     scan_start = std::chrono::steady_clock::now();
     ScanProgress::instance().init(*scanBase);
@@ -618,11 +651,16 @@ void ScanConsoleImpl::run() {
     scanBase->postScan();
     logger->info("Scan done!");
 
+    if (linkErrorCounters) {
+        this->readLinkErrorCounters();
+    }
+
     // Join from upstream to downstream.
     for (unsigned id=0; id<bookie->getNumOfEntries(); id++) {
         auto fe = bookie->getFe(id);
         if (fe->isActive()) {
             fe->clipboards().clipRawData.finish();
+            fe->clipboards().clipRawDataArchive.finish();
         }
     }
 
@@ -631,6 +669,9 @@ void ScanConsoleImpl::run() {
     // Join FeDataProcessor
     for( auto& proc : procs ) {
       proc.second->join();
+    }
+    for( auto& archiver : rawArchivers ) {
+      archiver.second->join();
     }
     processor_done = std::chrono::steady_clock::now();
     // Get logs
@@ -714,10 +755,10 @@ void ScanConsoleImpl::dump() {
 }
 
 void ScanConsoleImpl::setupLogger(const char *config) {
-    json loggerConfig = logging::defaultConfig();
+    logging::LoggingConfig loggerConfig = logging::defaultConfig();
     if (config) {
         try {
-            loggerConfig = json::parse(config);
+            loggerConfig = json::parse(config).get<logging::LoggingConfig>();
         } catch (...) {}
     }
     logging::setupLoggers(loggerConfig);

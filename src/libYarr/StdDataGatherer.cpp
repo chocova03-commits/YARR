@@ -110,13 +110,13 @@ void StdDataGatherer::execPart2() {
                         // Push data out
                         rdc->stat.is_end_of_iteration = false;
                         auto &cp = keeper->getFe(id)->clipboards();
-                        cp.clipRawData.pushData(std::move(rdc));
+                        cp.pushRawData(std::move(rdc));
                         // Create EoI
                         LoopStatus loopStatusIterationEnd({0}, {LoopStyle::LOOP_STYLE_GLOBAL_FEEDBACK});
                         loopStatusIterationEnd.is_end_of_iteration = true;
                         // Send EoI
                         std::unique_ptr<RawDataContainer> cIterEnd = std::make_unique<RawDataContainer>(loopStatusIterationEnd);
-                        cp.clipRawData.pushData(std::move(cIterEnd));
+                        cp.pushRawData(std::move(cIterEnd));
                         cp.clipProcFeedback.clearData();
                     }
                 }
@@ -152,7 +152,7 @@ void StdDataGatherer::execPart2() {
         for (auto &[id, rdc] : rdcMap) {
             if (rdc->size() > 0) {
                 rdc->stat.is_end_of_iteration = false;
-                keeper->getFe(id)->clipboards().clipRawData.pushData(std::move(rdc));
+                keeper->getFe(id)->clipboards().pushRawData(std::move(rdc));
             }
         }
         rdcMap.clear();
@@ -163,7 +163,7 @@ void StdDataGatherer::execPart2() {
             loopStatusIterationEnd.is_end_of_iteration = true;
             std::unique_ptr<RawDataContainer> cIterEnd = std::make_unique<RawDataContainer>(loopStatusIterationEnd);
             auto &cp = keeper->getEntry(id).fe->clipboards();
-            cp.clipRawData.pushData(std::move(cIterEnd));
+            cp.pushRawData(std::move(cIterEnd));
             cp.clipProcFeedback.clearData();
         }
     }

@@ -10,8 +10,11 @@
 
 void usage(char* argv[])
 {
-    std::cout << "Usage: " << argv[0] << " inputFile1 inputFile2 ... \n -t <int>: number of triggers in data window\n"
-        " -s <int>: start position (default 0)\n -e <int>: end position (default -1)\n -v: use verbose output (default false)" << std::endl;
+    std::cout << "Usage: " << argv[0] << " inputFile1 inputFile2 ... \n"
+        " -t <int>: number of triggers in data window\n"
+        " -s <int>: start position (default 0)\n"
+        " -e <int>: end position (default -1)\n"
+        " -v: use verbose output (default false)" << std::endl;
     exit(1);
 }
 
@@ -71,7 +74,7 @@ int main(int argc, char *argv[]) {
         int basetag = 0;
         int exttag = 0;
         int prev_basetag = 0;
-        int i = 0;
+        unsigned i = 0;
         int basetag_jumps = 0;
         int totaljumps = 0;
 

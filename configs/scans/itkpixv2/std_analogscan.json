@@ -4,7 +4,9 @@
             "0": {
                 "algorithm": "OccupancyAnalysis",
                 "config": {
-                    "createMask": true
+                    "createMask": true,
+                    "LowThr": 99,
+                    "HighThr" : 101
                 }
             },
             "1": {

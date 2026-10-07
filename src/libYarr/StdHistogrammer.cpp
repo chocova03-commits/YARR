@@ -92,6 +92,8 @@ void DataArchiver::processEvent(FrontEndData *data) {
 }
 
 void OccupancyMap::create(const LoopStatus &stat) {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
     auto h2 = createHistoMap(outputName(), "Hits", nCol, nRow, stat);
     // Save the 2d pointer for filling
     h = h2.get();
@@ -111,6 +113,9 @@ void OccupancyMap::processEvent(FrontEndData *data) {
 }
 
 void TotMap::create(const LoopStatus &stat) {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     auto h2 = createHistoMap(outputName(), "Total ToT", nCol, nRow, stat);
     h = h2.get();
     r = std::move(h2);
@@ -128,6 +133,9 @@ void TotMap::processEvent(FrontEndData *data) {
 }
 
 void Tot2Map::create(const LoopStatus &stat) {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     auto h2 = createHistoMap(outputName(), "Total ToT2", nCol, nRow, stat);
     h = h2.get();
     r = std::move(h2);
@@ -162,6 +170,9 @@ void TotDist::processEvent(FrontEndData *data) {
 }
 
 void Tot3d::create(const LoopStatus &stat) {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     auto h3 = createHistoMap3d<uint16_t>("Tot3d", nCol, nRow, "ToT", 16, 0.5, 16.5, stat);
     h = h3.get();
     r = std::move(h3);
@@ -192,6 +203,9 @@ void TagDist::processEvent(FrontEndData *data) {
 }
 
 void TagMap::create(const LoopStatus &stat) {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     auto h2 = createHistoMap(outputName(), "Tag2", nCol, nRow, stat);
     h = h2.get();
     r = std::move(h2);
@@ -224,6 +238,9 @@ void TagOccupancyMap::loadConfig(const json &cfg)
 }
 
 void TagOccupancyMap::create(const LoopStatus &stat) {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     h = new Histo3d(outputName(),
                     nCol, 0.5, nCol+0.5,
                     nRow, 0.5, nRow+0.5,
@@ -302,6 +319,9 @@ void L1Hist::processEvent(FrontEndData *data) {
 }
 
 void L13d::create(const LoopStatus &stat) {
+    auto nCol = fe_geom.nCol;
+    auto nRow = fe_geom.nRow;
+
     auto h3 = createHistoMap3d<uint16_t>(outputName(), nCol, nRow, "L1A", 16, -0.5, 15.5, stat);
     h = h3.get();
     r = std::move(h3);

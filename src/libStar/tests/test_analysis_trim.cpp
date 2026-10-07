@@ -84,8 +84,9 @@ TEST_CASE("StarTrimDacAnalysis", "[Analysis][Star][Trim]") {
     // This is for one FE
     AnalysisProcessor analysis(rx_channel);
 
-    int nCol = Star::StripsPerABCRow * chip_count;
-    int nRow = Star::RowsPerABC;
+    FrontEndGeometry geom{Star::RowsPerABC, Star::StripsPerABCRow * chip_count};
+    int nCol = geom.nCol;
+    int nRow = geom.nRow;
 
     {
       auto ana = StdDict::getAnalysis("StarTrimDacAnalysis");
@@ -96,7 +97,7 @@ TEST_CASE("StarTrimDacAnalysis", "[Analysis][Star][Trim]") {
 
       ana->setConfig(bookie.getFeCfg(rx_channel));
 
-      ana->setMapSize(nCol, nRow);
+      ana->setMapSize(geom);
 
       analysis.addAlgorithm(std::move(ana));
     }

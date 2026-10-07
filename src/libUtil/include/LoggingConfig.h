@@ -37,6 +37,8 @@ struct LoggingConfig {
   std::string default_sink{};
   /// If default_sink is 'ringbuffer', set depth
   size_t ringbuffer_size{};
+  /// Directory if file loggers specified with relative path
+  std::string output_dir{};
   /// If true, report only log contents
   bool simple{};
 };
@@ -48,10 +50,10 @@ constexpr const char *defaultLogPattern = "[%T:%e]%^[%=8l][%=15n][%t]:%$ %v";
  * If configs/logging/default.json exists, this is used.
  * Otherwise create simple config.
  */
-json defaultConfig();
+LoggingConfig defaultConfig();
 
 /// Setup loggers according to configuration in json file
-void setupLoggers(const json &j, const std::string &path="");
+void setupLoggers(const LoggingConfig &j);
 
 /// Add a stdout.log file sink to every logger, using the same level and
 /// pattern as the terminal sink, writing into outputDir (must already

@@ -52,7 +52,7 @@ def get_layer_from_serial_number(serial_number):
     log.exception("Invalid module SN: %s", serial_number)
     raise ValueError()
 
-def clear_chip_config(connectivity_file):
+def clear_chip_config(connectivity_file, enable_all_cc=False):
     # check if any SN is in the connectivity file name
     sn = connectivity_file.split("/")[-1]
     isModule = False
@@ -124,6 +124,13 @@ def clear_chip_config(connectivity_file):
             "LP": 0,
             }[power_config]
 
+        if enable_all_cc:
+            log.info("Enabling all core columns.")
+            data_chip[chip_type]["GlobalConfig"]["EnCoreCol0"] = 65535
+            data_chip[chip_type]["GlobalConfig"]["EnCoreCol1"] = 65535
+            data_chip[chip_type]["GlobalConfig"]["EnCoreCol2"] = 65535
+            data_chip[chip_type]["GlobalConfig"]["EnCoreCol3"] = 63
+
         with open(chipConfigPath,'w') as outfile:
             outfile.write(json.dumps(data_chip, sort_keys=True, indent=4))
         outfile.close()
@@ -132,7 +139,9 @@ def clear_chip_config(connectivity_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--connectivity', dest="connectivity_file", help="Connectivity file")
+    parser.add_argument('--enable-all-cc', action="store_true", dest="enable_all_cc", help="Enable all core columns.")
     args = vars(parser.parse_args())
 
     connectivity_file=args["connectivity_file"]
-    clear_chip_config(connectivity_file)
+    enable_all_cc=args["enable_all_cc"]
+    clear_chip_config(connectivity_file, enable_all_cc)

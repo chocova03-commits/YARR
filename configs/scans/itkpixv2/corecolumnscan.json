@@ -4,7 +4,9 @@
             "0": {
                 "algorithm": "OccupancyAnalysis",
                 "config": {
-		    "coreColMask": true
+                    "coreColMask": true,
+                    "LowThr": 99,
+                    "HighThr" : 101
                 }
             },
             "1": {

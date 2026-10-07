@@ -67,15 +67,16 @@ TEST_CASE("StarNPointGainAnalysis", "[Star][Analysis][NPointGain]") {
 
   AnalysisProcessor processor(channel);
 
-  int nCol = Star::StripsPerABCRow;
-  int nRow = Star::RowsPerABC;
+  FrontEndGeometry geom{Star::RowsPerABC, Star::StripsPerABCRow};
+  int nCol = geom.nCol;
+  int nRow = geom.nRow;
 
   {
     auto analysis = StdDict::getAnalysis("StarNPointGainAnalysis");
     REQUIRE(analysis);
 
     analysis->loadConfig(analysisConfig);
-    analysis->setMapSize(nCol, nRow);
+    analysis->setMapSize(geom);
     analysis->setConfig(bookie.getFeCfg(channel));
 
     processor.addAlgorithm(std::move(analysis));

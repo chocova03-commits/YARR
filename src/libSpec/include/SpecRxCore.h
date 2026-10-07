@@ -111,8 +111,12 @@ class SpecRxCore : virtual public RxCore, virtual public SpecCom{
 
         void checkRxSync() override;
 
+        bool resetLinkErrorCounters() override;
+        std::vector<uint64_t> readLinkErrorCounters(uint32_t channel) override;
+
     protected:
         uint32_t m_rxActiveLanes;
+        bool m_linkErrorCounters = false;
         std::vector<uint32_t> m_delay;
 
     private:

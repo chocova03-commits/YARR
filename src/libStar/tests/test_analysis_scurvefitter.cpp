@@ -32,15 +32,16 @@ TEST_CASE("ScurveFitterAnalysis", "[Analysis][ScurveFitter]") {
 
     AnalysisProcessor processor(channel);
 
-    int nCol = 2;
-    int nRow = 2;
+    FrontEndGeometry geom{2, 2};
+    int nCol = geom.nCol;
+    int nRow = geom.nRow;
 
     {
         auto analysis = StdDict::getAnalysis("ScurveFitter");
         REQUIRE(analysis);
 
         analysis->loadConfig(analysisConfig);
-        analysis->setMapSize(nCol, nRow);
+        analysis->setMapSize(geom);
         analysis->setConfig(bookie.getFeCfg(channel));
 
         processor.addAlgorithm(std::move(analysis));
@@ -139,15 +140,16 @@ TEST_CASE("ScurveFitterAnalysisNonDivisibleStep", "[Analysis][ScurveFitter]") {
 
     AnalysisProcessor processor(channel);
 
-    int nCol = 2;
-    int nRow = 2;
+    FrontEndGeometry geom{2, 2};
+    int nCol = geom.nCol;
+    int nRow = geom.nRow;
 
     {
         auto analysis = StdDict::getAnalysis("ScurveFitter");
         REQUIRE(analysis);
 
         analysis->loadConfig(analysisConfig);
-        analysis->setMapSize(nCol, nRow);
+        analysis->setMapSize(geom);
         analysis->setConfig(bookie.getFeCfg(channel));
 
         processor.addAlgorithm(std::move(analysis));

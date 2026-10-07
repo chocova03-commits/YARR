@@ -11,6 +11,7 @@
 
 #include "AnalysisDataProcessor.h"
 #include "AllPlotters.h"
+#include "RawDataArchiver.h"
 #include "ThreadPool.h"
 #include "ScanOpts.h"
 #include "ScanBase.h"
@@ -22,6 +23,7 @@
 
 #include "storage.hpp"
 #include "logging.h"
+#include "LoggingConfig.h"
 
 class ScanConsoleImpl {
 public:
@@ -50,6 +52,8 @@ public:
     ~ScanConsoleImpl() = default;
 
 private:
+    /// Read link error counters of all active FEs into the scan log
+    void readLinkErrorCounters();
     ScanOpts scanOpts;
     unsigned runCounter{};
     std::string strippedScan{};
@@ -67,12 +71,13 @@ private:
     std::unique_ptr<ScanBase> scanBase{};
     std::map<unsigned, std::unique_ptr<FeDataProcessor> > procs{};
     std::map<unsigned, std::unique_ptr<HistoDataProcessor> > histogrammers{};
+    std::map<unsigned, std::unique_ptr<RawDataArchiver> > rawArchivers{};
     std::map<unsigned, std::vector<std::unique_ptr<AnalysisDataProcessor>> > analyses{};
     FeedbackClipboardMap fbData;
     std::string chipType{};
     std::string timestampStr{};
     std::time_t now{};
-    json loggerConfig;
+    logging::LoggingConfig loggerConfig;
     json chipConfig;
     json dbCfg;
     json ctrlCfg;

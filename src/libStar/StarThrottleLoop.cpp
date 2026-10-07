@@ -34,11 +34,11 @@ void StarThrottleLoop::writeConfig(json &j) {
 }
 
 void StarThrottleLoop::loadConfig(const json &j) {
-    if (!j["max"].empty())
+    if (j.contains("max") && !j["max"].empty())
         max = j["max"];
-    if (!j["step"].empty())
+    if (j.contains("step") && !j["step"].empty())
         step = j["step"];
-    if (!j["max_iters"].empty())
+    if (j.contains("max_iters") && !j["max_iters"].empty())
         max_iters = j["max_iters"];
 }
 

@@ -128,11 +128,11 @@ void StarStrobeDelayAnalysis::processHistogram(HistogramBase *h) {
       abort();
     }
 
-    for(unsigned col=1; col<=nCol; col++) {
-        for (unsigned row=1; row<=nRow; row++) {
+    for(unsigned col=1; col<=fe_geom.nCol; col++) {
+        for (unsigned row=1; row<=fe_geom.nRow; row++) {
 	  unsigned bin = hh->binNum(col, row);
                 // Only one loop so ident can simply be obtained from row and column number
-	        unsigned ident = ((row-1)*nCol) + (col-1);
+                unsigned ident = ((row-1)*fe_geom.nCol) + (col-1);
                 unsigned strobeDelay = hh->getStat().get(strobeDelayLoop);
                 std::string name = "StrobeDelay";
                 name += "-" + std::to_string(col) + "-" + std::to_string(row);
@@ -173,7 +173,7 @@ void StarStrobeDelayAnalysis::processHistogram(HistogramBase *h) {
 		  m_rightEdgeMap[ident] = fitParams[1][0];
 
 		  // Dump SD plots if desired
-		  if (m_dumpDebugSDPlots && row == nRow/Star::RowsPerABC && col%10 == 0) {
+		  if (m_dumpDebugSDPlots && row == fe_geom.nRow/Star::RowsPerABC && col%10 == 0) {
 		    output->pushData(std::move(m_strobeDelayHistos[ident]));
 		  }
 		  m_strobeDelayHistos[ident].reset(nullptr);
@@ -204,7 +204,7 @@ void StarStrobeDelayAnalysis::pushData() {
   auto upJD = std::make_unique<StarJsonData>("JsonData_StarStrobeDelayResult");
   upJD->setJsonDataType("JsonData_StarStrobeDelayResult");
 
-  unsigned nChips = (nCol/Star::StripsPerABCRow);
+  unsigned nChips = (fe_geom.nCol/Star::StripsPerABCRow);
 
   auto feedbackData = std::make_unique<Histo2d>("feedback", nChips, 0, nChips, 1, 0, 1);
 
@@ -217,7 +217,7 @@ void StarStrobeDelayAnalysis::pushData() {
       upJD->initialiseStarChannelsDataAtProp({"ABCStar_" + std::to_string(iChip), "LeftEdge", "Row" + std::to_string(row)});
       upJD->initialiseStarChannelsDataAtProp({"ABCStar_" + std::to_string(iChip), "RightEdge", "Row" + std::to_string(row)});
       for (unsigned iStrip=0; iStrip<Star::StripsPerABCRow; iStrip++) {
-	unsigned iChannel = iStrip + row*nCol + Star::StripsPerABCRow*iChip;
+	unsigned iChannel = iStrip + row*fe_geom.nCol + Star::StripsPerABCRow*iChip;
 	double leftEdgeThisChannel = m_leftEdgeMap.at(iChannel);
 	double rightEdgeThisChannel = m_rightEdgeMap.at(iChannel);
 	hDistLeftEdge->fill(leftEdgeThisChannel);
@@ -269,8 +269,8 @@ void StarStrobeDelayAnalysis::pushData() {
 
   // Output occupancy map vs SD vs channel per chip/row
   for (unsigned int row=0; row<Star::RowsPerABC; row++){
-    auto hOccVsSDVsCh = std::make_unique<Histo2d>("OccVsStrobeDelayVsChan_Row" + std::to_string(row), nCol, 0, nCol, m_strobeDelayBins,  m_strobeDelayMin-((double)m_strobeDelayStep/2.0), m_strobeDelayMax+((double)m_strobeDelayStep/2.0));
-    for (unsigned int iChip=0; iChip<(nCol/Star::StripsPerABCRow); iChip++) {
+    auto hOccVsSDVsCh = std::make_unique<Histo2d>("OccVsStrobeDelayVsChan_Row" + std::to_string(row), fe_geom.nCol, 0, fe_geom.nCol, m_strobeDelayBins,  m_strobeDelayMin-((double)m_strobeDelayStep/2.0), m_strobeDelayMax+((double)m_strobeDelayStep/2.0));
+    for (unsigned int iChip=0; iChip<(fe_geom.nCol/Star::StripsPerABCRow); iChip++) {
       auto hOccVsStrobeDelayPerRow = m_hOccVsStrobeDelayVsChannelPerRow[iChip*Star::RowsPerABC + row]->profileY();
       const unsigned n_par = FIT_N_PAR;
       upJD->initialiseStarChannelsDataAtProp({"ABCStar_" + std::to_string(iChip), "FitParamsLeft", "Row" + std::to_string(row)}, n_par);
