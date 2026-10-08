@@ -1,7 +1,11 @@
 
 # Launch felix_client_bridge to connect an emulator to FelixClient
 # Bus paths match hw controller config
-bin/felix_client_bridge --bus-dir /tmp/bus --bus-groupname FELIX -f configs/controller/emuCfg_star.json & pid_bridge=($!)
+
+FLX_DID=4
+FLX_CID=2
+
+bin/felix_client_bridge --cid $FLX_CID --did $FLX_DID --bus-dir /tmp/bus --bus-groupname FELIX -f configs/controller/emuCfg_star.json & pid_bridge=($!)
 echo "TESTS: WAITING for FCB (on PID ${pid_bridge}) to start"
 sleep 3
 
@@ -11,7 +15,14 @@ find /tmp/bus -name "*.ndjson" | xargs cat
 
 HW_CONTROLLER_IN=configs/controller/felix_client_strips.json
 HW_CONTROLLER=configs/controller/felix_client_strips_patch.json
-jq '.ctrlCfg.cfg.FelixClient.skipFelixReg = true' ${HW_CONTROLLER_IN} > ${HW_CONTROLLER}
+jq --argjson did $FLX_DID --argjson cid $FLX_CID '
+  .ctrlCfg.cfg.FelixClient.skipFelixReg = true
+  | .ctrlCfg.cfg.ToFLX.detectorID = $did
+  | .ctrlCfg.cfg.ToHost.detectorID = $did
+  | .ctrlCfg.cfg.ToFLX.connectorID = $cid
+  | .ctrlCfg.cfg.ToHost.connectorID = $cid
+' ${HW_CONTROLLER_IN} > ${HW_CONTROLLER}
+
 EMU_CONNECTIVITY=configs/connectivity/example_star_setup.json
 
 # Run scans with the FelixClient controller
