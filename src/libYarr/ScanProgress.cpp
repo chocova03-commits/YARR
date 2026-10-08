@@ -93,7 +93,8 @@ void ScanProgress::update(const LoopStatus &status) {
     std::string bar = ProgressBar::renderBar(fraction, barWidth);
 
     char pctBuf[8];
-    std::snprintf(pctBuf, sizeof(pctBuf), "%3d%%", (int)(fraction * 100));
+    // Max 100%, use 128 to suppress warning about buf length
+    std::snprintf(pctBuf, sizeof(pctBuf), "%3d%%", (int)(fraction * 100) % 128);
 
     std::string line = "[Scan] " + label + " " + bar + " " + pctBuf +
                         "  elapsed " + formatDuration(elapsedTime) +

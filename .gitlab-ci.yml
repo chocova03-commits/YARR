@@ -197,10 +197,10 @@ job_build_none:
     - bin/scanConsole -k
 
 # Run build with latest gcc and no other dependencies
-job_build_test_gcc_15:
+job_build_test_gcc_16:
   extends: .rules
   stage: build
-  image: registry.cern.ch/docker.io/library/gcc:15
+  image: registry.cern.ch/docker.io/library/gcc:16
   script:
     - apt-get update
     - apt-get install -y cmake make
