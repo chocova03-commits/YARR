@@ -4,21 +4,25 @@
 Yarr uses spdlog for logging. This is used to enable turning on/off output
 from different parts of the system dynamically.
 
-Each logger provides output with specific level:
-
-* trace
-* debug
-* info
-* warn
-* error
-* critical
+Named loggers are used to send messages with different levels: trace, debug,
+info, warning, error and critical.
 
 The default for scanConsole is to enable output of message of info level or
 higher from all loggers. The loggers can be configured, using a json file,
 by passing the -l flag to scanConsole.
 
-The same configuration can be used for investigating test failures passing 
---logger-config FILENAME to test_main.
+Each logger provides output with specific level which should be used for
+different purposes:
+
+* `trace`: for very low level messages
+* `debug`: messages generally useful for debugging (normally one, or a few, logger would be enabled at a time)
+* `info`: reporting control flow in general operation
+* `warning`: something the user should be aware about, but the program can continue and should be able to complete successfully
+* `error`: something happened that could lead to unintended consequences, but the program can continue
+* `critical`: something happened that will lead to unintended consequences, the program cannot continue (normally followed by `abort()`)
+
+The same configuration file can be used for investigating unit-test failures by
+passing --logger-config FILENAME to testYarr et al.
 
 You can list all available loggers (that can be enabled/disabled) as part of:
 
@@ -112,3 +116,26 @@ Or to send all loggers' output to a file in addition to the console:
 
 See `configs/logging/` for further worked examples (`trace_spec.json`,
 `default_to_file.json`, `trace_all.json`, etc).
+
+## Trace logging
+
+In many cases the `trace` level can cause performance issues. Thus the
+whole invocation can wrapped in a macro which is not enabled in the 
+default configuration.
+
+If you want to see these you'll need to configure cmake with:
+
+```bash
+cmake ... -DYARR_ACTIVE_LOGGER_LEVEL=TRACE
+```
+
+in addition to enabling the trace level using the runtime configuration.
+
+This is not the case for all trace messages, 
+
+```cpp
+  // Disabled by macro
+  SPDLOG_LOGGER_TRACE(logger, message);
+  // Compiled in, but runtime disabled by default
+  logger->trace(message);
+```
