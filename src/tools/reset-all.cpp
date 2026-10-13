@@ -21,7 +21,8 @@ namespace fs = std::filesystem;
 #include "HwController.h"
 #include "FrontEndConnectivity.h"
 #include "AllChips.h"
-#include "ScanHelper.h" // openJson
+#include "LoadJson.h"
+#include "ScanHelper.h"
 #include "Bookkeeper.h"
 
 void print_usage(char* argv[]) {
@@ -72,7 +73,7 @@ int main(int argc, char* argv[]) {
     std::unique_ptr<HwController> hw;
     json jcontroller;
     try {
-        jcontroller = ScanHelper::openJsonFile(hw_controller_filename);
+        jcontroller = JsonHelper::openJsonFile(hw_controller_filename);
         hw = ScanHelper::loadController(jcontroller);
     } catch (std::exception& e) {
         std::cerr << "ERROR: Unable to load controller from provided config, exception caught: " << e.what() << std::endl;
@@ -81,7 +82,7 @@ int main(int argc, char* argv[]) {
 
     json jconnectivity;
     try {
-        jconnectivity = ScanHelper::openJsonFile(connectivity_filename);
+        jconnectivity = JsonHelper::openJsonFile(connectivity_filename);
         if(!jconnectivity.contains("chipType")) {
             std::cerr << "ERROR: Connectivity file is missing expected \"chipType\" field" << std::endl;
             return 1;

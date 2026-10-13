@@ -1,8 +1,8 @@
 #include "FelixController.h"
 #include "FelixTools.h"
 #include "logging.h"
+#include "LoadJson.h"
 #include "LoggingConfig.h"
-#include "ScanHelper.h"
 
 #include <cstdint>
 #include <fstream>
@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
     // Configure controller
     json jctrl;
     try {
-        jctrl = ScanHelper::openJsonFile(hw_controller_filename);
+        jctrl = JsonHelper::openJsonFile(hw_controller_filename);
         if (jctrl["ctrlCfg"]["type"] != "FelixClient") {
             logger->error("The controller type is not FelixClient.");
             return -1;

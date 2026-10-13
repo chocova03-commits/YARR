@@ -8,9 +8,9 @@ namespace fs = std::filesystem;
 
 #include "logging.h"
 #include "LoggingConfig.h"
+#include "LoadJson.h"
 
 #include "SpecCom.h"
-#include "ScanHelper.h"
 
 void print_help() {
     std::cout << "Usage: ./bin/specSoftReset [-h] [-r <hw_controller_file>] [-o <reset_option>] \n \n"
@@ -65,7 +65,7 @@ int main(int argc, char **argv) {
 
 
     json jcontroller;
-    jcontroller = ScanHelper::openJsonFile(hw_controller_filename);
+    jcontroller = JsonHelper::openJsonFile(hw_controller_filename);
     specNum=jcontroller["ctrlCfg"]["cfg"]["specNum"];
 
     SpecCom mySpec(specNum);

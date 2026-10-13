@@ -17,7 +17,8 @@ namespace fs = std::filesystem;
 #include <memory> // unique_ptr
 
 // YARR
-#include "ScanHelper.h" // openJson
+#include "LoadJson.h"
+#include "ScanHelper.h"
 #include "Utils.h"
 
 void print_usage(char* argv[]) {
@@ -89,7 +90,7 @@ int main(int argc, char* argv[]) {
 
     
     // open up the connectivity config to get the list of front-ends
-    auto jconn = ScanHelper::openJsonFile(connectivity_filename);
+    auto jconn = JsonHelper::openJsonFile(connectivity_filename);
     std::string chip_type = ScanHelper::loadChipConfigs(jconn, false, Utils::dirFromPath(connectivity_filename));
 
     // Loop through chips in connectivity file

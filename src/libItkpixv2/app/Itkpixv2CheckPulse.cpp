@@ -24,7 +24,8 @@ namespace fs = std::filesystem;
 #include "FrontEnd.h"
 #include "Itkpixv2.h"
 #include "AllChips.h"
-#include "ScanHelper.h" // openJson
+#include "LoadJson.h"
+#include "ScanHelper.h"
 #include "Utils.h"
 
 #include "logging.h"
@@ -67,7 +68,7 @@ std::unique_ptr<FrontEnd> init_fe1(std::unique_ptr<HwController>& hw, json &jcon
         fe.reset();
         return fe;
     }
-    auto chip_register_json = ScanHelper::openJsonFile(chip_register_file_path1);
+    auto chip_register_json = JsonHelper::openJsonFile(chip_register_file_path1);
     cfg->loadConfig(chip_register_json);
     return fe;
 }
@@ -101,7 +102,7 @@ std::unique_ptr<FrontEnd> init_fe2(std::unique_ptr<HwController>& hw, json &jcon
         fe.reset();
         return fe;
     }
-    auto chip_register_json = ScanHelper::openJsonFile(chip_register_file_path2);
+    auto chip_register_json = JsonHelper::openJsonFile(chip_register_file_path2);
     cfg->loadConfig(chip_register_json);
     return fe;
 }
@@ -169,7 +170,7 @@ int main(int argc, char* argv[]) {
     std::unique_ptr<HwController> hw;
     json jcontroller;
     try {
-        jcontroller = ScanHelper::openJsonFile(hw_controller_filename);
+        jcontroller = JsonHelper::openJsonFile(hw_controller_filename);
         hw = ScanHelper::loadController(jcontroller);
     } catch (std::exception& e) {
         std::cerr << "ERROR: Unable to load controller from provided config, exception caught: " << e.what() << std::endl;
@@ -180,7 +181,7 @@ int main(int argc, char* argv[]) {
     hw->disableRx(); // needed?
 
     // open up the connectivity config to get the list of front-ends
-    auto jconn = ScanHelper::openJsonFile(connectivity_filename);
+    auto jconn = JsonHelper::openJsonFile(connectivity_filename);
 
     std::string chipType = ScanHelper::loadChipConfigs(jconn, false, Utils::dirFromPath(connectivity_filename));
 
