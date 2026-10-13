@@ -17,6 +17,7 @@ namespace fs = std::filesystem;
 #include "HwController.h"
 #include "FrontEndCfg.h"
 #include "AllChips.h"
+#include "LoadJson.h"
 #include "ScanHelper.h"
 #include "Utils.h"
 
@@ -56,7 +57,7 @@ std::unique_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, json &jconn
         fe.reset();
         return fe;
     }
-    auto chip_register_json = ScanHelper::openJsonFile(chip_register_file_path);
+    auto chip_register_json = JsonHelper::openJsonFile(chip_register_file_path);
     cfg->loadConfig(chip_register_json);
     hw->setCmdEnable(cfg->getTxChannel());
     return fe;
@@ -125,7 +126,7 @@ int main(int argc, char **argv) {
     json jcontroller;
 
     try {
-        jcontroller = ScanHelper::openJsonFile(hw_controller_filename);
+        jcontroller = JsonHelper::openJsonFile(hw_controller_filename);
         hw = ScanHelper::loadController(jcontroller);
     } catch (std::exception& e) {
         std::cerr << "ERROR: Unable to load controller from provided config, exception caught: " << e.what() << std::endl;
@@ -142,7 +143,7 @@ int main(int argc, char **argv) {
     hw->setTrigEnable(0);
     hw->disableRx(); // needed?
 
-    auto jconn = ScanHelper::openJsonFile(connectivity_filename);
+    auto jconn = JsonHelper::openJsonFile(connectivity_filename);
     std::string chipType = ScanHelper::loadChipConfigs(jconn, false, Utils::dirFromPath(connectivity_filename));
 
     auto chip_configs = jconn["chips"];
@@ -186,7 +187,7 @@ int main(int argc, char **argv) {
             return -1;
         } else {
             fs::path chip_register_file_path{chip_configs[ichip]["__config_path__"]};
-            auto jchip = ScanHelper::openJsonFile(chip_register_file_path);
+            auto jchip = JsonHelper::openJsonFile(chip_register_file_path);
             std::string name = dynamic_cast<FrontEndCfg*>(&*fe)->getName();
 
             logger->info("Configuring chip {} ...", name);

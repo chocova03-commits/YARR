@@ -1,7 +1,7 @@
 #include "FelixController.h"
 #include "logging.h"
+#include "LoadJson.h"
 #include "LoggingConfig.h"
-#include "ScanHelper.h"
 
 #include <iostream>
 #include <unistd.h>
@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
     if (logCfg.empty()) { // default
       jlog = logging::defaultConfig();
     } else {
-      jlog = ScanHelper::openJsonFile(logCfg);
+      jlog = JsonHelper::openJsonFile(logCfg);
     }
     logging::setupLoggers(jlog);
   } catch (std::runtime_error &e) {
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
   // Configure controller
   json jctrl;
   try {
-    jctrl = ScanHelper::openJsonFile(ctrlCfg);
+    jctrl = JsonHelper::openJsonFile(ctrlCfg);
     if (jctrl["ctrlCfg"]["type"] != "FelixClient") {
       logger->critical("The controller type is not FelixClient.");
       return -1;

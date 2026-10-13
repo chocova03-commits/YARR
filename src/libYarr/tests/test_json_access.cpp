@@ -3,10 +3,10 @@
 #include <iostream>
 #include <filesystem>
 
-#include "ScanHelper.h"
+#include "LoadJson.h"
 
 //! Test a few json operations (related to file opening, including fragments)
-TEST_CASE("OpenJsonFiles", "[Json][ScanHelper]") {
+TEST_CASE("OpenJsonFiles", "[Json][JsonHelper]") {
     // Look up in dir hierarchy so we can run from anywhere in YARR directory
     namespace fs = std::filesystem;
     fs::path baseDir{fs::current_path()};
@@ -29,28 +29,28 @@ TEST_CASE("OpenJsonFiles", "[Json][ScanHelper]") {
     REQUIRE (fs::exists(cfg));
 
     // Should throw if the file does not exist
-    CHECK_THROWS ( ScanHelper::openJsonFile(cfg/"scans/not_a_scan.json") );
+    CHECK_THROWS ( JsonHelper::openJsonFile(cfg/"scans/not_a_scan.json") );
 
-    auto nm = ScanHelper::openJsonFile(cfg/"scans/star/std_nmask.json");
+    auto nm = JsonHelper::openJsonFile(cfg/"scans/star/std_nmask.json");
 
     CHECK (nm.contains("scan"));
 
     // Test if the json file can be opened with a fragment (json pointer)
-    auto nm_p = ScanHelper::openJsonFile(cfg/"scans/star/std_nmask.json#/scan");
+    auto nm_p = JsonHelper::openJsonFile(cfg/"scans/star/std_nmask.json#/scan");
 
     CHECK (nm_p.contains("analysis"));
 
     // Check it throws if the fragment is not valid
     CHECK_THROWS (
-      ScanHelper::openJsonFile(cfg/"scans/star/std_nmask.json#/not_a_scan")
+      JsonHelper::openJsonFile(cfg/"scans/star/std_nmask.json#/not_a_scan")
     );
 
-    auto fe = ScanHelper::openJsonFile(cfg/"defaults/default_rd53b.json");
+    auto fe = JsonHelper::openJsonFile(cfg/"defaults/default_rd53b.json");
 
     CHECK (fe.contains("RD53B"));
 
     // Access an array via json pointer
-    auto fe_p = ScanHelper::openJsonFile(cfg/"defaults/default_rd53b.json#/RD53B/PixelConfig/0/Enable");
+    auto fe_p = JsonHelper::openJsonFile(cfg/"defaults/default_rd53b.json#/RD53B/PixelConfig/0/Enable");
 
     CHECK (fe_p.size() == 384);
 }

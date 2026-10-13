@@ -12,6 +12,7 @@
 #include "LoggingConfig.h"
 #include "PirateSpeak.h"
 
+#include "LoadJson.h"
 #include "ScanHelper.h"
 #include "ScanOpts.h"
 
@@ -121,7 +122,7 @@ int ScanConsoleImpl::init(ScanOpts options) {
     scanOpts=std::move(options);
     runCounter = ScanHelper::newRunCounter();
     if(!scanOpts.logCfgPath.empty()) {
-        loggerConfig = ScanHelper::openJsonFile(scanOpts.logCfgPath).get<logging::LoggingConfig>();
+        loggerConfig = JsonHelper::openJsonFile(scanOpts.logCfgPath).get<logging::LoggingConfig>();
     } else {
         // default log setting
         loggerConfig = logging::defaultConfig();
@@ -151,9 +152,9 @@ int ScanConsoleImpl::loadConfig() {
     scanCfg=scanConsoleConfig["scanCfg"];
     if(scanOpts.dbUse) {
         try {
-            dbCfg = ScanHelper::openJsonFile(scanOpts.dbCfgPath);
-            userCfg = ScanHelper::openJsonFile(scanOpts.dbUserCfgPath);
-            siteCfg = ScanHelper::openJsonFile(scanOpts.dbSiteCfgPath);
+            dbCfg = JsonHelper::openJsonFile(scanOpts.dbCfgPath);
+            userCfg = JsonHelper::openJsonFile(scanOpts.dbUserCfgPath);
+            siteCfg = JsonHelper::openJsonFile(scanOpts.dbSiteCfgPath);
         }catch (std::runtime_error &e) {
             logger->critical("#ERROR# failed to load database config: {}", e.what());
             return -1;

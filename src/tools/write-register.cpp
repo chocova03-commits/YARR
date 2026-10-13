@@ -23,7 +23,8 @@ namespace fs = std::filesystem;
 #include "HwController.h"
 #include "FrontEndCfg.h"
 #include "AllChips.h"
-#include "ScanHelper.h" // openJson
+#include "LoadJson.h"
+#include "ScanHelper.h"
 #include "Utils.h"
 #include "logging.h"
 #include "LoggingConfig.h"
@@ -65,7 +66,7 @@ std::unique_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, json &jconn
         fe.reset();
         return fe;
     }
-    auto chip_register_json = ScanHelper::openJsonFile(chip_register_file_path);
+    auto chip_register_json = JsonHelper::openJsonFile(chip_register_file_path);
     cfg->loadConfig(chip_register_json);
     return fe;
 }
@@ -152,7 +153,7 @@ int main(int argc, char* argv[]) {
     std::unique_ptr<HwController> hw;
     json jcontroller;
     try {
-        jcontroller = ScanHelper::openJsonFile(hw_controller_filename);
+        jcontroller = JsonHelper::openJsonFile(hw_controller_filename);
         hw = ScanHelper::loadController(jcontroller);
     } catch (std::exception& e) {
         std::cerr << "ERROR: Unable to load controller from provided config, exception caught: " << e.what() << std::endl;
@@ -163,7 +164,7 @@ int main(int argc, char* argv[]) {
     hw->disableRx(); // needed?
 
     // open up the connectivity config to get the list of front-ends
-    auto jconn = ScanHelper::openJsonFile(connectivity_filename);
+    auto jconn = JsonHelper::openJsonFile(connectivity_filename);
 
     std::string chipType = ScanHelper::loadChipConfigs(jconn, false, Utils::dirFromPath(connectivity_filename));
 

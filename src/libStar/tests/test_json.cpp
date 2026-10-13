@@ -14,6 +14,7 @@ namespace fs = std::filesystem;
 
 #include "AllChips.h"
 #include "FrontEndCfg.h"
+#include "LoadJson.h"
 #include "ScanHelper.h"
 
 void bounce_check(json &j, std::string fe_name) {
@@ -69,7 +70,7 @@ TEST_CASE("StarJsonDefault", "[star][json]") {
 
   CAPTURE (fe_name);
 
-  json cfg = ScanHelper::openJsonFile(fileName);
+  json cfg = JsonHelper::openJsonFile(fileName);
   auto fe = StdDict::getFrontEnd(fe_name);
   auto fecfg = dynamic_cast<FrontEndCfg*>(&*fe);
   REQUIRE(fecfg);
