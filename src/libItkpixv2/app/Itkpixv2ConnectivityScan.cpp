@@ -24,6 +24,7 @@ namespace fs = std::filesystem;
 #include "HwController.h"
 #include "FrontEnd.h"
 #include "AllChips.h"
+#include "LoadJson.h"
 #include "ScanHelper.h"
 #include "Utils.h"
 
@@ -169,7 +170,7 @@ int main(int argc, char **argv) {
     std::unique_ptr<HwController> hw;
     json jcontroller;
     try {
-        jcontroller = ScanHelper::openJsonFile(hw_controller_filename);
+        jcontroller = JsonHelper::openJsonFile(hw_controller_filename);
         hw = ScanHelper::loadController(jcontroller);
     } catch (std::exception& e) {
         std::cerr << "ERROR: Unable to load controller from provided config, exception caught: " << e.what() << std::endl;

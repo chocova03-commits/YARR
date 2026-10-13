@@ -11,8 +11,8 @@
 #include "RxCore.h"
 #include "TxCore.h"
 #include "logging.h"
+#include "LoadJson.h"
 #include "LoggingConfig.h"
-#include "ScanHelper.h"
 #include "FelixTools.h"
 
 #include "spdlog/fmt/bundled/ranges.h"
@@ -245,7 +245,7 @@ int main(int argc, char** argv)
       // default setting
       jlog = logging::defaultConfig();
     } else {
-      jlog = ScanHelper::openJsonFile(settings.logCfgPath);
+      jlog = JsonHelper::openJsonFile(settings.logCfgPath);
     }
     logging::setupLoggers(jlog);
   } catch (std::runtime_error &e) {

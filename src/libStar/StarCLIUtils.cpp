@@ -3,6 +3,7 @@
 #include "HwController.h"
 #include "LCBUtils.h"
 #include "LoggingConfig.h"
+#include "LoadJson.h"
 #include "ScanHelper.h"
 #include "StarCmd.h"
 #include "logging.h"
@@ -34,7 +35,7 @@ void setLoggingDefaults(const std::string &programName) {
 std::unique_ptr<HwController>
 createHwController(const std::string &configPath) {
   logger->info("Using controller from {}", configPath);
-  json controllerConfig = ScanHelper::openJsonFile(configPath);
+  json controllerConfig = JsonHelper::openJsonFile(configPath);
   std::unique_ptr<HwController> hwCtrl =
       StdDict::getHwController(controllerConfig["ctrlCfg"]["type"]);
   if (!hwCtrl) {

@@ -3,6 +3,7 @@
 #include <set>
 
 #include "logging.h"
+#include "LoadJson.h"
 #include "LoggingConfig.h"
 #include "ScanHelper.h"
 #include "AllHwControllers.h"
@@ -326,7 +327,7 @@ int main(int argc, char **argv) {
     if (logCfg.empty()) { // default
       jlog = setupDefaultLoggers(verbose);
     } else {
-      jlog = ScanHelper::openJsonFile(logCfg);
+      jlog = JsonHelper::openJsonFile(logCfg);
     }
     logging::setupLoggers(jlog);
   } catch (std::runtime_error &e) {
@@ -344,7 +345,7 @@ int main(int argc, char **argv) {
   json jctrl;
   try {
     logger->debug("Loading controller config: {}", ctrlCfg);
-    jctrl = ScanHelper::openJsonFile(ctrlCfg);
+    jctrl = JsonHelper::openJsonFile(ctrlCfg);
   } catch (std::runtime_error &e) {
     logger->critical("Failed to load controller config: {}", e.what());
     return 1;
@@ -370,7 +371,7 @@ int main(int argc, char **argv) {
     json jchips;
     try {
       logger->debug("Loading connectivity config: {}", conCfg);
-      jchips = ScanHelper::openJsonFile(conCfg);
+      jchips = JsonHelper::openJsonFile(conCfg);
     } catch (std::runtime_error &e) {
       logger->critical("Failed to load connectivity config: {}", e.what());
     }

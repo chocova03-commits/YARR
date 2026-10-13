@@ -12,7 +12,7 @@
 #include "StarConstants.h"
 #include "LCBUtils.h"
 #include "LoggingConfig.h"
-#include "ScanHelper.h"
+#include "LoadJson.h"
 #include "StarChipPacket.h"
 #include "logging.h"
 #include "LoopStatus.h"
@@ -1848,7 +1848,7 @@ int main(int argc, char *argv[]) {
       logging::setupLoggers(j);
     } else {
       try {
-        auto j = ScanHelper::openJsonFile(logCfgPath);
+        auto j = JsonHelper::openJsonFile(logCfgPath);
         logging::setupLoggers(j);
       } catch (std::runtime_error &e) {
         spdlog::error("Opening logger config: {}", e.what());
@@ -1906,7 +1906,7 @@ int main(int argc, char *argv[]) {
     } else {
       try {
         logger->info("Using controller from {}", controller);
-        json ctrlCfg = ScanHelper::openJsonFile(controller);
+        json ctrlCfg = JsonHelper::openJsonFile(controller);
         controllerType = ctrlCfg["ctrlCfg"]["type"];
         hwCtrl = StdDict::getHwController(controllerType);
         hwCtrl->loadConfig(ctrlCfg["ctrlCfg"]["cfg"]);

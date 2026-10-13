@@ -6,6 +6,7 @@
 #include "AllStdActions.h"
 #include "ClipBoard.h"
 #include "FrontEndCfg.h"
+#include "LoadJson.h"
 #include "ScanHelper.h"
 #include "ThreadPool.h"
 
@@ -253,7 +254,7 @@ void AnalysisConsoleImpl::loadHistograms() {
     for(auto &h: options.histogramFiles) {
         logger->info("Loading histogram from {}", h);
         try {
-            auto histoJson = ScanHelper::openJsonFile(h);
+            auto histoJson = JsonHelper::openJsonFile(h);
             auto histo = HistogramBase::fromJson(histoJson, loopTemplate);
             pushHisto(std::move(histo));
         } catch (std::runtime_error &e) {
@@ -321,7 +322,7 @@ int AnalysisConsoleImpl::loadConfigFile(const AnalysisOpts &anOpts, bool writeCo
     json chipConfig;
 
     try {
-        chipConfig = ScanHelper::openJsonFile(anOpts.chipConfigPath);
+        chipConfig = JsonHelper::openJsonFile(anOpts.chipConfigPath);
     } catch (std::runtime_error &e) {
         logger->critical("#ERROR# opening chip configs ({}): {}",
                          anOpts.chipConfigPath, e.what());
@@ -334,7 +335,7 @@ int AnalysisConsoleImpl::loadConfigFile(const AnalysisOpts &anOpts, bool writeCo
     json scan;
     try {
         if (!anOpts.scanFile.empty()) {
-            scan = ScanHelper::openJsonFile(anOpts.scanFile);
+            scan = JsonHelper::openJsonFile(anOpts.scanFile);
         }
     } catch (std::runtime_error &e) {
         logger->critical("#ERROR# opening scan config: {}", e.what());
@@ -455,7 +456,7 @@ int AnalysisConsoleImpl::setupAnalysis()
     BasicScanInfo scanInfo;
 
     try {
-        scanCfg = ScanHelper::openJsonFile(options.scanFile);
+        scanCfg = JsonHelper::openJsonFile(options.scanFile);
     } catch (std::runtime_error &e) {
         logger->critical("#ERROR# opening chip configs ({}): {}",
                          options.scanFile, e.what());
@@ -595,7 +596,7 @@ int AnalysisConsoleImpl::init() {
     logging::LoggingConfig loggerConfig;
 
     if(!options.logCfgPath.empty()) {
-        loggerConfig = ScanHelper::openJsonFile(options.logCfgPath).get<logging::LoggingConfig>();
+        loggerConfig = JsonHelper::openJsonFile(options.logCfgPath).get<logging::LoggingConfig>();
     } else {
         // default log setting
         loggerConfig = logging::defaultConfig();

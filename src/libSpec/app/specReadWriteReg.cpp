@@ -5,8 +5,8 @@
 namespace fs = std::filesystem;
 #include <unistd.h>
 
+#include "LoadJson.h"
 #include "SpecCom.h"
-#include "ScanHelper.h"
 #include "SpecTxCore.h"
 #include <map>
 
@@ -219,7 +219,7 @@ int main(int argc, char **argv) {
 
 
     json jcontroller;
-    jcontroller = ScanHelper::openJsonFile(hw_controller_filename);
+    jcontroller = JsonHelper::openJsonFile(hw_controller_filename);
     specNum=jcontroller["ctrlCfg"]["cfg"]["specNum"];
 
     SpecCom mySpec(specNum, false);

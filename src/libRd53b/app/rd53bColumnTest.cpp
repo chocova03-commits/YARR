@@ -19,6 +19,7 @@ namespace fs = std::filesystem;
 #include "LoggingConfig.h"
 #include "spdlog/fmt/bundled/color.h"
 
+#include "LoadJson.h"
 #include "ScanHelper.h"
 #include "HwController.h"
 #include "FrontEnd.h"
@@ -178,7 +179,7 @@ void writeConfig(json &jconn, int fe_num, std::vector<int> results){
   auto chip_config = chip_configs[fe_num];
   auto chip_register_file_path = chip_config["__config_path__"];
   fs::path pconfig{chip_register_file_path};
-  auto chip_register_json = ScanHelper::openJsonFile(chip_register_file_path);
+  auto chip_register_json = JsonHelper::openJsonFile(chip_register_file_path);
 
 
   std::string varNames [4] = {"EnCoreCol0","EnCoreCol1", "EnCoreCol2", "EnCoreCol3"};
@@ -217,7 +218,7 @@ std::unique_ptr<FrontEnd> init_fe(std::unique_ptr<HwController>& hw, json &jconn
         fe.reset();
         return fe;
     }
-    auto chip_register_json = ScanHelper::openJsonFile(chip_register_file_path);
+    auto chip_register_json = JsonHelper::openJsonFile(chip_register_file_path);
     cfg->loadConfig(chip_register_json);
     hw->setCmdEnable(cfg->getTxChannel());
     return fe;
@@ -296,7 +297,7 @@ int main (int argc, char *argv[]) {
     std::unique_ptr<HwController> hwCtrl = nullptr;
     json ctrlCfg;
     try {
-        ctrlCfg = ScanHelper::openJsonFile(ctrlFilePath);
+        ctrlCfg = JsonHelper::openJsonFile(ctrlFilePath);
         hwCtrl = ScanHelper::loadController(ctrlCfg);
     } catch (std::runtime_error &e) {
         logger->critical("Error opening or loading controller config: {}", e.what());
@@ -321,7 +322,7 @@ int main (int argc, char *argv[]) {
         logger->info("Loading connnectivity file: {}", connFilePath);
         
         try {
-            conn = ScanHelper::openJsonFile(connFilePath);
+            conn = JsonHelper::openJsonFile(connFilePath);
         } catch (std::runtime_error &e) {
             logger->error("Error opening connectivity config: {}", e.what());
             throw(std::runtime_error("loadChips failure"));
