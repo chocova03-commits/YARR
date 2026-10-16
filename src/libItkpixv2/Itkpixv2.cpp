@@ -69,8 +69,8 @@ void Itkpixv2::resetAllHard() {
 void Itkpixv2::resetAllSoft() {
     logger->info("Performing soft reset ...");
 
-    // Reset the data path only (bit 4). Bit 3 would also reset Aurora and force the receiver to relock.
-    this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x010);
+    // Reset data path (bit 4) and Aurora (bit 3). Data merging needs Aurora reset on all chips at the same time.
+    this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x018);
     this->writeRegister(&Itkpixv2::GlobalPulseWidth, 10);
     core->waitCmdEmpty();
 
