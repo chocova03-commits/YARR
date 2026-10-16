@@ -17,9 +17,6 @@ namespace fs = std::filesystem;
 #include "HwController.h"
 #include "FrontEndCfg.h"
 #include "AllChips.h"
-#ifdef YARR_HAS_ITKPIXV2
-#include "Itkpixv2.h"
-#endif
 #include "ScanHelper.h"
 #include "Utils.h"
 
@@ -287,15 +284,7 @@ int main(int argc, char **argv) {
     gFe->makeGlobal();
 
     logger->info("Soft resets all chips to synch gearboxes.");
-#ifdef YARR_HAS_ITKPIXV2
-    if (auto itkpix = dynamic_cast<Itkpixv2*>(gFe.get())) {
-        // Merging needs the Aurora reset as well, applied to all chips at once
-        itkpix->resetAllSoft(Itkpixv2::SOFT_RESET_DATA_PATH | Itkpixv2::SOFT_RESET_AURORA);
-    } else
-#endif
-    {
-        gFe->resetAllSoft();
-    }
+    gFe->resetAllSoft();
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     hw->waitCmdEmpty();

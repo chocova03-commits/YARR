@@ -67,14 +67,10 @@ void Itkpixv2::resetAllHard() {
 }
 
 void Itkpixv2::resetAllSoft() {
-    // Data path only, so the link stays locked
-    this->resetAllSoft(SOFT_RESET_DATA_PATH);
-}
+    logger->info("Performing soft reset ...");
 
-void Itkpixv2::resetAllSoft(uint16_t globalPulseConf) {
-    logger->info("Performing soft reset (GlobalPulseConf 0x{:03x}) ...", globalPulseConf);
-
-    this->writeRegister(&Itkpixv2::GlobalPulseConf, globalPulseConf);
+    // Reset data path (bit 4) and Aurora (bit 3). Data merging needs Aurora reset on all chips at the same time.
+    this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x018);
     this->writeRegister(&Itkpixv2::GlobalPulseWidth, 10);
     core->waitCmdEmpty();
 

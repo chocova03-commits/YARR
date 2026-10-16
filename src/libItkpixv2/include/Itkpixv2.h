@@ -27,15 +27,8 @@ class Itkpixv2 : public FrontEnd, public Itkpixv2Cfg, public Itkpixv2Cmd{
             return std::make_unique<Itkpixv2>();
         }
 
-        // GlobalPulseConf bits used for the soft reset
-        static constexpr uint16_t SOFT_RESET_AURORA = 0x008;    // Aurora (receiver has to relock)
-        static constexpr uint16_t SOFT_RESET_DATA_PATH = 0x010; // Data path
-
         void resetAllHard() override;
-        /// Soft reset of the data path only
         void resetAllSoft() override;
-        /// Soft reset with the given GlobalPulseConf pattern, e.g. data path and Aurora for data merging
-        void resetAllSoft(uint16_t globalPulseConf);
         void configure() override;
         void configureInit();
         void configureGlobal();
