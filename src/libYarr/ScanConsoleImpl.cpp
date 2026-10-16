@@ -642,6 +642,8 @@ void ScanConsoleImpl::readLinkErrorCounters() {
 void ScanConsoleImpl::run() {
     ScanHelper::banner(logger,"Run Scan");
 
+    // Reset the link error counters only now, well after the soft reset in configure(), so a soft reset that
+    // also resets Aurora (link relock) isn't counted
     bool linkErrorCounters = hwCtrl->resetLinkErrorCounters();
 
     scan_start = std::chrono::steady_clock::now();

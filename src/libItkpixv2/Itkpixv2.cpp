@@ -67,10 +67,14 @@ void Itkpixv2::resetAllHard() {
 }
 
 void Itkpixv2::resetAllSoft() {
-    logger->info("Performing soft reset ...");
+    // Data path only, so the link stays locked
+    this->resetAllSoft(SOFT_RESET_DATA_PATH);
+}
 
-    // Reset the data path only (bit 4). Bit 3 would also reset Aurora and force the receiver to relock.
-    this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x010);
+void Itkpixv2::resetAllSoft(uint16_t globalPulseConf) {
+    logger->info("Performing soft reset (GlobalPulseConf 0x{:03x}) ...", globalPulseConf);
+
+    this->writeRegister(&Itkpixv2::GlobalPulseConf, globalPulseConf);
     this->writeRegister(&Itkpixv2::GlobalPulseWidth, 10);
     core->waitCmdEmpty();
 

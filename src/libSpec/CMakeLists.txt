@@ -43,6 +43,11 @@ foreach (target IN LISTS apps)
     post_build_debug_executable(${target})
 endforeach ()
 
+# dataMergingCheck uses the ITkPixV2 soft reset with Aurora reset if that front end is built
+if("Itkpixv2" IN_LIST FRONT_ENDS)
+    target_compile_definitions(dataMergingCheck PRIVATE YARR_HAS_ITKPIXV2)
+endif()
+
 install(TARGETS Spec ${apps}
     EXPORT Yarr_SpecTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

@@ -68,9 +68,13 @@ void Rd53b::resetAllHard() {
 }
 
 void Rd53b::resetAllSoft() {
-    logger->info("Performing soft reset ...");
+    this->resetAllSoft(0x490);
+}
 
-    this->writeRegister(&Rd53b::GlobalPulseConf, 0x490);
+void Rd53b::resetAllSoft(uint16_t globalPulseConf) {
+    logger->info("Performing soft reset (GlobalPulseConf 0x{:03x}) ...", globalPulseConf);
+
+    this->writeRegister(&Rd53b::GlobalPulseConf, globalPulseConf);
     this->writeRegister(&Rd53b::GlobalPulseWidth, 10);
     core->waitCmdEmpty();
 

@@ -30,6 +30,8 @@ class Rd53b : public FrontEnd, public Rd53bCfg, public Rd53bCmd{
 
         void resetAllHard() override;
         void resetAllSoft() override;
+        /// Soft reset with the given GlobalPulseConf pattern
+        void resetAllSoft(uint16_t globalPulseConf);
         void configure() override;
         void configureInit();
         void configureGlobal();
