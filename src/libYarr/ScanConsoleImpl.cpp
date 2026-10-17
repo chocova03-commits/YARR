@@ -642,6 +642,7 @@ void ScanConsoleImpl::readLinkErrorCounters() {
 void ScanConsoleImpl::run() {
     ScanHelper::banner(logger,"Run Scan");
 
+    // Reset after configuration, so the counts only cover the scan itself
     bool linkErrorCounters = hwCtrl->resetLinkErrorCounters();
 
     scan_start = std::chrono::steady_clock::now();

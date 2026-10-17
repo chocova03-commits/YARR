@@ -56,6 +56,9 @@ struct AppSettings {
 
   /// Log config to load
   std::string logCfgPath;
+
+  uint8_t detectorID{0};
+  uint16_t connectorID{0};
 };
 
 template<typename Publish>
@@ -88,16 +91,12 @@ void publish_and_report_failure(Publish &publisher, uint64_t fid_tag, std::span<
 }
 
 template<typename Publish>
-void send_packet(std::span<uint32_t> data, uint32_t addr, Publish &publisher) {
-  logger->debug("Send RxCore->Publish: (buf adr words) {:08x} {} {}", data[0], addr, data.size());
+void send_packet(std::span<uint32_t> data, uint64_t fid_tag, Publish &publisher) {
+  logger->debug("Send RxCore->Publish: (buf adr words) {:016x} {} {}", data[0], fid_tag, data.size());
 
   for (uint32_t &d: data) {
     logger->trace(" 0x{:08x}", d);
   }
-
-  // Map to fid
-  uint64_t fid_tag = addr;
-  fid_tag |= 1ULL<<60;
 
   // Want data in uint8_t, from RxCore uint32_t
   std::vector<uint8_t> outdata(data.size() * 4);
@@ -119,25 +118,35 @@ void send_packet(std::span<uint32_t> data, uint32_t addr, Publish &publisher) {
 }
 
 template<typename Publish>
-void send_packets_from_rx_core_to_publisher(RxCore& rx_core, Publish &publisher)
+void send_packets_from_rx_core_to_publisher(RxCore& rx_core, Publish &publisher, uint8_t detectorID, uint16_t connectorID)
 {
   std::vector<RawDataPtr> dataVec = rx_core.readData();
   for (auto data : dataVec) {
-    send_packet({data->getBuf(), data->getSize()}, data->getAdr(), publisher);
+    bool is_virtual = false;
+    bool to_felix = false;
+    uint8_t protocol = 0;
+    uint8_t streamID = 0;
+    uint8_t linkID = FelixTools::link_from_chn(data->getAdr());
+    uint8_t elink = FelixTools::elink_from_chn(data->getAdr());
+    uint64_t fid = FelixTools::get_fid(detectorID, connectorID, is_virtual, linkID, elink, to_felix, protocol, streamID);
+
+    send_packet({data->getBuf(), data->getSize()}, fid, publisher);
   }
 }
 
 void receive_packets_to_tx_core(TxCore &tx_core, std::uint64_t tag, std::span<const std::uint8_t> data, std::uint8_t status)
 {
-  uint32_t tx_id = tag;
-  // Turn off direction bit
-  tx_id &= ~0x8000;
+  // Don't worry about connectorID and detectorID as we shouldn't have received the message
+  auto link = FelixTools::link_from_fid(tag);
+  auto elink = FelixTools::elink_from_fid(tag);
+
+  uint32_t tx_chan = (link << FelixTools::BLOCK_LNK_SHIFT) | elink;
 
   // Tell TxCore which channel this is
-  tx_core.setCmdEnable(tx_id);
+  tx_core.setCmdEnable(tx_chan);
 
   // Read data
-  logger->trace(" words to TxCore (chan {}):", tx_id);
+  logger->trace(" words to TxCore (chan {}):", tx_chan);
 
   // Extracting 32-bit, so strip low 2 bits
   size_t len = data.size()&~3;
@@ -166,6 +175,8 @@ void printHelp()
   std::cout << "\t--bus-dir BUS_PATH Specify felix bus path\n";
   std::cout << "\t--bus-groupname BUS_GROUP Specify felix bus group name\n";
   std::cout << "\t-H HOST Specify Host to connect to (not implemented)\n";
+  std::cout << "\t--did detectorID in FID (ie strips or pixels) (defaults to 0)\n";
+  std::cout << "\t--cid connectorID in FID (defaults to 0)\n";
   std::cout << "\t-h\tReport this usage info\n";
   std::cout << "\n";
 }
@@ -174,12 +185,15 @@ AppSettings parseArgs(int argc, char** argv)
 {
   // Constructor sets up various defaults;
   AppSettings settings;
-
-  char opt;
+  const int CID_FLAG = 1000;
+  const int DID_FLAG = 1000+1;
+  int opt;
   const struct option long_options[] = {
     {"help", no_argument, nullptr, 'h'},
     {"bus-dir", required_argument, nullptr, 'B'},
     {"bus-groupname", required_argument, nullptr, 'G'},
+    {"cid", required_argument, nullptr, CID_FLAG},
+    {"did", required_argument, nullptr, DID_FLAG},
     {nullptr, 0, nullptr, 0}
     };
   while ((opt = getopt_long(argc, argv, "H:f:l:h", long_options, nullptr)) != -1) {
@@ -202,6 +216,12 @@ AppSettings parseArgs(int argc, char** argv)
     case 'h':
       printHelp();
       exit(0);
+    case CID_FLAG:
+      settings.connectorID = std::stoi(optarg);
+      break;
+    case DID_FLAG:
+      settings.detectorID = std::stoi(optarg);
+      break;
     default:
       std::cout << "Bad parameter flag '" << opt << "'\n";
       printHelp();
@@ -266,12 +286,34 @@ int main(int argc, char** argv)
   felix_server::FelixServer server{felix_server::EventLoopType::epoll};
 
   std::vector<uint64_t> recv_tags{};
-  recv_tags.push_back(0x1000000000008000ULL);
+
+  {
+    bool is_virtual = false;
+    bool to_felix = true;
+    uint8_t protocol = 0;
+    uint8_t streamID = 0;
+    uint8_t linkID = 0;
+    uint8_t elink = 0;
+    uint64_t fid = FelixTools::get_fid(settings.detectorID, settings.connectorID, is_virtual, linkID, elink, to_felix, protocol, streamID);
+
+    recv_tags.push_back(fid);
+  }
 
   logger->info("Create buffered publisher");
 
   std::vector<uint64_t> pub_tags{};
-  pub_tags.push_back(0x1000000000000000ULL);
+
+  {
+    bool is_virtual = false;
+    bool to_felix = false;
+    uint8_t protocol = 0;
+    uint8_t streamID = 0;
+    uint8_t linkID = 0;
+    uint8_t elink = 0;
+    uint64_t fid = FelixTools::get_fid(settings.detectorID, settings.connectorID, is_virtual, linkID, elink, to_felix, protocol, streamID);
+
+    pub_tags.push_back(fid);
+  }
 
   // Don't need libfabric
   auto network_type = netio3::NetworkType::ASYNCMSG;
@@ -338,9 +380,11 @@ int main(int argc, char** argv)
 
   auto message_receiver = server.create_receiver(recv_settings, recv_tags);
 
-  std::jthread publish_thread([&](std::stop_token stoken) {
+  auto did = settings.detectorID;
+  auto cid = settings.connectorID;
+  std::jthread publish_thread([&, did, cid](std::stop_token stoken) {
     while(!stoken.stop_requested()) {
-      send_packets_from_rx_core_to_publisher(*hwCtrl, publisher);
+      send_packets_from_rx_core_to_publisher(*hwCtrl, publisher, did, cid);
     }
     logger->info("Shutdown RxCore publisher thread");
   });
