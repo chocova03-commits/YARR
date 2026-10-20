@@ -777,6 +777,9 @@ void ScurveFitter::loadConfig(const json &j) {
             maxBaselineDifference = j["fitParameterCuts"]["maxBaselineDifference"];
         }
     }
+    if (j.contains("ignore_offset")) {
+        ignore_offset = j["ignore_offset"];
+    }
 }
 
 // Errorfunction
@@ -793,7 +796,7 @@ double reverseScurveFct(double x, const double *par) {
     return par[3] + 0.5*( erfc( (x-par[0])/(par[1]*SQRT2) ) )*par[2];
 }
 
-bool ScurveFitter::fitSuccess(const double (&fit_params)[n_fit_params], const double &chi2) const {
+bool ScurveFitter::fitSuccess(const double (&fit_params)[n_fit_params], const double &chi2, const bool ignore_offset = false) const {
     return (vcalMin < fit_params[0]) && (fit_params[0] < vcalMax) && \
            // mean should be within vcal bounds
            (0 <= fit_params[1]) && (fit_params[1] < (vcalMax-vcalMin)) && \
@@ -802,9 +805,12 @@ bool ScurveFitter::fitSuccess(const double (&fit_params)[n_fit_params], const do
            // reverse s-curve fit can touch 0, but not the regular s-curve fit
            (chi2Min < chi2) && (chi2 < chi2Max) && \
            // chi2 should be within specified range
-           (fabs((fit_params[2] - fit_params[3])/injections - 1) < maxBaselineDifference);
+           (ignore_offset ? (fabs((fit_params[2])/injections - 1) < maxBaselineDifference) : (fabs((fit_params[2] - fit_params[3])/injections - 1) < maxBaselineDifference));
            // difference between 100% baseline and 0% baseline compared to number of injections
            // should be within specified range
+
+           // if ignore_offset is true, then the offset is not considered in the baseline difference check
+           //probably previous method of checking baseline difference was not correct, as it considers the offset more than it should. The new method checks the difference between the 100% baseline and the 0% baseline, which is more accurate.
 }
 
 // void ScurveFitter::createFitResultHistograms(LoopStatus::UID uid, const LoopStatus& loopStatus) {
@@ -958,7 +964,7 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                     //override the following chi2 check if using scurvegauss (no fit involved)
                     if (use_scurvegauss) chi2 = 1.;
 
-                    if (fitSuccess(par, chi2)) {
+                    if (fitSuccess(par, chi2, ignore_offset)) {
                         thrMap[uid]->setBin(bin, feCfg->toCharge(par[0], useScap, useLcap));
                         // Reudce effect of vcal offset on this, don't want to probe at low vcal
                         sigMap[uid]->setBin(bin, feCfg->toCharge(par[0]+par[1], useScap, useLcap)-feCfg->toCharge(par[0], useScap, useLcap));

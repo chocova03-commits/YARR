@@ -186,6 +186,7 @@ class ScurveFitter : public AnalysisAlgorithm {
         bool reverse         = false;
         bool use_scurvegauss = false;
 
+        bool ignore_offset = false; // if true, the offset is not considered in the baseline difference check
         bool m_dumpDebugScurvePlots=false;
 };
 
