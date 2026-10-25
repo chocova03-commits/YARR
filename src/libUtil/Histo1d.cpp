@@ -296,3 +296,10 @@ int Histo1d::binNum(double x) const {
         return xbin;
     }
 }
+
+double Histo1d::getBinCenter(unsigned n) const {
+    if (n < bins) {
+        return xlow + (n*binWidth) + (binWidth/2.0);
+    }
+    return 0;
+}

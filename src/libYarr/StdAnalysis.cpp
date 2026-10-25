@@ -937,7 +937,7 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                         double offset = histos[{uid, bin}]-> getBin(0);
                         for (unsigned i=0; i<histos[{uid, bin}]->size(); i++) {
                             if (histos[{uid, bin}]->getBin(i) > 0.5*injections + offset) {
-                                prefixed_thr = histos[{uid, bin}]->getXaxisBinCenter(i);
+                                prefixed_thr = histos[{uid, bin}]->getBinCenter(i);
                                 break;
                             }
                         }
