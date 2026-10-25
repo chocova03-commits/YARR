@@ -140,7 +140,7 @@ class ScurveFitter : public AnalysisAlgorithm {
 
     private:
         const static unsigned n_fit_params = 4;
-        bool fitSuccess(const double (&fit_params)[n_fit_params], const double &chi2) const;
+        bool fitSuccess(const double (&fit_params)[n_fit_params], const double &chi2, const bool ignore_offset) const;
         void createFitResultHistograms(LoopStatus::UID uid, const LoopStatus& loopStatus);
 
         unsigned vcalLoop;
