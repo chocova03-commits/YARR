@@ -934,9 +934,9 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                     double par[n_par] = {((vcalMax-vcalMin)/2.0)+vcalMin,  0.05*(((vcalMax-vcalMin)/2.0)+vcalMin)  , (double) injections, 0};
                     if (use_prefixed_threshold) {
                         double prefixed_thr = par[0];
-                        double offset = histos[{uid, bin}]-> getData[0];
+                        double offset = histos[{uid, bin}]-> getBin(0);
                         for (unsigned i=0; i<histos[{uid, bin}]->size(); i++) {
-                            if (histos[{uid, bin}]->getData[i] > 0.5*injections + offset) {
+                            if (histos[{uid, bin}]->getBin(i) > 0.5*injections + offset) {
                                 prefixed_thr = histos[{uid, bin}]->getXaxisBinCenter(i);
                                 break;
                             }
