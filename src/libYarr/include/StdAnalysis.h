@@ -1,0 +1,589 @@
+#ifndef STD_ANALYSIS_H
+#define STD_ANALYSIS_H
+
+// #################################
+// # Author: Timon Heim
+// # Email: timon.heim at cern.ch
+// # Project: Yarr
+// # Description: Analysis Base class
+// ################################
+
+#include <cmath>
+#include <functional>
+#include <vector>
+
+#include "AnalysisAlgorithm.h"
+#include "StdTriggerAction.h"
+
+// Need size to make unique_ptr destructors
+#include "Histo1d.h"
+#include "Histo2d.h"
+#include "Histo3d.h"
+
+
+
+class OccupancyAnalysis : public AnalysisAlgorithm {
+    public:
+        OccupancyAnalysis() : AnalysisAlgorithm() {
+            createMask = true;
+            LowThr = 0.0;
+            HighThr = 0.0;
+            coreColMask = false;
+            coreColMaskThr = 0.1;
+        }
+        ~OccupancyAnalysis() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override {}
+        void loadConfig(const json &config) override;
+    private:
+        std::vector<size_t> loops;
+        std::vector<unsigned> loopMax;
+        bool createMask;
+        bool coreColMask;
+        double coreColMaskThr;
+        unsigned n_count;
+        unsigned injections;
+        double LowThr, HighThr;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
+};
+
+class HistogramArchiver : public AnalysisAlgorithm {
+    public:
+        HistogramArchiver() = default;
+        ~HistogramArchiver() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override {}
+        void loadConfig(const json &config) override;
+
+        void setOutputDirectory(std::string dir);
+    private:
+        std::string output_dir;
+};
+
+class TotAnalysis : public AnalysisAlgorithm {
+    public:
+        TotAnalysis() : AnalysisAlgorithm() {
+            tot_bins_n = 16;
+            tot_bins_x_lo = 0;
+            tot_bins_x_hi = 16;
+            tot_unit = "BC";
+            tot_sigma_bins_n = 101;
+            tot_sigma_bins_x_lo = -0.05;
+            tot_sigma_bins_x_hi = 1.05;
+        }
+        ~TotAnalysis() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override;
+        void loadConfig(const json &config) override;
+        void setParams(int tot, int _charge) override { target_tot = tot; }
+
+    private:
+        std::vector<size_t> loops;
+        std::vector<unsigned> loopMax;
+        unsigned n_count;
+        double injections;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, unsigned> occInnerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> totMaps;
+        std::map<LoopStatus::UID, unsigned> totInnerCnt;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> tot2Maps;
+        std::map<LoopStatus::UID, unsigned> tot2InnerCnt;
+        std::unique_ptr<GlobalFeedbackSender> globalFb;
+        std::unique_ptr<PixelFeedbackSender> pixelFb;
+        bool useScap;
+        bool useLcap;
+        bool hasVcalLoop;
+        unsigned vcalMin;
+        unsigned vcalMax;
+        unsigned vcalStep;
+        unsigned vcalBins;
+        unsigned vcalLoopIndex;
+
+        int target_tot;
+
+        std::unique_ptr<Histo2d> chargeVsTotMap;
+	std::unique_ptr<Histo2d> pixelTotMap;
+	std::unique_ptr<Histo1d> RMSTotVsCharge;
+
+        // histogram configuration for ToT distributions
+        unsigned tot_bins_n;
+        float tot_bins_x_lo;
+        float tot_bins_x_hi;
+        std::string tot_unit;
+
+        // histogram configuration for ToT sigma distributions
+        unsigned tot_sigma_bins_n;
+        float tot_sigma_bins_x_lo;
+        float tot_sigma_bins_x_hi;
+};
+
+class ScurveFitter : public AnalysisAlgorithm {
+    public:
+        ScurveFitter() : AnalysisAlgorithm() {}
+        ~ScurveFitter() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override;
+        void loadConfig(const json &config) override;
+
+        void setParams(int _tot, int charge) override {
+            thrTarget = charge;
+        }
+
+    private:
+        const static unsigned n_fit_params = 4;
+        bool fitSuccess(const double (&fit_params)[n_fit_params], const double &chi2) const;
+        void createFitResultHistograms(LoopStatus::UID uid, const LoopStatus& loopStatus);
+
+        unsigned vcalLoop;
+        unsigned pixelFeedbackLoop{};
+        unsigned vcalMin;
+        unsigned vcalMax;
+        unsigned vcalStep;
+        unsigned vcalBins;
+        unsigned n_count;
+        unsigned injections;
+        unsigned cnt;
+        unsigned n_failedfit;
+        double chi2Min = 1e-6;
+        double chi2Max = 2.5;
+        double maxBaselineDifference = 0.1;
+
+        std::vector<double> x;
+        std::vector<size_t> loops;
+        std::vector<unsigned> loopMax;
+
+        std::map<std::pair<LoopStatus::UID, unsigned>, std::unique_ptr<Histo1d>> histos;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> thrMap;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> thrDist;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> sigMap;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> sigDist;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> chiDist;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> timeDist;
+
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> chi2Map;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> statusMap;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> statusDist;
+
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> thrMap_raw;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> sigMap_raw;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> ofsMap_raw;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> norMap_raw;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> fit_statusMap_raw;
+
+        std::unique_ptr<PixelFeedbackSender> fb;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> step;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> deltaThr;
+        LoopStatus::UID prevUid{};
+        double thrTarget;
+
+        std::map<LoopStatus::UID, unsigned> medCnt;
+        std::map<unsigned, unsigned> vcalCnt;
+        bool useScap;
+        bool useLcap;
+        bool reverse         = false;
+        bool use_scurvegauss = false;
+        bool use_prefixed_threshold = false;
+        bool use_refitting = false;
+
+        bool m_dumpDebugScurvePlots=false;
+};
+
+class NPointGain : public AnalysisAlgorithm {
+    public:
+        NPointGain() : AnalysisAlgorithm() {}
+        ~NPointGain() override = default;
+
+        virtual void init(const ScanLoopInfo *s) override;
+        virtual void processHistogram(HistogramBase *h) override;
+        virtual void end() override;
+        virtual void loadConfig(const json &config) override;
+
+        bool requireDependency() override {return !m_skipDependencyCheck;}
+
+    protected:
+        // indicates which scan loop is our injection loop
+        unsigned m_injectionLoopIndex;
+
+        // stores (converted) parameter values for each injection
+        std::vector<double> m_injections;
+
+        // response function and associated parameters
+        using NPGRespFuncT = double (*)(double, const double *);
+        NPGRespFuncT m_respFunc;
+        NPGRespFuncT m_gainConvFunc;
+        unsigned int m_respFuncNParams;
+        std::string m_respFuncName;
+        std::map<std::string, NPGRespFuncT> m_respFuncMap = { // response functions
+            {"linear", [](double x, const double *par){return par[0] + x*par[1];}},
+            {"polynomial", [](double x, const double *par){return par[0] + x*(par[1]+(par[2]*x));}},
+            {"exponential", [](double x, const double *par){return par[2] + par[0] / (1 + exp(-x / par[1]));}}
+        };
+        std::map<std::string, int> m_respFuncNParamsMap = { // number of parameters for each response function
+            {"linear", 2},
+            {"polynomial", 3},
+            {"exponential", 3}
+        };
+        std::map<std::string, NPGRespFuncT> m_gainConvFuncMap = { // gain conversion functions (d/dx response function)
+            {"linear", [](double x, const double*par){return par[1];}},
+            {"polynomial", [](double x, const double*par){return par[1] + 2*par[2]*x;}},
+            {"exponential", [](double x, const double*par){return (par[0] * exp(-1 * x / par[1])) / (par[1] * pow(1 + exp(-1 * x / par[1]), 2));}}
+        };
+
+        // maps of 2d vectors, one for each injection + channel
+        // not totally ideal to store everything as it can use a lot of memory,
+        // but it makes organization significantly easier
+        typedef std::map<double,std::vector<std::vector<double>>> InjectionDataContainer;
+        InjectionDataContainer m_thresholdMap;
+        InjectionDataContainer m_outputNoiseMap;
+        InjectionDataContainer m_inputNoiseMap;
+        InjectionDataContainer m_gainMap;
+        typedef std::vector<std::vector<std::vector<double>>> ResponseParamContainer;
+        ResponseParamContainer m_responseParamMap;
+
+        /// @brief Placeholder to convert injection units from DAC counts to the desired unit (e.g. fC)
+        /// @param inj Injection value in DAC counts
+        /// @return Converted injection value
+        virtual double convertInjectionUnit(double inj) { return inj; }
+
+        /// @brief Placeholder to convert threshold units from DAC counts to the desired unit (e.g. mV)
+        /// This conversion is applied to both threshold and output noise values.
+        /// @param thr Threshold value in DAC counts
+        /// @return Converted threshold value
+        virtual double convertThresholdUnit(double thr) { return thr; }
+
+        /// @brief Placeholder to convert input noise units from injection units to the desired unit (e.g. ENC)
+        /// @param noise Input noise value in injection units
+        /// @return Converted input noise value
+        virtual double convertInputNoiseUnit(double noise) { return noise; }
+
+        /// @brief Create a response curve for a given column and row
+        /// @param col Channel column index
+        /// @param row Channel row index
+        /// @return Vector of response values ordered by injection for the given channel
+        virtual std::vector<double> createResponseCurve(unsigned col, unsigned row);
+
+        /// @brief Guess the initial fit parameters for the response curve fit
+        /// The parameters for the exponential fit are very dependent on the unit conversions applied
+        /// so these parameters are set to 1. More detailed guesses can be performed in derived classes.
+        /// The parameters for the linear and polynomial fits are determined from the first and last threshold values.
+        /// @param thresholds Vector of response values
+        /// @return Initial guess for fit parameters
+        virtual std::vector<double> guessInitialFitParams(const std::vector<double>& thresholds);
+
+        /// @brief Fit the specified response curve given a set of initial parameter guesses
+        /// @param thresholds Vector of response values
+        /// @param fitParams Vector of initial fit parameters (is updated with the fit result)
+        virtual void fitResponseCurve(const std::vector<double>& thresholds, std::vector<double>& fitParams);
+
+    private:
+        bool m_skipDependencyCheck = false;
+
+        /// @brief Create, fill, and push output histograms
+        /// These contain data that is necessary for proper analysis downstream,
+        /// but are mostly 3D histograms and thus not easy to interpret directly.
+        /// No (usable) plots are produced from these histograms.
+        void writeOutputHistograms();
+
+        // indicates whether to produce basic validation plots
+        bool m_produceValidationHistos = false;
+
+        /// @brief Create, fill, and push validation histograms
+        /// For immediate (partial) validation of the analysis results,
+        /// these histograms contain more easily interpretable data.
+        /// They are 1D histograms per injection, filled with data from all channels.
+        void writeValidationHistograms();
+};
+
+class OccGlobalThresholdTune : public AnalysisAlgorithm {
+    public:
+        OccGlobalThresholdTune() : AnalysisAlgorithm()  {}
+        ~OccGlobalThresholdTune() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override {}
+        void loadConfig(const json &config) override{}
+    private:
+        std::vector<size_t> loops;
+        std::vector<unsigned> loopMax;
+        unsigned n_count;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> occDists;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
+        unsigned injections;
+        std::unique_ptr<GlobalFeedbackSender> fb;
+
+        bool m_done = false;
+        double m_sign = -1;
+        double m_entries = 0;
+        double m_oldEntries = -1;
+};
+
+class InjDelayTune : public AnalysisAlgorithm {
+    public:
+        InjDelayTune() : AnalysisAlgorithm()  {}
+        ~InjDelayTune() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override;
+        void loadConfig(const json &config) override{}
+    private:
+        std::vector<unsigned> loops;
+        std::vector<unsigned> loopMax;
+        unsigned n_count = 0;
+        unsigned n_param_loop = 0;
+        unsigned n_filled_bins = 0;
+        unsigned param_loop_max = 0;
+        unsigned step = 0;
+        bool finishedFeedback = false;
+        std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
+        std::unique_ptr<Histo1d> delayDist;
+        std::map<unsigned, unsigned> innerCnt;
+        unsigned injections = 0;
+        std::unique_ptr<GlobalFeedbackSender> fb;
+};
+
+class GlobalPreampTune : public AnalysisAlgorithm {
+    public:
+        GlobalPreampTune() : AnalysisAlgorithm()  {}
+        ~GlobalPreampTune() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override {}
+        void loadConfig(const json &config) override{}
+
+    private:
+        std::vector<size_t> loops;
+        std::vector<unsigned> loopMax;
+        unsigned n_count;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> totMaps;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> occDists;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
+        unsigned injections;
+        std::unique_ptr<GlobalFeedbackSender> fb;
+
+};
+
+class OccPixelThresholdTune : public AnalysisAlgorithm {
+    public:
+        OccPixelThresholdTune() : AnalysisAlgorithm()  {
+            m_occLowCut = {0.3f};
+            m_occHighCut = {0.7f};
+        }
+        ~OccPixelThresholdTune() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override {}
+        void loadConfig(const json &config) override;
+
+    private:
+        std::vector<size_t> loops;
+        std::vector<unsigned> loopMax;
+        unsigned n_count;
+        std::vector<float> m_occLowCut;
+        std::vector<float> m_occHighCut;
+        unsigned int m_cutIndex = 0;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
+        unsigned injections;
+        std::unique_ptr<PixelFeedbackSender> fb;
+
+};
+
+class L1Analysis : public AnalysisAlgorithm {
+    public:
+        L1Analysis() : AnalysisAlgorithm() {}
+        ~L1Analysis() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override;
+        void loadConfig(const json &config) override{}
+    private:
+        std::vector<size_t> loops;
+        std::vector<unsigned> loopMax;
+        unsigned n_count;
+        unsigned injections;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> l1Histos;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
+
+};
+
+class TagAnalysis : public AnalysisAlgorithm {
+    public:
+        TagAnalysis() : AnalysisAlgorithm() {}
+        ~TagAnalysis() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override;
+        void loadConfig(const json &config) override{}
+    private:
+        std::vector<size_t> loops;
+        std::vector<unsigned> loopMax;
+        unsigned n_count;
+        unsigned injections;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> tagHistos;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> tagMaps;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, unsigned> tagDistInnerCnt;
+        std::map<LoopStatus::UID, unsigned> tagMapInnerCnt;
+        std::map<LoopStatus::UID, unsigned> occInnerCnt;
+
+};
+
+class TotDistPlotter : public AnalysisAlgorithm {
+    public:
+        TotDistPlotter() : AnalysisAlgorithm() {}
+        ~TotDistPlotter() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override {}
+        void loadConfig(const json &config) override{}
+    private:
+        std::vector<size_t> loops;
+        std::vector<unsigned> loopMax;
+        unsigned n_count;
+        unsigned injections;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> tot;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
+};
+
+class NoiseAnalysis : public AnalysisAlgorithm {
+    public:
+        NoiseAnalysis() : AnalysisAlgorithm() {
+            createMask = true;
+            noiseThr = 1e-6;
+	        doAltMask = false;
+            minOcc = 1; // need at least one hit to mask any pixel, default
+        }
+        ~NoiseAnalysis() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override;
+        void loadConfig(const json &config) override;
+    private:
+        unsigned n_trigger;
+        std::unique_ptr<Histo2d> occ, tot;
+        std::unique_ptr<Histo1d> tag, totDist;
+        bool createMask;
+        double noiseThr;
+        bool doAltMask;
+        unsigned minOcc; // minimum absolute occupancy for noise masking
+};
+
+class NoiseTuning : public AnalysisAlgorithm {
+    public:
+        NoiseTuning() : AnalysisAlgorithm() {}
+        ~NoiseTuning() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override;
+        void loadConfig(const json &config) override{}
+    private:
+        std::vector<size_t> loops;
+        std::vector<unsigned> loopMax;
+        unsigned n_count;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, unsigned> innerCnt;
+        std::unique_ptr<GlobalFeedbackSender> globalFb;
+        std::unique_ptr<PixelFeedbackSender> pixelFb;
+};
+
+class DelayAnalysis : public AnalysisAlgorithm {
+    public:
+        DelayAnalysis() : AnalysisAlgorithm() {}
+        ~DelayAnalysis() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override;
+        void loadConfig(const json &config) override{}
+
+    private:
+        std::vector<size_t> loops;
+        std::vector<unsigned> loopMax;
+        unsigned n_count;
+        std::map<unsigned, std::unique_ptr<Histo3d>> occMaps;
+        std::map<unsigned, std::unique_ptr<Histo1d>> histos;
+        std::map<unsigned, unsigned> innerCnt;
+        unsigned injections;
+
+        std::unique_ptr<Histo2d> delayMap;
+        std::unique_ptr<Histo2d> rmsMap;
+
+        unsigned delayLoop;
+        unsigned delayMin;
+        unsigned delayMax;
+        unsigned delayStep;
+        unsigned count;
+};
+
+class ParameterAnalysis : public AnalysisAlgorithm {
+    public:
+        ParameterAnalysis() : AnalysisAlgorithm() {};
+        ~ParameterAnalysis() override = default;
+
+        void init(const ScanLoopInfo *s) override;
+        void processHistogram(HistogramBase *h) override;
+        void end() override;
+        void loadConfig(const json &config) override;
+    private:
+        std::vector<size_t> loops;
+        std::vector<unsigned> loopMax;
+        unsigned injections;
+        unsigned paramLoopNo{0xffffffff};
+        unsigned paramMin;
+        unsigned paramMax;
+        unsigned paramStep;
+        unsigned paramBins;
+        std::string paramName;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> occMaps;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> paramCurves;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> paramMaps;
+
+        bool m_createMap = false;
+};
+
+class TriggerThrottleAnalysis : public AnalysisAlgorithm {
+     public:
+ TriggerThrottleAnalysis() : AnalysisAlgorithm() {};
+    ~TriggerThrottleAnalysis() {};
+    
+    void init(const ScanLoopInfo *s) override;
+    void processHistogram(HistogramBase *h) override;
+    void end() override;
+    void loadConfig(const json &config) override;
+ private:
+    std::vector<unsigned> loops;
+    std::vector<unsigned> loopMax;
+    std::map<unsigned, std::unique_ptr<Histo2d>> occMaps;
+    std::map<unsigned, std::unique_ptr<Histo2d>> outerOccMaps;
+    std::map<unsigned, unsigned> innerCnt;
+    unsigned target_occ, target_inj, current_inj;
+    unsigned n_count;
+    int injections, start_inj;
+    std::unique_ptr<GlobalFeedbackSender> fb;
+
+    /// Save pointer to trigger loop to be adjusted
+    // TODO make this possible
+    const StdTriggerAction* trigLoop;
+};
+
+#endif
