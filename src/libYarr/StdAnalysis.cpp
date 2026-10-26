@@ -777,12 +777,6 @@ void ScurveFitter::loadConfig(const json &j) {
             maxBaselineDifference = j["fitParameterCuts"]["maxBaselineDifference"];
         }
     }
-    if (j.contains("use_prefixed_threshold")) {
-        use_prefixed_threshold = j["use_prefixed_threshold"];
-    }
-    if (j.contains("use_refitting")) {
-        use_refitting = j["use_refitting"];
-    }
 }
 
 // Errorfunction
@@ -938,17 +932,6 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                     const unsigned n_par = 4;
                     //double par[n_par] = {((vcalMax-vcalMin)/2.0)+vcalMin,  5 , (double) injections};
                     double par[n_par] = {((vcalMax-vcalMin)/2.0)+vcalMin,  0.05*(((vcalMax-vcalMin)/2.0)+vcalMin)  , (double) injections, 0};
-                    if (use_prefixed_threshold) {
-                        double prefixed_thr = par[0];
-                        double offset = histos[{uid, bin}]-> getBin(0);
-                        for (unsigned i=0; i<histos[{uid, bin}]->size(); i++) {
-                            if (histos[{uid, bin}]->getBin(i) > 0.5*injections + offset) {
-                                prefixed_thr = histos[{uid, bin}]->getBinCenter(i);
-                                break;
-                            }
-                        }
-                        par[0] = prefixed_thr;
-                    }
                     std::chrono::high_resolution_clock::time_point start;
                     std::chrono::high_resolution_clock::time_point end;
                     start = std::chrono::high_resolution_clock::now();
@@ -968,22 +951,6 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                         lmcurve(n_par, par, x.size(), x.data(), histos[{uid, bin}]->getData(), reverseScurveFct, &control, &status);
                     } else {
                         lmcurve(n_par, par, x.size(), x.data(), histos[{uid, bin}]->getData(), scurveFct, &control, &status);
-                    }
-
-                    if (use_refitting) {
-                        // Refit with new inital threhold based on the first fit result.
-                        par[1] = 0.05*(((vcalMax-vcalMin)/2.0)+vcalMin);
-                        par[2] = (double) injections;
-                        par[3] = 0;
-
-                        if (use_scurvegauss) {
-                            scurvegauss(par, x.size(), x.data(), histos[{uid, bin}]->getData());
-                        }
-                        else if (reverse) {
-                            lmcurve(n_par, par, x.size(), x.data(), histos[{uid, bin}]->getData(), reverseScurveFct, &control, &status);
-                        } else {
-                            lmcurve(n_par, par, x.size(), x.data(), histos[{uid, bin}]->getData(), scurveFct, &control, &status);
-                        }
                     }
 
                     end = std::chrono::high_resolution_clock::now();

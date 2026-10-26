@@ -191,8 +191,6 @@ class ScurveFitter : public AnalysisAlgorithm {
         bool useLcap;
         bool reverse         = false;
         bool use_scurvegauss = false;
-        bool use_prefixed_threshold = false;
-        bool use_refitting = false;
 
         bool m_dumpDebugScurvePlots=false;
 };
