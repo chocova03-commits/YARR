@@ -117,26 +117,12 @@ void SpecCom::readBlock(uint32_t off, uint32_t *val, size_t words) {
 }
 
 namespace {
-// Largest transfer per DMA descriptor. Default 4096; SPEC_DMA_MAX_DESC_BYTES (multiple of 4096) allows
-// larger ones for merged device-to-host lists, see readDma(). The limit is 32768: a single descriptor much
+// Largest transfer per DMA descriptor: one 4 KB page, or with merged device-to-host lists up to 32 KB.
+// The limit is 32768 and not the 65528 bytes the firmware length field would allow: a single descriptor much
 // above 40 KB lets the transmit FIFO in front of the PCIe core fill up, and the firmware then loses beats
 // under back-pressure (malformed TLP; it crashed a test host with a 60 KB limit).
-uint32_t maxDescBytes() {
-    static bool warned = false;
-    constexpr uint32_t kSafeMax = 32768;
-    const char *env = std::getenv("SPEC_DMA_MAX_DESC_BYTES");
-    uint32_t v = env ? std::strtoul(env, nullptr, 0) : 4096;
-    if (v < 4096 || v % 4096 != 0) {
-        if (!warned) slog->warn("Ignoring SPEC_DMA_MAX_DESC_BYTES={}, using 4096", v);
-        warned = true;
-        v = 4096;
-    } else if (v > kSafeMax) {
-        if (!warned) slog->warn("SPEC_DMA_MAX_DESC_BYTES={} is above the safe limit, using {}", v, kSafeMax);
-        warned = true;
-        v = kSafeMax;
-    }
-    return v;
-}
+constexpr uint32_t kPageDescBytes = 4096;
+constexpr uint32_t kMergedDescBytes = 32768;
 
 // Length of the next descriptor for a segment at 'addr' with 'remaining' bytes left. A TLP or read request
 // must not cross a 4 KB boundary, so a descriptor either starts on a 4 KB boundary or ends at the next one.
@@ -169,7 +155,7 @@ int SpecCom::writeDma(uint32_t off, uint32_t *data, size_t words) {
     int status = this->getDmaStatus(); 
     if ( status == DMAIDLE || status == DMADONE || status == DMAABORTED) {
         UserMemory *um = &spec->mapUserMemory(data, words*4, false);
-        KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*std::max<size_t>(countDescriptors(um, maxDescBytes()), 1));
+        KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*std::max<size_t>(countDescriptors(um, descLimit(true)), 1));
 
         struct dma_linked_list *llist = this->prepDmaList(um, km, off, 1);
 
@@ -196,15 +182,15 @@ int SpecCom::writeDma(uint32_t off, uint32_t *data, size_t words) {
     }
 }
 
-// With SPEC_DMA_MERGE_SG_READ set, physically contiguous pages are merged into one segment and
-// split into descriptors of up to SPEC_DMA_MAX_DESC_BYTES instead of one descriptor per 4 KB page.
-// The gaps between descriptors cost about half of the device-to-host bandwidth with 4 KB pages.
-// Needs a physically contiguous buffer (e.g. hugepages) to have any effect.
+// With merged lists (setMergeDmaRead(), on by default) physically contiguous pages are merged into one
+// segment and split into descriptors of up to 32 KB instead of one descriptor per 4 KB page. The gaps
+// between descriptors cost about half of the device-to-host bandwidth with 4 KB pages. Merging only has
+// an effect if the buffer is physically contiguous (e.g. hugepages, or with an IOMMU).
 int SpecCom::readDma(uint32_t off, uint32_t *data, size_t words) {
     int status = this->getDmaStatus(); 
     if ( status == DMAIDLE || status == DMADONE || status == DMAABORTED) {
-        UserMemory *um = &spec->mapUserMemory(data, words*4, std::getenv("SPEC_DMA_MERGE_SG_READ") != nullptr);
-        KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*std::max<size_t>(countDescriptors(um, maxDescBytes()), 1));
+        UserMemory *um = &spec->mapUserMemory(data, words*4, merge_dma_read);
+        KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*std::max<size_t>(countDescriptors(um, descLimit(false)), 1));
 
         struct dma_linked_list *llist = this->prepDmaList(um, km, off, 0);
         
@@ -366,7 +352,7 @@ struct dma_linked_list* SpecCom::prepDmaList(UserMemory *um, KernelMemory *km, u
     struct dma_linked_list *llist = (struct dma_linked_list*) km->getBuffer();
     uint32_t dev_off = off*4;
     unsigned int j = 0;
-    const uint32_t max_desc_bytes = maxDescBytes();
+    const uint32_t max_desc_bytes = descLimit(write);
     for (unsigned int i=0; i<um->getSGcount(); i++) {
         uint64_t sg_addr = um->getSGentryAddress(i);
         uint64_t sg_size = um->getSGentrySize(i);
@@ -471,6 +457,11 @@ void SpecCom::flushDma() {
         this->writeSingle(SPEC_GREG | SPEC_GREG_SOFTRST, SOFTRST_BRAM_CNT);
     }
 
+}
+
+uint32_t SpecCom::descLimit(bool write) const {
+    // Writes keep one descriptor per page: larger ones need the P2L address fix in the firmware
+    return (!write && merge_dma_read) ? kMergedDescBytes : kPageDescBytes;
 }
 
 DmaStats SpecCom::getDmaStats() {

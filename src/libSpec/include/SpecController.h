@@ -47,6 +47,11 @@ class SpecController : public HwController, public SpecTxCore, public SpecRxCore
                 this->setTxPolarity(j["txPolarity"]);
             }
 
+            // Merge contiguous pages of device-to-host DMA buffers into larger descriptors (default true)
+            if (j.contains("mergeDmaRead")) {
+                this->setMergeDmaRead(j["mergeDmaRead"]);
+            }
+
             if (j.contains("rxWaitTime")) {
                 m_waitTime = std::chrono::microseconds(j["rxWaitTime"]);
             }

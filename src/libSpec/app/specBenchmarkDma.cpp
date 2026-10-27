@@ -51,12 +51,19 @@ void printDmaStats(const DmaStats &d, double seconds, double bytes) {
 }
 }  // namespace
 
+// usage: specBenchmarkDma [spec number] [merge 0|1] [hugepage 0|1]
+//   merge:    device-to-host descriptors of contiguous pages are merged (default: the SpecCom default, on)
+//   hugepage: use a 2 MB aligned transparent-hugepage buffer, i.e. physically contiguous, so that merging
+//             has an effect (default 0, a normal buffer)
 int main(int argc, char *argv[]) {
     unsigned spec_num = 0;
-    if (argc == 2)
+    if (argc > 1)
         spec_num = atoi(argv[1]);
     logging::setupLoggers(logging::defaultConfig());
     SpecCom mySpec (spec_num);
+    if (argc > 2)
+        mySpec.setMergeDmaRead(atoi(argv[2]) != 0);
+    const bool use_huge = argc > 3 && atoi(argv[3]) != 0;
 
     std::fstream file_write("benchmarkDma_write.out", std::ios::out);
     std::fstream file_read("benchmarkDma_read.out", std::ios::out);
@@ -70,12 +77,10 @@ int main(int argc, char *argv[]) {
     timeval start = {}, end = {};
     
     constexpr size_t MAX_WORDS = 256 * (maxCycles+1);
-    // With SPEC_BENCH_HUGEPAGE set the buffer is 2 MB aligned and backed by a transparent hugepage, i.e.
-    // physically contiguous. Together with SPEC_DMA_MERGE_SG_READ the read phase then uses descriptors
-    // larger than 4 KB (see SpecCom::readDma).
+    // With the hugepage option the buffer is 2 MB aligned and backed by a transparent hugepage, i.e.
+    // physically contiguous, so merged lists (see SpecCom::readDma) can use descriptors larger than 4 KB.
     constexpr size_t kHugePage = 2 * 1024 * 1024;
     const size_t buf_bytes = ((MAX_WORDS * 4 + kHugePage - 1) / kHugePage) * kHugePage;
-    const bool use_huge = std::getenv("SPEC_BENCH_HUGEPAGE") != nullptr;
     std::unique_ptr<uint32_t, decltype(&std::free)> buf_owner(
         static_cast<uint32_t*>(std::aligned_alloc(use_huge ? kHugePage : 4096, buf_bytes)), &std::free);
     if (!buf_owner) {
@@ -86,6 +91,8 @@ int main(int argc, char *argv[]) {
     if (use_huge && madvise(data_buf, buf_bytes, MADV_HUGEPAGE) != 0)
         std::cerr << "madvise(MADV_HUGEPAGE) failed, the buffer may not be contiguous" << std::endl;
     std::memset(data_buf, 0, buf_bytes);  // touch the pages before the first transfer
+    std::cout << "Settings: merged device-to-host descriptors " << (mySpec.getMergeDmaRead() ? "on" : "off")
+              << ", " << (use_huge ? "hugepage" : "normal") << " buffer" << std::endl;
 
     std::cout << std::endl << "==========================================" << std::endl;
     std::cout << "Starting DMA Write Benchmark:" << std::endl;
