@@ -872,6 +872,12 @@ void ScurveFitter::createFitResultHistograms(LoopStatus::UID uid, const LoopStat
 
     hh1 = createHisto1d("TimePerFitDist", "Fit Time [us]", 201, -1, 401, "Number of Pixels", loopStatus);
     timeDist[uid] = std::move(hh1);
+
+    thrMap_raw[uid] = createHistoMap("ThresholdMap_raw", "Threshold [e]", nCol, nRow, loopStatus);
+    sigMap_raw[uid] = createHistoMap("NoiseMap_raw", "Noise [e]", nCol, nRow, loopStatus);
+    ofsMap_raw[uid] = createHistoMap("OffsetMap_raw", "Offset [e]", nCol, nRow, loopStatus);
+    norMap_raw[uid] = createHistoMap("NormalisationMap_raw", "Normalisation", nCol, nRow, loopStatus);
+    fit_statusMap_raw[uid] = createHistoMap("FitStatusMap_raw", "Fit Status", nCol, nRow, loopStatus);
 }
 
 void ScurveFitter::processHistogram(HistogramBase *h) {
@@ -963,7 +969,11 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
 
                     //override the following chi2 check if using scurvegauss (no fit involved)
                     if (use_scurvegauss) chi2 = 1.;
-
+                    thrMap_raw[uid]->setBin(bin, feCfg->toCharge(par[0], useScap, useLcap));
+                    sigMap_raw[uid]->setBin(bin, feCfg->toCharge(par[0]+par[1], useScap, useLcap)-feCfg->toCharge(par[0], useScap, useLcap));
+                    ofsMap_raw[uid]->setBin(bin, par[3]);
+                    norMap_raw[uid]->setBin(bin, par[2]);
+                    fit_statusMap_raw[uid]->setBin(bin, fitSuccess(par, chi2, ignore_offset) ? 1 : 0);
                     if (fitSuccess(par, chi2, ignore_offset)) {
                         thrMap[uid]->setBin(bin, feCfg->toCharge(par[0], useScap, useLcap));
                         // Reudce effect of vcal offset on this, don't want to probe at low vcal
@@ -1148,6 +1158,12 @@ void ScurveFitter::end() {
         output->pushData(std::move(sigMap[uid]));
         output->pushData(std::move(chiDist[uid]));
         output->pushData(std::move(timeDist[uid]));
+
+        output->pushData(std::move(thrMap_raw[uid]));
+        output->pushData(std::move(sigMap_raw[uid]));
+        output->pushData(std::move(ofsMap_raw[uid]));
+        output->pushData(std::move(norMap_raw[uid]));
+        output->pushData(std::move(fit_statusMap_raw[uid]));
     }
 }
 

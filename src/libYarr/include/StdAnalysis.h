@@ -173,6 +173,13 @@ class ScurveFitter : public AnalysisAlgorithm {
         std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> statusMap;
         std::map<LoopStatus::UID, std::unique_ptr<Histo1d>> statusDist;
 
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> thrMap_raw;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> sigMap_raw;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> ofsMap_raw;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> norMap_raw;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> fit_statusMap_raw;
+
+
         std::unique_ptr<PixelFeedbackSender> fb;
         std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> step;
         std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> deltaThr;
