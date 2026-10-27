@@ -779,9 +779,11 @@ void ScurveFitter::loadConfig(const json &j) {
     }
     if (j.contains("use_prefixed_threshold")) {
         use_prefixed_threshold = j["use_prefixed_threshold"];
+        std::cout << "use_prefixed_threshold: " << use_prefixed_threshold << std::endl;
     }
     if (j.contains("use_refitting")) {
         use_refitting = j["use_refitting"];
+        std::cout << "use_refitting: " << use_refitting << std::endl;
     }
 }
 
