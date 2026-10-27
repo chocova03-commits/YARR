@@ -22,6 +22,7 @@ namespace fs = std::filesystem;
 #include "Configuration.h"
 #include "FrontEndCfg.h"
 #include "FrontEndClipBoards.h"
+#include "LoadJson.h"
 #include "HistogramProcessor.h"
 #include "RawDataArchiver.h"
 #include "StdHistogrammer.h" // needed for special handling of DataArchiver
@@ -253,7 +254,7 @@ namespace ScanHelper {
               shlog->info("Loading global overwrite config file: {}", globalConfigPath);
               json cfg;
               try {
-                  cfg = ScanHelper::openJsonFile(globalConfigPath);
+                  cfg = JsonHelper::openJsonFile(globalConfigPath);
               } catch (std::runtime_error &e) {
                   shlog->error("Error opening chip config: {}", e.what());
                   throw (std::runtime_error("buildChips failure"));
@@ -444,7 +445,7 @@ namespace ScanHelper {
         // Emulator specific case
         if(cfg.contains("feCfg")) {
             try {
-                cfg["__feCfg_data__"]=ScanHelper::openJsonFile(cfg["feCfg"]);
+                cfg["__feCfg_data__"]=JsonHelper::openJsonFile(cfg["feCfg"]);
             } catch (std::runtime_error &e) {
                 shlog->critical("#ERROR# opening emulator FE model config: {}", e.what());
                 return -1;
@@ -454,7 +455,7 @@ namespace ScanHelper {
         // Emulator specific case
         if(cfg.contains("chipCfg")) {
             try {
-                cfg["__chipCfg_data__"]=ScanHelper::openJsonFile(cfg["chipCfg"]);
+                cfg["__chipCfg_data__"]=JsonHelper::openJsonFile(cfg["chipCfg"]);
             } catch (std::runtime_error &e) {
                 shlog->critical("#ERROR# opening emulator chip model config ({}): {}", (std::string)cfg["chipCfg"], e.what());
                 return -1;

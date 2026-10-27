@@ -5,7 +5,7 @@
 #include <getopt.h>
 
 #include "StarSeqGenerator.h"
-#include "ScanHelper.h"
+#include "LoadJson.h"
 
 namespace {
 
@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
   json cfg;
   if (not configPath.empty()) {
     try {
-      cfg = ScanHelper::openJsonFile(configPath);
+      cfg = JsonHelper::openJsonFile(configPath);
     } catch (std::runtime_error &e) {
       std::cerr << "Failed to open config file: " << configPath << std::endl;
       std::cerr << e.what() << std::endl;

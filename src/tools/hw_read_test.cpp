@@ -8,7 +8,7 @@
 #include "LoggingConfig.h"
 
 #include "AllHwControllers.h"
-#include "ScanHelper.h"
+#include "LoadJson.h"
 
 namespace {
     auto logger = logging::make_log("hw_read_test");
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
     } else {
       try {
         logger->info("Using controller from {}", c.controllerConfig);
-        json ctrlCfg = ScanHelper::openJsonFile(c.controllerConfig);
+        json ctrlCfg = JsonHelper::openJsonFile(c.controllerConfig);
         auto controllerType = ctrlCfg["ctrlCfg"]["type"];
         hwCtrl = StdDict::getHwController(controllerType);
         hwCtrl->loadConfig(ctrlCfg["ctrlCfg"]["cfg"]);

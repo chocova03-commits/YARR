@@ -4,14 +4,11 @@
 
 #include "logging.h"
 
-#include "ScanHelper.h"
+#include "LoadJson.h"
 
 namespace {
   auto fclog = logging::make_log("FileConfiguration");
 }
-
-/// For now use the json open function from ScanHelper
-using ScanHelper::openJsonFile;
 
 /**
  * Default implementation of Configuration, reading from files on disk.
@@ -41,7 +38,7 @@ json FileConfiguration::getConnectivity(const std::vector<std::string> &names)
         fclog->debug("Loading connectivity from {}", cPath);
         json feConnect;
         try {
-            feConnect = openJsonFile(cPath);
+            feConnect = JsonHelper::openJsonFile(cPath);
             feConnect["_read_path"] = cPath;
         } catch (std::runtime_error &e) {
             fclog->critical("#ERROR# opening connectivity ({}): {}", cPath, e.what());
@@ -61,7 +58,7 @@ json FileConfiguration::getFrontEndConfig(const std::string &name)
 
     try {
         fclog->debug("Loading front end configuration from {}", name);
-        return ScanHelper::openJsonFile(name);
+        return JsonHelper::openJsonFile(name);
     } catch (std::runtime_error &e) {
         fclog->error("Error opening chip config: {}", e.what());
         throw (std::runtime_error("buildChips failure"));
@@ -72,7 +69,7 @@ json FileConfiguration::getControllerConfiguration(const std::string &name)
 {
     try {
         fclog->debug("Loading controller configuration from {}", name);
-        return  ScanHelper::openJsonFile(name);
+        return JsonHelper::openJsonFile(name);
     } catch(std::runtime_error &e) {
         fclog->error("Error opening controller config ({}): {}",
                      name, e.what());
@@ -84,7 +81,7 @@ json FileConfiguration::getScanConfiguration(const std::string &name)
 {
     try {
         fclog->debug("Loading scan configuration from {}", name);
-        return openJsonFile(name);
+        return JsonHelper::openJsonFile(name);
     } catch (std::runtime_error &e) {
         fclog->critical("#ERROR# opening scan config: {}", e.what());
         throw std::runtime_error("Load scan failure");

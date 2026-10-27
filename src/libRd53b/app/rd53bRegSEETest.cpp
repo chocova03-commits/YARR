@@ -13,6 +13,7 @@
 #include "LoggingConfig.h"
 #include "spdlog/fmt/bundled/color.h"
 
+#include "LoadJson.h"
 #include "ScanHelper.h"
 #include "Bookkeeper.h"
 #include "HwController.h"
@@ -266,7 +267,7 @@ int main(int argc, char *argv[])
     json ctrlCfg;
     try
     {
-        ctrlCfg = ScanHelper::openJsonFile(ctrlFilePath);
+        ctrlCfg = JsonHelper::openJsonFile(ctrlFilePath);
         hwCtrl = ScanHelper::loadController(ctrlCfg);
     }
     catch (std::runtime_error &e)
@@ -299,7 +300,7 @@ int main(int argc, char *argv[])
         json cfg;
         try
         {
-            cfg = ScanHelper::openJsonFile(cfgFilePath);
+            cfg = JsonHelper::openJsonFile(cfgFilePath);
         }
         catch (std::runtime_error &e)
         {

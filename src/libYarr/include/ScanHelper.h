@@ -17,7 +17,7 @@
 
 #include "storage.hpp"
 #include "logging.h"
-#include "LoadJson.h"
+// #include "LoadJson.h"
 
 #include "ScanOpts.h"
 
@@ -38,7 +38,7 @@ namespace ScanHelper {
         /// Get a new run number, such that it's different next time
         unsigned newRunCounter();
 
-        using JsonHelper::openJsonFile;
+        // using JsonHelper::openJsonFile;
         std::unique_ptr<HwController> loadController(const json &ctrlCfg);
 
         /**

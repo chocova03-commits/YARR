@@ -8,7 +8,7 @@
 #include "EmuCom.h"
 #include "EmuRxCore.h"
 #include "LCBUtils.h"
-#include "ScanHelper.h"
+#include "LoadJson.h"
 #include "logging.h"
 
 #include "StarChips.h"
@@ -40,7 +40,7 @@ StarEmu::StarEmu(std::vector<ClipBoard<RawData>*> &rx, EmuCom * tx, EmuCom * tx2
         if (not regCfgFile.empty()) {
             json jChips;
             try {
-                jChips = ScanHelper::openJsonFile(regCfgFile);
+                jChips = JsonHelper::openJsonFile(regCfgFile);
             } catch (std::runtime_error &e) {
                 logger->error("Error opening chip config: {}", e.what());
                 throw(std::runtime_error("StarEmu::StarEmu"));
@@ -385,7 +385,7 @@ void EmuController<StarChips, StarEmu>::loadConfig(const json &j) {
   json chipCfg;
   if (j.contains("chipCfg")) {
     try {
-      chipCfg = ScanHelper::openJsonFile(j["chipCfg"]);
+      chipCfg = JsonHelper::openJsonFile(j["chipCfg"]);
     } catch (std::runtime_error &e) {
       logger->error("Error opening chip config: {}", e.what());
       throw(std::runtime_error("EmuController::loadConfig failure"));

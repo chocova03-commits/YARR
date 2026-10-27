@@ -2,8 +2,8 @@
 #include "HwController.h"
 #include "FelixController.h"
 #include "logging.h"
+#include "LoadJson.h"
 #include "LoggingConfig.h"
-#include "ScanHelper.h"
 #include "storage.hpp"
 
 #include <iostream>
@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
     logging::setupLoggers(jlog);
   } else {
     try {
-      auto jlog = ScanHelper::openJsonFile(loggerCfg);
+      auto jlog = JsonHelper::openJsonFile(loggerCfg);
       logging::setupLoggers(jlog);
     } catch (std::runtime_error &e) {
       spdlog::error("Failed to load logger config: {}", e.what());
@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
   // controller config
   json ctrlCfg;
   try {
-    ctrlCfg = ScanHelper::openJsonFile(controllerCfg);
+    ctrlCfg = JsonHelper::openJsonFile(controllerCfg);
   } catch (std::runtime_error &e) {
     logger->critical("Cannot open controller config: {}", e.what());
     return -1;

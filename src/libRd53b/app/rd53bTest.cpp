@@ -17,6 +17,7 @@
 #include "LoggingConfig.h"
 #include "spdlog/fmt/bundled/color.h"
 
+#include "LoadJson.h"
 #include "ScanHelper.h"
 #include "Bookkeeper.h"
 #include "HwController.h"
@@ -93,7 +94,7 @@ int main (int argc, char *argv[]) {
     std::unique_ptr<HwController> hwCtrl = nullptr;
     json ctrlCfg;
     try {
-        ctrlCfg = ScanHelper::openJsonFile(ctrlFilePath);
+        ctrlCfg = JsonHelper::openJsonFile(ctrlFilePath);
         hwCtrl = ScanHelper::loadController(ctrlCfg);
     } catch (std::runtime_error &e) {
         logger->critical("Error opening or loading controller config: {}", e.what());
@@ -122,7 +123,7 @@ int main (int argc, char *argv[]) {
         logger->info("Loading config file: {}", cfgFilePath);
         json cfg;
         try {
-            cfg = ScanHelper::openJsonFile(cfgFilePath);
+            cfg = JsonHelper::openJsonFile(cfgFilePath);
         } catch (std::runtime_error &e) {
             logger->error("Error opening chip config: {}", e.what());
             throw(std::runtime_error("loadChips failure"));
