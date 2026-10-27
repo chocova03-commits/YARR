@@ -179,12 +179,25 @@ class ScurveFitter : public AnalysisAlgorithm {
         LoopStatus::UID prevUid{};
         double thrTarget;
 
-        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> thrMap_raw;
-        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> sigMap_raw;
-        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> ofsMap_raw;
-        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> norMap_raw;
-        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> fit_statusMap_raw;
-        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> thrMap_prefix;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> thrMap_raw_normal;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> sigMap_raw_normal;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> ofsMap_raw_normal;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> norMap_raw_normal;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> fit_statusMap_raw_normal;
+
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> thrMap_raw_prefix;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> sigMap_raw_prefix;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> ofsMap_raw_prefix;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> norMap_raw_prefix;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> fit_statusMap_raw_prefix;
+
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> thrMap_raw_refit;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> sigMap_raw_refit;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> ofsMap_raw_refit;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> norMap_raw_refit;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> fit_statusMap_raw_refit;
+
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> thrMap_prefix_init;
 
         std::map<LoopStatus::UID, unsigned> medCnt;
         std::map<unsigned, unsigned> vcalCnt;
@@ -192,7 +205,7 @@ class ScurveFitter : public AnalysisAlgorithm {
         bool useLcap;
         bool reverse         = false;
         bool use_scurvegauss = false;
-        bool use_prefixed_threshold = false;
+        bool use_prefixed_threshold = false;ß
         bool use_refitting = false;
 
         bool m_dumpDebugScurvePlots=false;
