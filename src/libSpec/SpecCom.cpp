@@ -7,6 +7,7 @@
 // #          Modified for SPEC card
 // ################################
 
+#include <algorithm>
 #include <cstdlib>
 #include <unistd.h>
 #include <iostream>
@@ -115,11 +116,60 @@ void SpecCom::readBlock(uint32_t off, uint32_t *val, size_t words) {
     this->readBlock(bar0, off, val, words);
 }
 
+namespace {
+// Largest transfer per DMA descriptor. Default 4096; SPEC_DMA_MAX_DESC_BYTES (multiple of 4096) allows
+// larger ones for merged device-to-host lists, see readDma(). The limit is 32768: a single descriptor much
+// above 40 KB lets the transmit FIFO in front of the PCIe core fill up, and the firmware then loses beats
+// under back-pressure (malformed TLP; it crashed a test host with a 60 KB limit).
+uint32_t maxDescBytes() {
+    static bool warned = false;
+    constexpr uint32_t kSafeMax = 32768;
+    const char *env = std::getenv("SPEC_DMA_MAX_DESC_BYTES");
+    uint32_t v = env ? std::strtoul(env, nullptr, 0) : 4096;
+    if (v < 4096 || v % 4096 != 0) {
+        if (!warned) slog->warn("Ignoring SPEC_DMA_MAX_DESC_BYTES={}, using 4096", v);
+        warned = true;
+        v = 4096;
+    } else if (v > kSafeMax) {
+        if (!warned) slog->warn("SPEC_DMA_MAX_DESC_BYTES={} is above the safe limit, using {}", v, kSafeMax);
+        warned = true;
+        v = kSafeMax;
+    }
+    return v;
+}
+
+// Length of the next descriptor for a segment at 'addr' with 'remaining' bytes left. A TLP or read request
+// must not cross a 4 KB boundary, so a descriptor either starts on a 4 KB boundary or ends at the next one.
+// The firmware does not carry into the high word of the host address, so it must not cross a 4 GB boundary.
+uint64_t nextDescLength(uint64_t addr, uint64_t remaining, uint32_t max_bytes) {
+    uint64_t n = std::min<uint64_t>(remaining, max_bytes);
+    if (addr & 0xFFF) n = std::min<uint64_t>(n, 0x1000 - (addr & 0xFFF));
+    n = std::min<uint64_t>(n, 0x100000000ULL - (addr & 0xFFFFFFFFULL));
+    return n;
+}
+
+// Number of descriptors prepDmaList() creates for this buffer (a merged segment becomes several).
+size_t countDescriptors(UserMemory *um, uint32_t max_bytes) {
+    size_t count = 0;
+    for (unsigned int i = 0; i < um->getSGcount(); i++) {
+        uint64_t addr = um->getSGentryAddress(i);
+        uint64_t remaining = um->getSGentrySize(i);
+        while (remaining > 0) {
+            const uint64_t n = nextDescLength(addr, remaining, max_bytes);
+            addr += n;
+            remaining -= n;
+            count++;
+        }
+    }
+    return count;
+}
+}  // namespace
+
 int SpecCom::writeDma(uint32_t off, uint32_t *data, size_t words) {
     int status = this->getDmaStatus(); 
     if ( status == DMAIDLE || status == DMADONE || status == DMAABORTED) {
         UserMemory *um = &spec->mapUserMemory(data, words*4, false);
-        KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*um->getSGcount());
+        KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*std::max<size_t>(countDescriptors(um, maxDescBytes()), 1));
 
         struct dma_linked_list *llist = this->prepDmaList(um, km, off, 1);
 
@@ -146,11 +196,15 @@ int SpecCom::writeDma(uint32_t off, uint32_t *data, size_t words) {
     }
 }
 
+// With SPEC_DMA_MERGE_SG_READ set, physically contiguous pages are merged into one segment and
+// split into descriptors of up to SPEC_DMA_MAX_DESC_BYTES instead of one descriptor per 4 KB page.
+// The gaps between descriptors cost about half of the device-to-host bandwidth with 4 KB pages.
+// Needs a physically contiguous buffer (e.g. hugepages) to have any effect.
 int SpecCom::readDma(uint32_t off, uint32_t *data, size_t words) {
     int status = this->getDmaStatus(); 
     if ( status == DMAIDLE || status == DMADONE || status == DMAABORTED) {
-        UserMemory *um = &spec->mapUserMemory(data, words*4, false);
-        KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*um->getSGcount());
+        UserMemory *um = &spec->mapUserMemory(data, words*4, std::getenv("SPEC_DMA_MERGE_SG_READ") != nullptr);
+        KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*std::max<size_t>(countDescriptors(um, maxDescBytes()), 1));
 
         struct dma_linked_list *llist = this->prepDmaList(um, km, off, 0);
         
@@ -312,13 +366,15 @@ struct dma_linked_list* SpecCom::prepDmaList(UserMemory *um, KernelMemory *km, u
     struct dma_linked_list *llist = (struct dma_linked_list*) km->getBuffer();
     uint32_t dev_off = off*4;
     unsigned int j = 0;
+    const uint32_t max_desc_bytes = maxDescBytes();
     for (unsigned int i=0; i<um->getSGcount(); i++) {
-        int sg_size = um->getSGentrySize(i);
-        uint32_t sg_addr_h = ((uint64_t)um->getSGentryAddress(i) >> 32);
-        uint32_t sg_addr_l = ((um->getSGentryAddress(i)) & 0xFFFFFFFF);
+        uint64_t sg_addr = um->getSGentryAddress(i);
+        uint64_t sg_size = um->getSGentrySize(i);
+        if (sg_size == 0) continue;
         do {
-            uint32_t fixed_size = sg_size;
-            if (sg_size > 4096) fixed_size = 4096;
+            const uint32_t sg_addr_h = sg_addr >> 32;
+            const uint32_t sg_addr_l = sg_addr & 0xFFFFFFFF;
+            const uint32_t fixed_size = nextDescLength(sg_addr, sg_size, max_desc_bytes);
             llist[j].carrier_start = dev_off;
             //llist[j].carrier_start = 0;
             dev_off += fixed_size;
@@ -340,10 +396,8 @@ struct dma_linked_list* SpecCom::prepDmaList(UserMemory *um, KernelMemory *km, u
             std::cout << "  Host Next H    0x" << llist[j].host_next_h << std::endl;
             std::cout << "  Attribute      0x" << llist[j].attr << std::endl;
 #endif
-            sg_size = sg_size - fixed_size;
-            sg_addr_l = sg_addr_l + fixed_size;
-            // Prevent overflow
-            sg_addr_h = sg_addr_h + ((uint64_t)(sg_addr_l + fixed_size) >> 32);
+            sg_size -= fixed_size;
+            sg_addr += fixed_size;
             j++;
         } while (sg_size > 0);
     }
@@ -417,6 +471,30 @@ void SpecCom::flushDma() {
         this->writeSingle(SPEC_GREG | SPEC_GREG_SOFTRST, SOFTRST_BRAM_CNT);
     }
 
+}
+
+DmaStats SpecCom::getDmaStats() {
+    DmaStats s;
+    // Feature mask (older firmware reads 0; without it the counter registers must not be read: 0x10..0x13 alias
+    // the control registers there, and 0xA..0xD read 0xDEADBEEF without the TLP counters)
+    const uint32_t features = readSingle(SPEC_GREG | SPEC_GREG_FEATURES);
+    s.tlp_128 = readSingle(SPEC_GREG | SPEC_GREG_STAT_TLP_128);
+    s.has_tlp = s.tlp_128 != 0xDEADBEEF;
+    s.has_cycles = (features & 0x2) != 0;
+    if (s.has_tlp) {
+        s.tlp_256 = readSingle(SPEC_GREG | SPEC_GREG_STAT_TLP_256);
+        s.tlp_512 = readSingle(SPEC_GREG | SPEC_GREG_STAT_TLP_512);
+        s.tlp_other = readSingle(SPEC_GREG | SPEC_GREG_STAT_TLP_OTHER);
+    } else {
+        s.tlp_128 = 0;
+    }
+    if (s.has_cycles) {
+        s.busy = readSingle(SPEC_GREG | SPEC_GREG_STAT_BUSY);
+        s.starved = readSingle(SPEC_GREG | SPEC_GREG_STAT_STARVED);
+        s.backpressure = readSingle(SPEC_GREG | SPEC_GREG_STAT_BACKPRESS);
+        s.header_wait = readSingle(SPEC_GREG | SPEC_GREG_STAT_HDRWAIT);
+    }
+    return s;
 }
 
 std::string SpecCom::getSpecIdentHw(uint32_t fw_ident) {

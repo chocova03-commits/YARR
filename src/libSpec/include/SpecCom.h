@@ -52,6 +52,17 @@ enum SPEC_DMA_STATUS {
 
 #define SPEC_GREG_SOFTRST 0xF
 
+// Read-only DMA statistics of the control block (firmware with TLP and cycle counters)
+#define SPEC_GREG_FEATURES 0x8       // bit 0: TLP counters, bit 1: cycle counters
+#define SPEC_GREG_STAT_TLP_128 0xA   // device-to-host TLPs with 128 B payload
+#define SPEC_GREG_STAT_TLP_256 0xB
+#define SPEC_GREG_STAT_TLP_512 0xC
+#define SPEC_GREG_STAT_TLP_OTHER 0xD // shorter remainder TLPs
+#define SPEC_GREG_STAT_BUSY 0x10     // cycles with an active device-to-host transfer
+#define SPEC_GREG_STAT_STARVED 0x11  // ... waiting for data from the memory side
+#define SPEC_GREG_STAT_BACKPRESS 0x12 // ... waiting for the PCIe side
+#define SPEC_GREG_STAT_HDRWAIT 0x13  // ... waiting at a TLP header
+
 #define RESET_OPTION_BRAM_CNT 0x1
 #define RESET_OPTION_WSHEXP_CORE 0x2
 #define RESET_OPTION_TX_CORE 0x3
@@ -93,6 +104,22 @@ static std::map<uint16_t, std::string> specIdentFw = {
     {0x4d9ff6d, "v1.2.1"},
     {0x1493b73, "v1.1.1"}};
 
+/// Free-running counters of the device-to-host DMA master in the firmware. Take the difference
+/// of two snapshots to get the statistics of the transfers in between.
+struct DmaStats {
+    bool has_tlp = false;     ///< firmware has the TLP counters
+    bool has_cycles = false;  ///< firmware has the cycle counters
+    uint32_t tlp_128 = 0, tlp_256 = 0, tlp_512 = 0, tlp_other = 0;
+    uint32_t busy = 0, starved = 0, backpressure = 0, header_wait = 0;  ///< wb_clk cycles
+
+    DmaStats operator-(const DmaStats &o) const {
+        DmaStats d = *this;
+        d.tlp_128 -= o.tlp_128; d.tlp_256 -= o.tlp_256; d.tlp_512 -= o.tlp_512; d.tlp_other -= o.tlp_other;
+        d.busy -= o.busy; d.starved -= o.starved; d.backpressure -= o.backpressure; d.header_wait -= o.header_wait;
+        return d;
+    }
+};
+
 struct dma_linked_list {
     uint32_t carrier_start;
     uint32_t host_start_l;
@@ -130,6 +157,9 @@ class SpecCom {
 
         int writeDma(uint32_t off, uint32_t *data, size_t words);
         int readDma(uint32_t off, uint32_t *data, size_t words);
+
+        /// Snapshot of the DMA statistics counters (see DmaStats)
+        DmaStats getDmaStats();
     protected:
         void flushDma();
 
