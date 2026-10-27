@@ -184,6 +184,7 @@ class ScurveFitter : public AnalysisAlgorithm {
         std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> ofsMap_raw;
         std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> norMap_raw;
         std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> fit_statusMap_raw;
+        std::map<LoopStatus::UID, std::unique_ptr<Histo2d>> thrMap_prefix;
 
         std::map<LoopStatus::UID, unsigned> medCnt;
         std::map<unsigned, unsigned> vcalCnt;

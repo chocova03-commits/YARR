@@ -878,6 +878,7 @@ void ScurveFitter::createFitResultHistograms(LoopStatus::UID uid, const LoopStat
     ofsMap_raw[uid] = createHistoMap("OffsetMapRaw", "Offset", nCol, nRow, loopStatus);
     norMap_raw[uid] = createHistoMap("NormalizationMapRaw", "Normalization", nCol, nRow, loopStatus);
     fit_statusMap_raw[uid] = createHistoMap("FitStatusMapRaw", "Fit Status", nCol, nRow, loopStatus);
+    thrMap_prefix[uid] = createHistoMap("ThresholdMapPrefix", "Threshold [e]", nCol, nRow, loopStatus);
 }
 
 void ScurveFitter::processHistogram(HistogramBase *h) {
@@ -948,6 +949,7 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                             }
                         }
                         par[0] = prefixed_thr;
+                        thrMap_prefix[uid]->setBin(bin, feCfg->toCharge(prefixed_thr, useScap, useLcap));
                     }
                     std::chrono::high_resolution_clock::time_point start;
                     std::chrono::high_resolution_clock::time_point end;
@@ -1191,6 +1193,7 @@ void ScurveFitter::end() {
         output->pushData(std::move(ofsMap_raw[uid]));
         output->pushData(std::move(norMap_raw[uid]));
         output->pushData(std::move(fit_statusMap_raw[uid]));
+        output->pushData(std::move(thrMap_prefix[uid]));
     }
 }
 
