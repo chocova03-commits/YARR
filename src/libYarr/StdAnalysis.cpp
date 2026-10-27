@@ -779,6 +779,7 @@ void ScurveFitter::loadConfig(const json &j) {
     }
     if (j.contains("ignore_offset")) {
         ignore_offset = j["ignore_offset"];
+        std::cout << "ScurveFitter: ignore_offset set to " << ignore_offset << std::endl;
     }
 }
 
