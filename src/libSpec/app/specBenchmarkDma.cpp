@@ -51,10 +51,11 @@ void printDmaStats(const DmaStats &d, double seconds, double bytes) {
 }
 }  // namespace
 
-// usage: specBenchmarkDma [spec number] [merge 0|1] [hugepage 0|1]
+// usage: specBenchmarkDma [spec number] [merge 0|1] [hugepage 0|1] [merged descriptor bytes]
 //   merge:    device-to-host descriptors of contiguous pages are merged (default: the SpecCom default, on)
 //   hugepage: use a 2 MB aligned transparent-hugepage buffer, i.e. physically contiguous, so that merging
 //             has an effect (default 0, a normal buffer)
+//   merged descriptor bytes: largest merged descriptor, 4096 to 32768 (default 32768)
 int main(int argc, char *argv[]) {
     unsigned spec_num = 0;
     if (argc > 1)
@@ -64,6 +65,8 @@ int main(int argc, char *argv[]) {
     if (argc > 2)
         mySpec.setMergeDmaRead(atoi(argv[2]) != 0);
     const bool use_huge = argc > 3 && atoi(argv[3]) != 0;
+    if (argc > 4)
+        mySpec.setMergedDescBytes(strtoul(argv[4], nullptr, 0));
 
     std::fstream file_write("benchmarkDma_write.out", std::ios::out);
     std::fstream file_read("benchmarkDma_read.out", std::ios::out);
@@ -92,6 +95,7 @@ int main(int argc, char *argv[]) {
         std::cerr << "madvise(MADV_HUGEPAGE) failed, the buffer may not be contiguous" << std::endl;
     std::memset(data_buf, 0, buf_bytes);  // touch the pages before the first transfer
     std::cout << "Settings: merged device-to-host descriptors " << (mySpec.getMergeDmaRead() ? "on" : "off")
+              << " (up to " << mySpec.getMergedDescBytes() << " bytes)"
               << ", " << (use_huge ? "hugepage" : "normal") << " buffer" << std::endl;
 
     std::cout << std::endl << "==========================================" << std::endl;

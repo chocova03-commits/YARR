@@ -461,7 +461,11 @@ void SpecCom::flushDma() {
 
 uint32_t SpecCom::descLimit(bool write) const {
     // Writes keep one descriptor per page: larger ones need the P2L address fix in the firmware
-    return (!write && merge_dma_read) ? kMergedDescBytes : kPageDescBytes;
+    return (!write && merge_dma_read) ? merged_desc_bytes : kPageDescBytes;
+}
+
+void SpecCom::setMergedDescBytes(uint32_t bytes) {
+    merged_desc_bytes = std::clamp<uint32_t>(bytes & ~0xFFFu, kPageDescBytes, kMergedDescBytes);
 }
 
 DmaStats SpecCom::getDmaStats() {
