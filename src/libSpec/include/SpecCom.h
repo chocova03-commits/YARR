@@ -165,6 +165,10 @@ class SpecCom {
         /// (default true). Fewer descriptors mean fewer gaps between them; false gives one descriptor per page.
         void setMergeDmaRead(bool merge) { merge_dma_read = merge; }
         bool getMergeDmaRead() const { return merge_dma_read; }
+        /// Largest merged device-to-host descriptor in bytes (default and maximum 32768). Smaller values keep the
+        /// bursts shorter; the value is rounded down to a multiple of 4096 and clamped to 4096..32768.
+        void setMergedDescBytes(uint32_t bytes);
+        uint32_t getMergedDescBytes() const { return merged_desc_bytes; }
     protected:
         void flushDma();
 
@@ -183,6 +187,7 @@ class SpecCom {
         bool is_initialized = false;
         bool do_reset = true;
         bool merge_dma_read = true;
+        uint32_t merged_desc_bytes = 32768;
 
         /// Largest descriptor for a DMA in the given direction
         uint32_t descLimit(bool write) const;
