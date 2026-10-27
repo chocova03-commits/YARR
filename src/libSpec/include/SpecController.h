@@ -52,6 +52,11 @@ class SpecController : public HwController, public SpecTxCore, public SpecRxCore
                 this->setMergeDmaRead(j["mergeDmaRead"]);
             }
 
+            // Largest merged descriptor in bytes, 4096 to 32768 (default 32768)
+            if (j.contains("mergedDescBytes")) {
+                this->setMergedDescBytes(j["mergedDescBytes"]);
+            }
+
             if (j.contains("rxWaitTime")) {
                 m_waitTime = std::chrono::microseconds(j["rxWaitTime"]);
             }
