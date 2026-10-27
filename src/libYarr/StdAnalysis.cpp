@@ -954,6 +954,9 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                     const unsigned n_par = 4;
                     //double par[n_par] = {((vcalMax-vcalMin)/2.0)+vcalMin,  5 , (double) injections};
                     double par[n_par] = {((vcalMax-vcalMin)/2.0)+vcalMin,  0.05*(((vcalMax-vcalMin)/2.0)+vcalMin)  , (double) injections, 0};
+                    if (thrMap[uid] == nullptr) {
+                        createFitResultHistograms(uid, loopStatus);
+                    }
                     if (use_prefixed_threshold) {
                         double prefixed_thr = par[0];
                         double offset = histos[{uid, bin}]-> getBin(0);
@@ -978,6 +981,9 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                     } else {
                         lmcurve(n_par, par, x.size(), x.data(), histos[{uid, bin}]->getData(), scurveFct, &control, &status);
                     }
+                    double chi2= status.fnorm/(double)(x.size() - n_par);
+
+                    
 
                     thrMap_raw_prefix[uid]->setBin(bin, feCfg->toCharge(par[0], useScap, useLcap));
                     sigMap_raw_prefix[uid]->setBin(bin, feCfg->toCharge(par[0]+par[1], useScap, useLcap)-feCfg->toCharge(par[0], useScap, useLcap));
@@ -1008,6 +1014,8 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                         lmcurve(n_par, par, x.size(), x.data(), histos[{uid, bin}]->getData(), scurveFct, &control, &status);
                     }
 
+                    chi2= status.fnorm/(double)(x.size() - n_par);
+
                     thrMap_raw_normal[uid]->setBin(bin, feCfg->toCharge(par[0], useScap, useLcap));
                     sigMap_raw_normal[uid]->setBin(bin, feCfg->toCharge(par[0]+par[1], useScap, useLcap)-feCfg->toCharge(par[0], useScap, useLcap));
                     ofsMap_raw_normal[uid]->setBin(bin, par[3]);
@@ -1035,8 +1043,9 @@ void ScurveFitter::processHistogram(HistogramBase *h) {
                     if (thrMap[uid] == nullptr) {
                         createFitResultHistograms(uid, loopStatus);
                     }
+                    chi2= status.fnorm/(double)(x.size() - n_par);
 
-                    double chi2= status.fnorm/(double)(x.size() - n_par);
+                    //double chi2= status.fnorm/(double)(x.size() - n_par);
 
                     //override the following chi2 check if using scurvegauss (no fit involved)
                     if (use_scurvegauss) chi2 = 1.;
