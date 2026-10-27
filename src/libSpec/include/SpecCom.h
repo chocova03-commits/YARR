@@ -160,6 +160,11 @@ class SpecCom {
 
         /// Snapshot of the DMA statistics counters (see DmaStats)
         DmaStats getDmaStats();
+
+        /// Merge physically contiguous pages of device-to-host buffers into descriptors of up to 32 KB
+        /// (default true). Fewer descriptors mean fewer gaps between them; false gives one descriptor per page.
+        void setMergeDmaRead(bool merge) { merge_dma_read = merge; }
+        bool getMergeDmaRead() const { return merge_dma_read; }
     protected:
         void flushDma();
 
@@ -177,6 +182,10 @@ class SpecCom {
         unsigned int specId = 0;
         bool is_initialized = false;
         bool do_reset = true;
+        bool merge_dma_read = true;
+
+        /// Largest descriptor for a DMA in the given direction
+        uint32_t descLimit(bool write) const;
         SpecDevice *spec = nullptr;
         void *bar0 = nullptr, *bar4 = nullptr;
 
