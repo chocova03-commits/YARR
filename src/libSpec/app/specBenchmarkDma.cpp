@@ -63,6 +63,7 @@ int verifyDma(SpecCom &spec, bool use_huge, size_t max_words, size_t only_words,
     constexpr uint32_t kPoison = 0xDEADBEEF;
     constexpr size_t kGuard = 16;            // poisoned words behind the transfer, detect an overrun
     constexpr size_t kHugePage = 2 * 1024 * 1024;
+    if (only_words > max_words) max_words = only_words;   // a single size may be larger than the sizes of the benchmark
     uint32_t kInv = kMul;                    // modular inverse of kMul (Newton iteration), to find the source index
     for (int i = 0; i < 5; i++) kInv *= 2 - kMul * kInv;
 
