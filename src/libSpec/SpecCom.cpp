@@ -124,6 +124,9 @@ namespace {
 constexpr uint32_t kPageDescBytes = 4096;
 constexpr uint32_t kMergedDescBytes = 32768;
 
+// A register read that gets no answer from the card (PCIe link down, device gone) returns all ones
+bool cardNotResponding(uint32_t status) { return status == 0xFFFFFFFFu; }
+
 // Length of the next descriptor for a segment at 'addr' with 'remaining' bytes left. A TLP or read request
 // must not cross a 4 KB boundary, so a descriptor either starts on a 4 KB boundary or ends at the next one.
 // The firmware does not carry into the high word of the host address, so it must not cross a 4 GB boundary.
@@ -162,9 +165,11 @@ int SpecCom::writeDma(uint32_t off, uint32_t *data, size_t words) {
         this->writeBlock(bar0, DMACSTARTR, (uint32_t*) &llist[0], sizeof(struct dma_linked_list)/sizeof(uint32_t));
         this->startDma();
 
+        bool timeout = false;
         if (spec->waitForInterrupt(0) < 1) {
             slog->error("Interrupt timeout during DMA, aborting transfer!");
             this->abortDma();
+            timeout = true;
         }
 
         // Ackowledge interrupt
@@ -175,9 +180,17 @@ int SpecCom::writeDma(uint32_t off, uint32_t *data, size_t words) {
 
         delete km;
         delete um;
-        return 0;
+        status = this->getDmaStatus();
+        if (cardNotResponding(status)) {
+            slog->error("DMA status register reads all ones: the card does not respond (PCIe link down?)");
+            return 1;
+        }
+        return (timeout || status == DMAERROR || status == DMAABORTED) ? 1 : 0;
     } else {
-        slog->error("DMA Transfer aborted (Status = 0x{:x})", status);
+        if (cardNotResponding(status))
+            slog->error("DMA status register reads all ones: the card does not respond (PCIe link down?)");
+        else
+            slog->error("DMA Transfer aborted (Status = 0x{:x})", status);
         return 1;
     }
 }
@@ -212,6 +225,10 @@ int SpecCom::readDma(uint32_t off, uint32_t *data, size_t words) {
         delete km;
         delete um;
         status = this->getDmaStatus(); 
+        if (cardNotResponding(status)) {
+            slog->error("DMA status register reads all ones: the card does not respond (PCIe link down?)");
+            return 1;
+        }
         if (status == DMAABORTED || status == DMAERROR) {
             slog->error("DMA Transfer aborted (Status = 0x{:x})", status);
             return 1;
@@ -219,7 +236,10 @@ int SpecCom::readDma(uint32_t off, uint32_t *data, size_t words) {
             return 0;
         }
     } else {
-        slog->error("DMA Transfer aborted (Status = 0x{:x})", status);
+        if (cardNotResponding(status))
+            slog->error("DMA status register reads all ones: the card does not respond (PCIe link down?)");
+        else
+            slog->error("DMA Transfer aborted (Status = 0x{:x})", status);
         return 1;
     }
 }
