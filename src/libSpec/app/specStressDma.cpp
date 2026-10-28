@@ -77,7 +77,14 @@ struct Params {
     uint32_t salt;
 };
 
-Params drawParams(std::mt19937_64 &rng, size_t max_words, bool unaligned) {
+// Restrictions of the random parameters, to find out which of them makes a failure appear
+struct Restrict {
+    size_t max_off = 2047;   // largest start offset in the host buffers, in words (0: page-aligned buffers)
+    int buffers = 2;         // 0 normal pages only, 1 hugepages only, 2 both
+    bool dev_off = true;     // device addresses other than 0
+};
+
+Params drawParams(std::mt19937_64 &rng, size_t max_words, bool unaligned, const Restrict &rs) {
     auto uni = [&rng](uint64_t lo, uint64_t hi) { return lo + rng() % (hi - lo + 1); };
     Params p;
     const unsigned cat = rng() % 100;
@@ -90,15 +97,15 @@ Params drawParams(std::mt19937_64 &rng, size_t max_words, bool unaligned) {
         p.words = size_t(int64_t(p.words) + delta[rng() % 6]);
     }
     p.words = std::min(std::max<size_t>(p.words & ~size_t(1), 2), max_words);
-    p.huge = rng() % 2;
+    p.huge = rs.buffers == 2 ? bool(rng() % 2) : rs.buffers == 1;
     auto off = [&]() {
-        if (rng() % 2) return size_t(0);
-        size_t o = uni(0, 2047);
+        if (rs.max_off == 0 || rng() % 2) return size_t(0);
+        size_t o = uni(0, std::min<size_t>(rs.max_off, 2047));
         return unaligned ? o : (o & ~size_t(1));
     };
     p.src_off = off();
     p.dst_off = off();
-    p.dev_off = (rng() % 2) ? 0 : uint32_t(uni(0, 4095) * 8);
+    p.dev_off = (!rs.dev_off || rng() % 2) ? 0 : uint32_t(uni(0, 4095) * 8);
     p.merge = rng() % 4 != 0;
     const uint32_t caps[] = {4096, 8192, 16384, 32768};
     p.cap = caps[rng() % 4];
@@ -160,7 +167,7 @@ void hogThread(size_t bytes) {
 
 void usage(const char *prog) {
     std::cout << "usage: " << prog << " [-s spec id] [-t seconds, 0 = forever] [-r seed] [-k iterations to skip] [-j register threads]\n"
-              << "       [-m memory load threads] [-x max words] [-a] [-q]\n"
+              << "       [-m memory load threads] [-x max words] [-a] [-o max offset] [-b 0|1] [-D] [-n iterations] [-q]\n"
               << "  -s  card number (default 0)\n"
               << "  -t  duration (default 60 s)\n"
               << "  -r  seed of the random generator (default: from the clock, printed)\n"
@@ -169,6 +176,10 @@ void usage(const char *prog) {
               << "  -m  threads that load the host memory with 256 MB each (default 0)\n"
               << "  -x  largest transfer in 32-bit words (default 262144 = 1 MB)\n"
               << "  -a  also use host buffer offsets that are not a multiple of 8 bytes\n"
+              << "  -o  largest start offset in the host buffers in words (default 2047, 0 = page-aligned buffers)\n"
+              << "  -b  host buffers: 0 normal pages only, 1 hugepages only (default: both)\n"
+              << "  -D  device address 0 only\n"
+              << "  -n  stop after this many iterations (with -k: repeat exactly one transfer)\n"
               << "  -q  no progress lines" << std::endl;
 }
 
@@ -182,8 +193,10 @@ int main(int argc, char *argv[]) {
     int reg_threads = 1, hog_threads = 0;
     size_t max_words = 262144;
     bool unaligned = false, quiet = false;
+    Restrict rs;
+    uint64_t max_iter = 0;
     int c;
-    while ((c = getopt(argc, argv, "s:t:r:k:j:m:x:aqh")) != -1) {
+    while ((c = getopt(argc, argv, "s:t:r:k:j:m:x:o:b:n:Daqh")) != -1) {
         switch (c) {
             case 's': spec_num = atoi(optarg); break;
             case 't': seconds = atof(optarg); break;
@@ -193,6 +206,10 @@ int main(int argc, char *argv[]) {
             case 'm': hog_threads = atoi(optarg); break;
             case 'x': max_words = strtoul(optarg, nullptr, 0) & ~size_t(1); break;
             case 'a': unaligned = true; break;
+            case 'o': rs.max_off = strtoul(optarg, nullptr, 0); break;
+            case 'b': rs.buffers = atoi(optarg); break;
+            case 'D': rs.dev_off = false; break;
+            case 'n': max_iter = strtoull(optarg, nullptr, 0); break;
             case 'q': quiet = true; break;
             default: usage(argv[0]); return c == 'h' ? 0 : 2;
         }
@@ -218,11 +235,11 @@ int main(int argc, char *argv[]) {
     std::cout << "specStressDma: card " << spec_num << ", seed " << seed << ", " << (seconds > 0 ? std::to_string(int(seconds)) + " s" : "no time limit")
               << ", " << reg_threads << " register thread(s), " << hog_threads << " memory load thread(s), transfers up to " << max_words * 4
               << " bytes" << (unaligned ? ", unaligned offsets" : "") << std::endl
-              << "repeat with: specStressDma -s " << spec_num << " -r " << seed << " -x " << max_words << (unaligned ? " -a" : "")
+              << "repeat with: specStressDma -s " << spec_num << " -r " << seed << " -x " << max_words << (unaligned ? " -a" : "") << (rs.max_off != 2047 ? " -o " + std::to_string(rs.max_off) : std::string()) << (rs.buffers != 2 ? " -b " + std::to_string(rs.buffers) : std::string()) << (rs.dev_off ? "" : " -D")
               << " -k <iteration>" << std::endl;
 
     std::mt19937_64 rng(seed);
-    for (uint64_t i = 0; i < skip; i++) drawParams(rng, max_words, unaligned);
+    for (uint64_t i = 0; i < skip; i++) drawParams(rng, max_words, unaligned, rs);
 
     std::vector<std::thread> threads;
     for (int i = 0; i < reg_threads; i++) threads.emplace_back(regThread, &spec, i);
@@ -241,14 +258,14 @@ int main(int argc, char *argv[]) {
     auto elapsed = [&t0]() { return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(); };
     auto fail = [&](int code, const std::string &what) {
         std::cout << std::endl << "FAILED at iteration " << iteration << ": " << what << std::endl
-                  << "  repeat this iteration with: -s " << spec_num << " -r " << seed << " -x " << max_words << (unaligned ? " -a" : "")
+                  << "  repeat this iteration with: -s " << spec_num << " -r " << seed << " -x " << max_words << (unaligned ? " -a" : "") << (rs.max_off != 2047 ? " -o " + std::to_string(rs.max_off) : std::string()) << (rs.buffers != 2 ? " -b " + std::to_string(rs.buffers) : std::string()) << (rs.dev_off ? "" : " -D")
                   << " -k " << iteration << std::endl;
         rc = code;
         g_stop = true;
     };
 
-    while (!g_stop && (seconds <= 0 || elapsed() < seconds)) {
-        const Params p = drawParams(rng, max_words, unaligned);
+    while (!g_stop && (seconds <= 0 || elapsed() < seconds) && (max_iter == 0 || done < max_iter)) {
+        const Params p = drawParams(rng, max_words, unaligned, rs);
         uint32_t *s = src[p.huge].data() + kPad + p.src_off;
         uint32_t *d = dst[p.huge].data() + kPad + p.dst_off;
         for (size_t i = 0; i < p.words; i++) s[i] = uint32_t(i) * kMul ^ p.salt;
