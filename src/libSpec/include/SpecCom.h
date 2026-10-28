@@ -120,6 +120,13 @@ struct DmaStats {
     }
 };
 
+/// Words of a descriptor that the firmware reads (and that are written to the DMA registers for the first one)
+constexpr size_t kDmaDescWords = 7;
+
+/// One DMA descriptor. The card fetches the next descriptor from host memory with one read of 7 words. A PCIe memory
+/// read must not cross a 4 KB boundary, and a host root complex treats one that does as a malformed TLP (fatal error,
+/// the DMA never finishes). Descriptors of 28 bytes in a row cross a page at the 147th one, so each is padded to
+/// 32 bytes: 128 fit in a page, none crosses it (the list starts on a page boundary).
 struct dma_linked_list {
     uint32_t carrier_start;
     uint32_t host_start_l;
@@ -128,7 +135,10 @@ struct dma_linked_list {
     uint32_t host_next_l;
     uint32_t host_next_h;
     uint32_t attr;
+    uint32_t pad;
 };
+static_assert(sizeof(dma_linked_list) == 32, "descriptors must be 32 bytes so that none crosses a 4 KB boundary");
+static_assert(sizeof(dma_linked_list) >= kDmaDescWords * sizeof(uint32_t), "descriptor smaller than what the firmware reads");
 
 
 using namespace specDriver;
