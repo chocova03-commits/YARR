@@ -9,7 +9,9 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <algorithm>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <sys/mman.h>
@@ -56,7 +58,7 @@ void printDmaStats(const DmaStats &d, double seconds, double bytes) {
 /// that are and are not multiples of a TLP, a 4 KB page and a descriptor. A lost, duplicated, shifted or
 /// short transfer shows up as a mismatch; the source word that arrived at the first bad position is printed.
 /// Returns the number of transfers with errors.
-int verifyDma(SpecCom &spec, bool use_huge, size_t max_words) {
+int verifyDma(SpecCom &spec, bool use_huge, size_t max_words, size_t only_words, int repeats) {
     constexpr uint32_t kMul = 2654435761u;   // odd: word i -> i * kMul is unique for every index
     constexpr uint32_t kPoison = 0xDEADBEEF;
     constexpr size_t kGuard = 16;            // poisoned words behind the transfer, detect an overrun
@@ -84,6 +86,9 @@ int verifyDma(SpecCom &spec, bool use_huge, size_t max_words) {
     std::vector<size_t> sizes = {2, 6, 62, 64, 66, 254, 256, 258, 1022, 1024, 1026, 2046, 2048, 2050,
                                  8190, 8192, 8194, 16382, 16384, 16386, 25600, 65534, 65536, 65538};
     for (int c = 0; c <= 400; c += 7) sizes.push_back(256 * (c + 1));
+    if (only_words > 0) {   // a single size, repeated: to find out whether a failure depends on the size
+        sizes.assign(std::max(repeats, 1), only_words);
+    }
 
     std::cout << std::endl << "===========================================" << std::endl;
     std::cout << "Starting DMA data verification (merged descriptors "
@@ -98,8 +103,22 @@ int verifyDma(SpecCom &spec, bool use_huge, size_t max_words) {
         for (size_t i = 0; i < n; i++) s[i] = uint32_t(i) * kMul ^ salt;
         for (size_t i = 0; i < n + kGuard; i++) d[i] = kPoison;
 
-        if (spec.writeDma(0x0, s, n)) { std::cerr << "verify: writeDma failed (" << n << " words)" << std::endl; return failed + 1; }
-        if (spec.readDma(0x0, d, n)) { std::cerr << "verify: readDma failed (" << n << " words)" << std::endl; return failed + 1; }
+        // After an error say whether the card still answers (a dead PCIe link reads all ones)
+        auto cardState = [&spec]() {
+            const uint32_t v = spec.readSingle(SPEC_GREG | 0x6);
+            std::ostringstream o;
+            if (v == 0xFFFFFFFFu) o << "the card does not respond (register reads all ones)";
+            else o << "the card still responds (firmware hash register 0x" << std::hex << v << ")";
+            return o.str();
+        };
+        if (spec.writeDma(0x0, s, n)) {
+            std::cerr << "verify: writeDma failed (" << n << " words, transfer " << run << "); " << cardState() << std::endl;
+            return failed + 1;
+        }
+        if (spec.readDma(0x0, d, n)) {
+            std::cerr << "verify: readDma failed (" << n << " words, transfer " << run << "); " << cardState() << std::endl;
+            return failed + 1;
+        }
 
         size_t errors = 0, first = n;
         for (size_t i = 0; i < n; i++) {
@@ -111,7 +130,10 @@ int verifyDma(SpecCom &spec, bool use_huge, size_t max_words) {
         size_t overrun = 0;
         for (size_t i = n; i < n + kGuard; i++) overrun += (d[i] != kPoison);
         words_total += n;
-        if (errors == 0 && overrun == 0) continue;
+        if (errors == 0 && overrun == 0) {
+            std::cout << "  ok   " << n << " words" << std::endl;
+            continue;
+        }
 
         failed++;
         std::cout << "  FAIL " << n << " words (" << n * 4 << " bytes): " << errors << " wrong words";
@@ -125,7 +147,8 @@ int verifyDma(SpecCom &spec, bool use_huge, size_t max_words) {
                 std::cout << " = not written (data missing)";
         }
         if (overrun > 0) std::cout << ", " << overrun << " words written beyond the end";
-        std::cout << std::endl;
+        std::cout << std::endl << "       " << cardState() << std::endl;
+        return failed;   // everything after a failure is not meaningful
     }
     std::cout << "Verification " << (failed == 0 ? "PASSED" : "FAILED") << ": " << run << " transfers, "
               << words_total * 4 / 1024 << " KB read back, " << failed << " with errors" << std::endl;
@@ -134,13 +157,14 @@ int verifyDma(SpecCom &spec, bool use_huge, size_t max_words) {
 }
 }  // namespace
 
-// usage: specBenchmarkDma [spec number] [merge 0|1] [hugepage 0|1] [merged descriptor bytes] [verify 0|1|2]
+// usage: specBenchmarkDma [spec number] [merge 0|1] [hugepage 0|1] [merged descriptor bytes] [verify 0|1|2] [words] [repeats]
 //   merge:    device-to-host descriptors of contiguous pages are merged (default: the SpecCom default, on)
 //   hugepage: use a 2 MB aligned transparent-hugepage buffer, i.e. physically contiguous, so that merging
 //             has an effect (default 0, a normal buffer)
 //   merged descriptor bytes: largest merged descriptor, 4096 to 32768 (default 32768)
 //   verify:   1 = also write a pattern, read it back and compare it (data check), 2 = only the data check,
 //             without the speed benchmark (default 0); exit code 1 if the data differs
+//   words, repeats: with verify, check only this transfer size (32-bit words), repeats times
 int main(int argc, char *argv[]) {
     unsigned spec_num = 0;
     if (argc > 1)
@@ -153,6 +177,8 @@ int main(int argc, char *argv[]) {
     if (argc > 4)
         mySpec.setMergedDescBytes(strtoul(argv[4], nullptr, 0));
     const int verify = argc > 5 ? atoi(argv[5]) : 0;
+    const size_t verify_words = argc > 6 ? strtoul(argv[6], nullptr, 0) : 0;
+    const int verify_repeats = argc > 7 ? atoi(argv[7]) : 1;
 
     std::fstream file_write("benchmarkDma_write.out", std::ios::out);
     std::fstream file_read("benchmarkDma_read.out", std::ios::out);
@@ -184,7 +210,7 @@ int main(int argc, char *argv[]) {
               << " (up to " << mySpec.getMergedDescBytes() << " bytes)"
               << ", " << (use_huge ? "hugepage" : "normal") << " buffer" << std::endl;
     if (verify == 2)
-        return verifyDma(mySpec, use_huge, MAX_WORDS) == 0 ? 0 : 1;
+        return verifyDma(mySpec, use_huge, MAX_WORDS, verify_words, verify_repeats) == 0 ? 0 : 1;
 
     std::cout << std::endl << "==========================================" << std::endl;
     std::cout << "Starting DMA Write Benchmark:" << std::endl;
@@ -246,7 +272,7 @@ int main(int argc, char *argv[]) {
 
     file_write.close();
     file_read.close();
-    if (verify == 1 && verifyDma(mySpec, use_huge, MAX_WORDS) != 0)
+    if (verify == 1 && verifyDma(mySpec, use_huge, MAX_WORDS, verify_words, verify_repeats) != 0)
         return 1;
     return 0;
 }
