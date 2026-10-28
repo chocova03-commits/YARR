@@ -162,7 +162,7 @@ int SpecCom::writeDma(uint32_t off, uint32_t *data, size_t words) {
 
         struct dma_linked_list *llist = this->prepDmaList(um, km, off, 1);
 
-        this->writeBlock(bar0, DMACSTARTR, (uint32_t*) &llist[0], sizeof(struct dma_linked_list)/sizeof(uint32_t));
+        this->writeBlock(bar0, DMACSTARTR, (uint32_t*) &llist[0], kDmaDescWords);
         this->startDma();
 
         bool timeout = false;
@@ -207,7 +207,7 @@ int SpecCom::readDma(uint32_t off, uint32_t *data, size_t words) {
 
         struct dma_linked_list *llist = this->prepDmaList(um, km, off, 0);
         
-        this->writeBlock(bar0, DMACSTARTR, (uint32_t*) &llist[0], sizeof(struct dma_linked_list)/sizeof(uint32_t));
+        this->writeBlock(bar0, DMACSTARTR, (uint32_t*) &llist[0], kDmaDescWords);
         this->startDma();
 
         if (spec->waitForInterrupt(0) < 1) {
@@ -392,6 +392,7 @@ struct dma_linked_list* SpecCom::prepDmaList(UserMemory *um, KernelMemory *km, u
             llist[j].host_next_l = (uint32_t)((uint64_t)next & 0xFFFFFFFF);
             llist[j].host_next_h = (uint32_t)((uint64_t)next >> 32);
             llist[j].attr = 0x1 + (write << 1); // L2P, not last
+            llist[j].pad = 0;
 #if 0
             std::cout << "Linked List Entry [" << std::dec << j << std::hex << "]:" << std::endl;
             std::cout << "  Carrier Start: 0x" << llist[j].carrier_start << std::endl;
