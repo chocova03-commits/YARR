@@ -34,12 +34,13 @@ LIST(APPEND apps
         cmlBiasScan
         dataMergingCheck
         specErrorCheckDma
+        specStressDma
         specErrorCheckSingle
         specSoftReset)
 
 foreach (target IN LISTS apps)
     add_executable(${target} app/${target}.cpp)
-    target_link_libraries(${target} Yarr)
+    target_link_libraries(${target} Yarr Threads::Threads)
     post_build_debug_executable(${target})
 endforeach ()
 
