@@ -130,7 +130,7 @@ std::string cardState(SpecCom &spec) {
 }
 
 /// Keeps reading registers that must never change; a difference means that a register read was corrupted.
-void regThread(SpecCom *spec, int id) {
+void regThread(SpecCom *spec, int id, unsigned pause_us) {
     const uint32_t regs[] = {SPEC_GREG | SPEC_GREG_FWVERS, SPEC_GREG | SPEC_GREG_FWIDENT, SPEC_GREG | 0x8};
     uint32_t ref[3];
     for (int i = 0; i < 3; i++) ref[i] = spec->readSingle(regs[i]);
@@ -149,6 +149,7 @@ void regThread(SpecCom *spec, int id) {
         }
         since += 3;
         if (since >= 4096) { g_reg_reads += since; since = 0; }
+        if (pause_us > 0) std::this_thread::sleep_for(std::chrono::microseconds(pause_us));
     }
     g_reg_reads += since;
 }
@@ -166,13 +167,14 @@ void hogThread(size_t bytes) {
 }
 
 void usage(const char *prog) {
-    std::cout << "usage: " << prog << " [-s spec id] [-t seconds, 0 = forever] [-r seed] [-k iterations to skip] [-j register threads]\n"
+    std::cout << "usage: " << prog << " [-s spec id] [-t seconds, 0 = forever] [-r seed] [-k iterations to skip] [-j register threads] [-p pause]\n"
               << "       [-m memory load threads] [-x max words] [-a] [-o max offset] [-b 0|1] [-D] [-n iterations] [-q]\n"
               << "  -s  card number (default 0)\n"
               << "  -t  duration (default 60 s)\n"
               << "  -r  seed of the random generator (default: from the clock, printed)\n"
               << "  -k  skip this many iterations (same seed: repeat a failure at that iteration)\n"
               << "  -j  threads that read registers during the DMA (default 1)\n"
+              << "  -p  pause in microseconds after each round of three register reads (default 0: as fast as possible)\n"
               << "  -m  threads that load the host memory with 256 MB each (default 0)\n"
               << "  -x  largest transfer in 32-bit words (default 262144 = 1 MB)\n"
               << "  -a  also use host buffer offsets that are not a multiple of 8 bytes\n"
@@ -191,18 +193,20 @@ int main(int argc, char *argv[]) {
     uint64_t seed = uint64_t(std::chrono::steady_clock::now().time_since_epoch().count());
     uint64_t skip = 0;
     int reg_threads = 1, hog_threads = 0;
+    unsigned pause_us = 0;
     size_t max_words = 262144;
     bool unaligned = false, quiet = false;
     Restrict rs;
     uint64_t max_iter = 0;
     int c;
-    while ((c = getopt(argc, argv, "s:t:r:k:j:m:x:o:b:n:Daqh")) != -1) {
+    while ((c = getopt(argc, argv, "s:t:r:k:j:p:m:x:o:b:n:Daqh")) != -1) {
         switch (c) {
             case 's': spec_num = atoi(optarg); break;
             case 't': seconds = atof(optarg); break;
             case 'r': seed = strtoull(optarg, nullptr, 0); break;
             case 'k': skip = strtoull(optarg, nullptr, 0); break;
             case 'j': reg_threads = atoi(optarg); break;
+            case 'p': pause_us = strtoul(optarg, nullptr, 0); break;
             case 'm': hog_threads = atoi(optarg); break;
             case 'x': max_words = strtoul(optarg, nullptr, 0) & ~size_t(1); break;
             case 'a': unaligned = true; break;
@@ -235,14 +239,14 @@ int main(int argc, char *argv[]) {
     std::cout << "specStressDma: card " << spec_num << ", seed " << seed << ", " << (seconds > 0 ? std::to_string(int(seconds)) + " s" : "no time limit")
               << ", " << reg_threads << " register thread(s), " << hog_threads << " memory load thread(s), transfers up to " << max_words * 4
               << " bytes" << (unaligned ? ", unaligned offsets" : "") << std::endl
-              << "repeat with: specStressDma -s " << spec_num << " -r " << seed << " -x " << max_words << (unaligned ? " -a" : "") << (rs.max_off != 2047 ? " -o " + std::to_string(rs.max_off) : std::string()) << (rs.buffers != 2 ? " -b " + std::to_string(rs.buffers) : std::string()) << (rs.dev_off ? "" : " -D")
+              << "repeat with: specStressDma -s " << spec_num << (pause_us ? " -p " + std::to_string(pause_us) : std::string()) << " -r " << seed << " -x " << max_words << (unaligned ? " -a" : "") << (rs.max_off != 2047 ? " -o " + std::to_string(rs.max_off) : std::string()) << (rs.buffers != 2 ? " -b " + std::to_string(rs.buffers) : std::string()) << (rs.dev_off ? "" : " -D")
               << " -k <iteration>" << std::endl;
 
     std::mt19937_64 rng(seed);
     for (uint64_t i = 0; i < skip; i++) drawParams(rng, max_words, unaligned, rs);
 
     std::vector<std::thread> threads;
-    for (int i = 0; i < reg_threads; i++) threads.emplace_back(regThread, &spec, i);
+    for (int i = 0; i < reg_threads; i++) threads.emplace_back(regThread, &spec, i, pause_us);
     for (int i = 0; i < hog_threads; i++) threads.emplace_back(hogThread, size_t(256) << 20);
 
     uint32_t kInv = kMul;   // modular inverse of kMul (Newton iteration), finds the source word of a received word
@@ -258,7 +262,7 @@ int main(int argc, char *argv[]) {
     auto elapsed = [&t0]() { return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(); };
     auto fail = [&](int code, const std::string &what) {
         std::cout << std::endl << "FAILED at iteration " << iteration << ": " << what << std::endl
-                  << "  repeat this iteration with: -s " << spec_num << " -r " << seed << " -x " << max_words << (unaligned ? " -a" : "") << (rs.max_off != 2047 ? " -o " + std::to_string(rs.max_off) : std::string()) << (rs.buffers != 2 ? " -b " + std::to_string(rs.buffers) : std::string()) << (rs.dev_off ? "" : " -D")
+                  << "  repeat this iteration with: -s " << spec_num << (pause_us ? " -p " + std::to_string(pause_us) : std::string()) << " -r " << seed << " -x " << max_words << (unaligned ? " -a" : "") << (rs.max_off != 2047 ? " -o " + std::to_string(rs.max_off) : std::string()) << (rs.buffers != 2 ? " -b " + std::to_string(rs.buffers) : std::string()) << (rs.dev_off ? "" : " -D")
                   << " -k " << iteration << std::endl;
         rc = code;
         g_stop = true;
