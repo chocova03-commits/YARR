@@ -109,11 +109,8 @@ merge, so ``"auto"`` costs nothing there.
 
 The firmware announces the capability in register ``0x1E`` of the control block (``0xC0DE0001``: magic ``C0DE``,
 bit 0 = long bursts are safe). Older firmware does not decode that address and answers ``0xDEADBEEF``. At start-up
-the controller logs what it found, for example
-
-```
-Long DMA bursts: supported by the firmware (merged DMA reads in automatic mode: on)
-```
+the controller logs what it found: ``Merged DMA reads (auto): on``, or ``Merged DMA reads (auto): off, firmware lacks
+long bursts``.
 
 The firmware also has counters of the device-to-host DMA (TLPs by payload size, cycles busy, waiting for data,
 back-pressured by the PCIe side, waiting at a TLP header; registers ``0x8``, ``0xA``..``0xD``, ``0x10``..``0x13``),
