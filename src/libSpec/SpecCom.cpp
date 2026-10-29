@@ -202,7 +202,7 @@ int SpecCom::writeDma(uint32_t off, uint32_t *data, size_t words) {
 int SpecCom::readDma(uint32_t off, uint32_t *data, size_t words) {
     int status = this->getDmaStatus(); 
     if ( status == DMAIDLE || status == DMADONE || status == DMAABORTED) {
-        UserMemory *um = &spec->mapUserMemory(data, words*4, merge_dma_read);
+        UserMemory *um = &spec->mapUserMemory(data, words*4, getMergeDmaRead());
         KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*std::max<size_t>(countDescriptors(um, descLimit(false)), 1));
 
         struct dma_linked_list *llist = this->prepDmaList(um, km, off, 0);
@@ -271,6 +271,7 @@ void SpecCom::init() {
     // Get FW info
     fw_vers = readSingle(SPEC_GREG | SPEC_GREG_FWVERS);
     fw_ident = readSingle(SPEC_GREG | SPEC_GREG_FWIDENT);
+    fw_caps = decodeSpecCaps(readSingle(SPEC_GREG | SPEC_GREG_CAPS));
     if (fw_ident == 0xFFFFFFFF || fw_vers == 0xFFFFFFFF) {
         slog->error("Could not read FW version or identifier!");
     } else {
@@ -279,6 +280,8 @@ void SpecCom::init() {
         slog->info("Firmware Hash: {}", static_cast<std::string>(status["firmware_hash"]));
         slog->info("Firmware Version: {}", static_cast<std::string>(status["firmware_vers"]));
         slog->info("Firmware Identifier: {}", static_cast<std::string>(status["firmware_identifier"]));
+        slog->info("Long DMA bursts: {}", fw_caps.long_burst ? "supported by the firmware (merged DMA reads in automatic mode: on)"
+                                                             : "not advertised by the firmware (merged DMA reads in automatic mode: off)");
         slog->info("FPGA card: {}", static_cast<std::string>(status["fpga_card"]));
         slog->info("FE Chip Type: {}", static_cast<std::string>(status["fe_chip_type"]));
         slog->info("FMC Card Type: {}", static_cast<std::string>(status["fmc_card_type"]));
@@ -482,7 +485,15 @@ void SpecCom::flushDma() {
 
 uint32_t SpecCom::descLimit(bool write) const {
     // Writes keep one descriptor per page: larger ones need the P2L address fix in the firmware
-    return (!write && merge_dma_read) ? merged_desc_bytes : kPageDescBytes;
+    return (!write && getMergeDmaRead()) ? merged_desc_bytes : kPageDescBytes;
+}
+
+void SpecCom::setMergeDmaRead(bool merge) {
+    merge_mode = merge ? MergeMode::On : MergeMode::Off;
+    if (merge && spec != nullptr && !fw_caps.long_burst) {
+        slog->warn("Merged DMA reads forced on, but the firmware does not say that it handles long DMA bursts: "
+                   "data can be lost or the host can crash");
+    }
 }
 
 void SpecCom::setMergedDescBytes(uint32_t bytes) {

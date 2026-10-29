@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <string>
+#include "SpecCaps.h"
 
 #include "storage.hpp"
 #include <SpecDevice.h>
@@ -54,6 +55,7 @@ enum SPEC_DMA_STATUS {
 
 // Read-only DMA statistics of the control block (firmware with TLP and cycle counters)
 #define SPEC_GREG_FEATURES 0x8       // bit 0: TLP counters, bit 1: cycle counters
+#define SPEC_GREG_CAPS 0x1E          // capabilities, see SpecCaps.h
 #define SPEC_GREG_STAT_TLP_128 0xA   // device-to-host TLPs with 128 B payload
 #define SPEC_GREG_STAT_TLP_256 0xB
 #define SPEC_GREG_STAT_TLP_512 0xC
@@ -171,10 +173,18 @@ class SpecCom {
         /// Snapshot of the DMA statistics counters (see DmaStats)
         DmaStats getDmaStats();
 
-        /// Merge physically contiguous pages of device-to-host buffers into descriptors of up to 32 KB
-        /// (default true). Fewer descriptors mean fewer gaps between them; false gives one descriptor per page.
-        void setMergeDmaRead(bool merge) { merge_dma_read = merge; }
-        bool getMergeDmaRead() const { return merge_dma_read; }
+        /// Merge physically contiguous pages of device-to-host buffers into descriptors of up to 32 KB. Fewer
+        /// descriptors mean fewer gaps between them; false gives one descriptor per page. Default: automatic, merged
+        /// only if the firmware advertises (capability register) that it keeps all data with long DMA bursts. Older
+        /// firmware loses data with descriptors larger than a few KB and can crash the host. This call forces the
+        /// setting; forcing it on with firmware without the capability logs a warning.
+        void setMergeDmaRead(bool merge);
+        /// Back to automatic
+        void setMergeDmaReadAuto() { merge_mode = MergeMode::Auto; }
+        /// Merged descriptors are used now (the setting and what the firmware can do)
+        bool getMergeDmaRead() const { return mergedReadsEnabled(merge_mode, fw_caps); }
+        MergeMode getMergeMode() const { return merge_mode; }
+        const SpecCaps &getFirmwareCaps() const { return fw_caps; }
         /// Largest merged device-to-host descriptor in bytes (default and maximum 32768). Smaller values keep the
         /// bursts shorter; the value is rounded down to a multiple of 4096 and clamped to 4096..32768.
         void setMergedDescBytes(uint32_t bytes);
@@ -196,7 +206,8 @@ class SpecCom {
         unsigned int specId = 0;
         bool is_initialized = false;
         bool do_reset = true;
-        bool merge_dma_read = true;
+        MergeMode merge_mode = MergeMode::Auto;
+        SpecCaps fw_caps;
         uint32_t merged_desc_bytes = 32768;
 
         /// Largest descriptor for a DMA in the given direction
