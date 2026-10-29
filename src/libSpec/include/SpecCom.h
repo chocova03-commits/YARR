@@ -97,7 +97,8 @@ const static std::string specIdentSpeed[] = {"undefined", "160Mbps", "320Mbps", 
 const static std::string specIdentChCfg[] = {"undefined", "4x4", "16x1", "8x4", "32x1", "3x4 TLU", "3x4 Ext Trig", "12x1 TLU", "12x1 Ext Trig"};
 const static uint32_t specIdentLaneCfg[] = {0, 4, 1, 4, 1, 4, 4, 1, 1};
 
-static std::map<uint16_t, std::string> specIdentFw = {
+static std::map<uint32_t, std::string> specIdentFw = {
+    {0x453cac0, "v1.7.0"},
     {0xacb87f4, "v1.6.0"},
     {0x7b14549, "v1.5.0"},
     {0xe7985d6, "v1.4.0"},

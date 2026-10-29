@@ -280,8 +280,7 @@ void SpecCom::init() {
         slog->info("Firmware Hash: {}", static_cast<std::string>(status["firmware_hash"]));
         slog->info("Firmware Version: {}", static_cast<std::string>(status["firmware_vers"]));
         slog->info("Firmware Identifier: {}", static_cast<std::string>(status["firmware_identifier"]));
-        slog->info("Long DMA bursts: {}", fw_caps.long_burst ? "supported by the firmware (merged DMA reads in automatic mode: on)"
-                                                             : "not advertised by the firmware (merged DMA reads in automatic mode: off)");
+        slog->info("Merged DMA reads (auto): {}", fw_caps.long_burst ? "on" : "off, firmware lacks long bursts");
         slog->info("FPGA card: {}", static_cast<std::string>(status["fpga_card"]));
         slog->info("FE Chip Type: {}", static_cast<std::string>(status["fe_chip_type"]));
         slog->info("FMC Card Type: {}", static_cast<std::string>(status["fmc_card_type"]));
