@@ -81,6 +81,107 @@ Success! No errors.
 
 For further information for the questionnaire see the section below for more information!
 
+## DMA settings, benchmark and stress test
+
+### Controller settings
+
+The SPEC controller reads two optional keys from the ``cfg`` block of the hardware controller config
+(for example ``configs/controller/specCfg-rd53b-16x1.json``):
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| ``mergeDmaRead`` | ``"auto"`` | ``"auto"``, ``true`` or ``false``. Readout (device to host) DMA can merge physically contiguous pages (hugepages, or an IOMMU) into descriptors of up to ``mergedDescBytes`` instead of one descriptor per 4 KB page. That removes most of the gaps between descriptors and makes the readout faster (about 20 to 40 % on a Nereid). ``"auto"`` merges only if the firmware says that it can take long DMA bursts (see below), otherwise it keeps one descriptor per page. ``true`` and ``false`` force it. |
+| ``mergedDescBytes`` | ``32768`` | Largest merged descriptor in bytes, 4096 to 32768 (rounded down to a multiple of 4096). |
+
+```json
+"cfg" : {
+    "specNum" : 0,
+    "mergeDmaRead" : "auto",
+    "mergedDescBytes" : 32768
+}
+```
+
+**Forcing ``mergeDmaRead`` to ``true`` is only safe with firmware that has the fixes of the device-to-host path.**
+Firmware without them (every release up to v1.6.0) can lose data with descriptors of more than a few KB and has crashed
+test hosts. The controller logs a warning if it is forced on without the capability. Merging only has an effect if the
+buffer is contiguous for the card: hugepages, or any buffer behind an IOMMU. Without an IOMMU ordinary buffers rarely
+merge, so ``"auto"`` costs nothing there.
+
+The firmware announces the capability in register ``0x1E`` of the control block (``0xC0DE0001``: magic ``C0DE``,
+bit 0 = long bursts are safe). Older firmware does not decode that address and answers ``0xDEADBEEF``. At start-up
+the controller logs what it found, for example
+
+```
+Long DMA bursts: supported by the firmware (merged DMA reads in automatic mode: on)
+```
+
+The firmware also has counters of the device-to-host DMA (TLPs by payload size, cycles busy, waiting for data,
+back-pressured by the PCIe side, waiting at a TLP header; registers ``0x8``, ``0xA``..``0xD``, ``0x10``..``0x13``),
+which ``specBenchmarkDma`` prints. Descriptors are 32 bytes in host memory so that none crosses a 4 KB page boundary.
+
+### specBenchmarkDma
+
+``specBenchmarkDma -h`` prints the usage:
+
+```
+specBenchmarkDma [spec number] [merge 0|1|auto] [hugepage 0|1] [merged descriptor bytes] [verify 0|1|2] [words] [repeats]
+```
+
+| Argument | Meaning |
+|----------|---------|
+| ``spec number`` | Card to use (default 0). |
+| ``merge`` | ``1`` merged descriptors, ``0`` one per page, ``auto`` (default) as the firmware allows. |
+| ``hugepage`` | ``1``: use a 2 MB aligned hugepage buffer (physically contiguous, so merging has an effect); default ``0``. |
+| ``merged descriptor bytes`` | Largest merged descriptor, 4096 to 32768 (default 32768). |
+| ``verify`` | ``1``: after the speed benchmark also write a pattern in which every word is unique, read it back and compare every word; ``2``: only that data check. The exit code is 1 if the data differs. |
+| ``words``, ``repeats`` | With ``verify``: check only this transfer size (in 32-bit words), ``repeats`` times. |
+
+The first output line says what is used, for example ``merged device-to-host descriptors on (automatic, firmware supports
+long bursts, up to 32768 bytes), hugepage buffer``. After the read phase the benchmark prints the TLPs by payload size,
+how long the DMA master was active, the payload rate while active and where the active cycles went. The cycle counters are
+converted to time with a clock of 320 MHz, so on a build with another clock (the Nereid build runs at 300 MHz) the rates
+are off by that ratio; the TLP counts and the percentages are not affected.
+
+```
+specBenchmarkDma 1 auto 1          # speed of card 1, hugepage buffer, merging as the firmware allows
+specBenchmarkDma 1 0 1             # the same with one descriptor per page, to see what merging gives
+specBenchmarkDma 1 1 1 32768 2     # data check only, merged descriptors
+```
+
+### specStressDma
+
+Randomised, data-checked DMA test. Each iteration writes a pattern in which every word is unique, reads it back into a
+poisoned buffer and compares every word, with random size (8 bytes to 1 MB), host buffer (hugepage or normal pages),
+offsets, device address, merging and descriptor size. Optional threads read registers all the time or load the host
+memory, to provoke the cases that a quiet host never shows. It stops at the first failure and prints how to repeat it.
+Merged descriptors are only used if the firmware supports them.
+
+| Option | Meaning |
+|--------|---------|
+| ``-s N`` | Card number (default 0). |
+| ``-t S`` | Duration in seconds (default 60, 0 = until stopped). |
+| ``-r SEED`` | Seed of the random generator (default from the clock, printed). |
+| ``-k N`` | Skip N iterations; with the same seed this repeats a failing iteration. |
+| ``-n N`` | Stop after N iterations (with ``-k``: repeat exactly one transfer). |
+| ``-j N`` | Threads that read registers during the DMA (default 1), ``-p US`` pause between their reads. |
+| ``-m N`` | Threads that load the host memory with 256 MB each (default 0). |
+| ``-x W`` | Largest transfer in 32-bit words (default 262144 = 1 MB). |
+| ``-o W``, ``-b 0\|1``, ``-D`` | Restrict the random parameters: largest host buffer offset (0 = page aligned), normal pages or hugepages only, device address 0 only. |
+| ``-a`` | Also use host buffer offsets that are not a multiple of 8 bytes (not known to be supported). |
+| ``-q`` | No progress lines. |
+
+The exit code is 0 if everything passed, 1 if the data differs, 2 for a DMA error or a card that does not respond, 3 if
+register reads returned wrong values. The progress lines show how much of the time the PCIe side held the DMA back; if it
+stays at 0.0 % the host never stalled and the flow control was not exercised (try ``-m``).
+
+```
+specStressDma -s 1 -t 600 -j 2          # ten minutes with two threads reading registers
+specStressDma -s 1 -r 12345 -k 7 -n 1   # repeat iteration 7 of a failed run with seed 12345
+```
+
+**Use it on a test machine.** A DMA that fails can leave the card unresponsive, and the next access to it (even
+``lspci`` on the card) can freeze the host, so a reboot is needed before the next test.
+
 ## Further information for Questionaire
 
 ### FPGA Board Type

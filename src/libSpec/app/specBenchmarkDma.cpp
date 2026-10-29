@@ -158,16 +158,27 @@ int verifyDma(SpecCom &spec, bool use_huge, size_t max_words, size_t only_words,
 }
 }  // namespace
 
-// usage: specBenchmarkDma [spec number] [merge 0|1|auto] [hugepage 0|1] [merged descriptor bytes] [verify 0|1|2] [words] [repeats]
-//   merge:    device-to-host descriptors of contiguous pages are merged: 1 on, 0 off, auto (default) only if the
-//             firmware says that it can take long DMA bursts (older firmware can lose data and crash the host)
-//   hugepage: use a 2 MB aligned transparent-hugepage buffer, i.e. physically contiguous, so that merging
-//             has an effect (default 0, a normal buffer)
-//   merged descriptor bytes: largest merged descriptor, 4096 to 32768 (default 32768)
-//   verify:   1 = also write a pattern, read it back and compare it (data check), 2 = only the data check,
-//             without the speed benchmark (default 0); exit code 1 if the data differs
-//   words, repeats: with verify, check only this transfer size (32-bit words), repeats times
+static void printUsage() {
+    std::cout <<
+        "usage: specBenchmarkDma [spec number] [merge 0|1|auto] [hugepage 0|1] [merged descriptor bytes] [verify 0|1|2] [words] [repeats]\n"
+        "  spec number              card to use (default 0)\n"
+        "  merge                    device-to-host descriptors of contiguous pages are merged: 1 on, 0 off, auto (default) only if the\n"
+        "                           firmware says that it can take long DMA bursts (older firmware can lose data and crash the host)\n"
+        "  hugepage                 use a 2 MB aligned transparent-hugepage buffer, i.e. physically contiguous, so that merging\n"
+        "                           has an effect (default 0, a normal buffer)\n"
+        "  merged descriptor bytes  largest merged descriptor, 4096 to 32768 (default 32768)\n"
+        "  verify                   1 = also write a pattern, read it back and compare it (data check), 2 = only the data check,\n"
+        "                           without the speed benchmark (default 0); exit code 1 if the data differs\n"
+        "  words, repeats           with verify: check only this transfer size (32-bit words), repeats times\n"
+        "examples: specBenchmarkDma 1 auto 1          speed of card 1 with hugepages, merging as the firmware allows\n"
+        "          specBenchmarkDma 1 1 1 32768 2     data check only, merged descriptors forced on\n";
+}
+
 int main(int argc, char *argv[]) {
+    if (argc > 8 || (argc > 1 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help"))) {
+        printUsage();
+        return argc > 8 ? 2 : 0;
+    }
     unsigned spec_num = 0;
     if (argc > 1)
         spec_num = atoi(argv[1]);
