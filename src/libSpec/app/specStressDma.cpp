@@ -242,6 +242,9 @@ int main(int argc, char *argv[]) {
               << "repeat with: specStressDma -s " << spec_num << (pause_us ? " -p " + std::to_string(pause_us) : std::string()) << " -r " << seed << " -x " << max_words << (unaligned ? " -a" : "") << (rs.max_off != 2047 ? " -o " + std::to_string(rs.max_off) : std::string()) << (rs.buffers != 2 ? " -b " + std::to_string(rs.buffers) : std::string()) << (rs.dev_off ? "" : " -D")
               << " -k <iteration>" << std::endl;
 
+    if (!spec.getFirmwareCaps().long_burst)
+        std::cout << "note: the firmware does not advertise long DMA bursts, merged descriptors are not used" << std::endl;
+
     std::mt19937_64 rng(seed);
     for (uint64_t i = 0; i < skip; i++) drawParams(rng, max_words, unaligned, rs);
 
@@ -277,7 +280,7 @@ int main(int argc, char *argv[]) {
         for (size_t i = 0; i < kPad; i++) d_front[i] = kPoison;               // in front of the transfer
         for (size_t i = 0; i < p.words + kGuard; i++) d[i] = kPoison;         // the transfer and behind it
 
-        spec.setMergeDmaRead(p.merge);
+        spec.setMergeDmaRead(p.merge && spec.getFirmwareCaps().long_burst);   // long bursts only on firmware that takes them
         spec.setMergedDescBytes(p.cap);
         if (spec.writeDma(p.dev_off, s, p.words)) {
             fail(2, "writeDma failed, " + describe(p) + "; " + cardState(spec));
