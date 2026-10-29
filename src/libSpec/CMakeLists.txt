@@ -38,6 +38,11 @@ LIST(APPEND apps
         specErrorCheckSingle
         specSoftReset)
 
+# Decision about merged DMA descriptors from the capability register of the firmware (no hardware needed)
+add_executable(testSpecCaps tests/test_spec_caps.cpp)
+target_include_directories(testSpecCaps PRIVATE include)
+add_test(NAME testSpecCaps COMMAND testSpecCaps)
+
 foreach (target IN LISTS apps)
     add_executable(${target} app/${target}.cpp)
     target_link_libraries(${target} Yarr Threads::Threads)

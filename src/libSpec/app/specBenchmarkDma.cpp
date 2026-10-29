@@ -158,8 +158,9 @@ int verifyDma(SpecCom &spec, bool use_huge, size_t max_words, size_t only_words,
 }
 }  // namespace
 
-// usage: specBenchmarkDma [spec number] [merge 0|1] [hugepage 0|1] [merged descriptor bytes] [verify 0|1|2] [words] [repeats]
-//   merge:    device-to-host descriptors of contiguous pages are merged (default: the SpecCom default, on)
+// usage: specBenchmarkDma [spec number] [merge 0|1|auto] [hugepage 0|1] [merged descriptor bytes] [verify 0|1|2] [words] [repeats]
+//   merge:    device-to-host descriptors of contiguous pages are merged: 1 on, 0 off, auto (default) only if the
+//             firmware says that it can take long DMA bursts (older firmware can lose data and crash the host)
 //   hugepage: use a 2 MB aligned transparent-hugepage buffer, i.e. physically contiguous, so that merging
 //             has an effect (default 0, a normal buffer)
 //   merged descriptor bytes: largest merged descriptor, 4096 to 32768 (default 32768)
@@ -172,8 +173,10 @@ int main(int argc, char *argv[]) {
         spec_num = atoi(argv[1]);
     logging::setupLoggers(logging::defaultConfig());
     SpecCom mySpec (spec_num);
-    if (argc > 2)
-        mySpec.setMergeDmaRead(atoi(argv[2]) != 0);
+    if (argc > 2) {
+        if (std::string(argv[2]) == "auto") mySpec.setMergeDmaReadAuto();
+        else mySpec.setMergeDmaRead(atoi(argv[2]) != 0);
+    }
     const bool use_huge = argc > 3 && atoi(argv[3]) != 0;
     if (argc > 4)
         mySpec.setMergedDescBytes(strtoul(argv[4], nullptr, 0));
@@ -208,7 +211,9 @@ int main(int argc, char *argv[]) {
         std::cerr << "madvise(MADV_HUGEPAGE) failed, the buffer may not be contiguous" << std::endl;
     std::memset(data_buf, 0, buf_bytes);  // touch the pages before the first transfer
     std::cout << "Settings: merged device-to-host descriptors " << (mySpec.getMergeDmaRead() ? "on" : "off")
-              << " (up to " << mySpec.getMergedDescBytes() << " bytes)"
+              << " (" << (mySpec.getMergeMode() == MergeMode::Auto ? "automatic" : "forced") << ", firmware "
+              << (mySpec.getFirmwareCaps().long_burst ? "supports" : "does not advertise") << " long bursts, up to "
+              << mySpec.getMergedDescBytes() << " bytes)"
               << ", " << (use_huge ? "hugepage" : "normal") << " buffer" << std::endl;
     if (verify == 2)
         return verifyDma(mySpec, use_huge, MAX_WORDS, verify_words, verify_repeats) == 0 ? 0 : 1;
