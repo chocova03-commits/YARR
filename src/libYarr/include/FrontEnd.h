@@ -93,7 +93,7 @@ class FrontEnd {
         virtual yarrStatus readUpdateWriteNamedRegister(std::string name, const uint16_t value) {return yarrFailure;};
 
         /// Configures ADC
-        virtual yarrStatus confAdc(uint16_t MONMUX, bool doCur) {return yarrFailure;};
+        virtual yarrStatus confAdc(uint16_t MONMUX, bool doCur, unsigned adcSleep_us = 1000) {return yarrFailure;};
 
         virtual void setInjCharge(double, bool, bool) = 0;
 
