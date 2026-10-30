@@ -75,7 +75,6 @@ void Itkpixv2::resetAllSoft() {
     core->waitCmdEmpty();
 
     this->sendGlobalPulse(m_chipId);
-    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
 }
@@ -111,7 +110,6 @@ void Itkpixv2::configureInit() {
     this->writeRegister(&Itkpixv2::GlobalPulseWidth, 10);
     core->waitCmdEmpty();
     this->sendGlobalPulse(m_chipId);
-    core->waitCmdEmpty();
     std::this_thread::sleep_for(std::chrono::microseconds(100));
     // Reset register
     this->writeRegister(&Itkpixv2::GlobalPulseConf, 0);
@@ -663,7 +661,7 @@ uint8_t Itkpixv2::readChipId() {
     return value;
 }
 
-yarrStatus Itkpixv2::confAdc(uint16_t MONMUX, bool doCur) {
+yarrStatus Itkpixv2::confAdc(uint16_t MONMUX, bool doCur, unsigned adcSleep_us) {
     //This only works for voltage MUX values.
     uint16_t OriginalGlobalRT = this->GlobalPulseConf.read();
     uint16_t OriginalMonitorEnable = this->MonitorEnable.read(); //Enabling monitoring
@@ -697,7 +695,7 @@ yarrStatus Itkpixv2::confAdc(uint16_t MONMUX, bool doCur) {
 
     success = success && (this->writeRegister(&Itkpixv2::GlobalPulseConf, 0x1000) == yarrSuccess); //Trigger ADC Conversion
     core->waitCmdEmpty();
-    std::this_thread::sleep_for(std::chrono::microseconds(1000));
+    std::this_thread::sleep_for(std::chrono::microseconds(adcSleep_us));
 
     this->sendGlobalPulse(m_chipId);
     std::this_thread::sleep_for(std::chrono::microseconds(1000)); //This is neccessary to clean. This might be controller dependent.
@@ -708,7 +706,7 @@ yarrStatus Itkpixv2::confAdc(uint16_t MONMUX, bool doCur) {
     success = success && (this->writeRegister(&Itkpixv2::MonitorV, OriginalMonitorV) == yarrSuccess);
     success = success && (this->writeRegister(&Itkpixv2::MonitorI, OriginalMonitorI) == yarrSuccess);
     core->waitCmdEmpty();
-    std::this_thread::sleep_for(std::chrono::microseconds(1000));
+    std::this_thread::sleep_for(std::chrono::microseconds(adcSleep_us));
 
     return (success ? yarrSuccess : yarrFailure);
 }

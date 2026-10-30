@@ -96,6 +96,7 @@ void Itkpixv2Cmd::sendGlobalPulse(uint8_t chipId) {
     SPDLOG_LOGGER_TRACE(logger, "Sending GlobalPulse(id({}))", chipId);
     core->writeFifo(0xAAAA0000 | Itkpixv2Cmd::genGlobalPulse(chipId)[0]);
     core->releaseFifo();
+    core->waitCmdEmpty(); // Make sure the pulse is actually sent before returning
 }
 
 void Itkpixv2Cmd::sendWrReg(uint8_t chipId, uint16_t address, uint16_t data) {
