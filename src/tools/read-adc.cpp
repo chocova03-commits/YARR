@@ -40,6 +40,7 @@ void print_usage(char* argv[]) {
     std::cerr << "   -s          Assume FE's have shared vmux, and set MonitorV register to this value (high-Z) on all FE's when not reading" << std::endl;
     std::cerr << "   -I          Measure current through vmux pad" << std::endl;
     std::cerr << "   -R          Return raw ADC count" << std::endl;
+    std::cerr << "   -w <us>     Wait time in microseconds after triggering the ADC conversion and after restoring registers (default: 1000)" << std::endl;
     std::cerr << "   -d          Enable debug print out." << std::endl;
     std::cerr << "   -h|--help   Print this help message and exit" << std::endl;
     std::cerr << std::endl;
@@ -84,9 +85,10 @@ int main(int argc, char* argv[]) {
     int high_z = -1;
     bool shared_vmux = false;
     bool debug = false;
+    unsigned adc_sleep_us = 1000;
 
     int c = 0;
-    while (( c = getopt(argc, argv, "r:c:i:n:s:IRdh")) != -1) {
+    while (( c = getopt(argc, argv, "r:c:i:n:s:w:IRdh")) != -1) {
         switch (c) {
             case 'r' :
                 hw_controller_filename = optarg;
@@ -112,6 +114,14 @@ int main(int argc, char* argv[]) {
                     high_z = std::stoi(optarg);
                 } catch (std::exception& e) {
                     std::cerr << "ERROR: High-z register value must be an integer value (you provided: " << optarg << ")" << std::endl;
+                    return 1;
+                }
+                break;
+            case 'w' :
+                try {
+                    adc_sleep_us = std::stoul(optarg);
+                } catch (std::exception& e) {
+                    std::cerr << "ERROR: Wait time must be a non-negative integer in microseconds (you provided: " << optarg << ")" << std::endl;
                     return 1;
                 }
                 break;
@@ -239,7 +249,7 @@ int main(int argc, char* argv[]) {
                 hw->waitCmdEmpty();
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
 
-                if (fe->confAdc(monitorV, meas_curr) != yarrSuccess) {
+                if (fe->confAdc(monitorV, meas_curr, adc_sleep_us) != yarrSuccess) {
                     std::cerr << "ERROR: failed to configure ADC for " << current_chip_name << "!" << std::endl;
                     error_cnt++;
                 }
@@ -265,7 +275,7 @@ int main(int argc, char* argv[]) {
                 hw->waitCmdEmpty();
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
 
-                if (fe->confAdc(monitorV, meas_curr) != yarrSuccess) {
+                if (fe->confAdc(monitorV, meas_curr, adc_sleep_us) != yarrSuccess) {
                     std::cerr << "ERROR: failed to configure ADC for " << current_chip_name << "!" << std::endl;
                     error_cnt++;
                 }
