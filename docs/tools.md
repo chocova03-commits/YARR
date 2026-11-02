@@ -85,7 +85,8 @@ are only built on non-ARM targets.
 | ``specSoftReset`` | Issue a soft reset to the SPEC firmware, see [Firmware Trigger Tagging Guide](trigger_tagging.md) |
 | ``config-GBT-FMC`` | One-time I2C configuration of the GBT-FMC clock chips (Si534x/LMK61E2) on a SPEC card |
 | ``dataMergingCheck`` | Verify SPEC-side data-merging/lane configuration |
-| ``specBenchmarkDma`` | Measure SPEC PCIe DMA transfer throughput |
+| ``specBenchmarkDma`` | Measure SPEC PCIe DMA transfer throughput, optionally with merged descriptors, hugepages and a data check, see [DMA settings](fw_guide.md#dma-settings-benchmark-and-stress-test) |
+| ``specStressDma`` | Randomised, data-checked DMA stress test (sizes, buffers, offsets, optional register-read and memory-load threads), see [DMA settings](fw_guide.md#dma-settings-benchmark-and-stress-test) |
 | ``specBenchmarkSingle`` | Measure SPEC PCIe single-word transfer throughput |
 | ``specErrorCheckDma`` | Soak-test SPEC PCIe DMA transfers for bit errors |
 | ``specErrorCheckSingle`` | Soak-test SPEC PCIe single-word transfers for bit errors |

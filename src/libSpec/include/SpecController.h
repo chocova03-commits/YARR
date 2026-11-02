@@ -13,6 +13,7 @@
 #include "HwController.h"
 #include "SpecTxCore.h"
 #include "SpecRxCore.h"
+#include <stdexcept>
 
 
 #include "storage.hpp"
@@ -45,6 +46,23 @@ class SpecController : public HwController, public SpecTxCore, public SpecRxCore
 
             if (j.contains("txPolarity")) {
                 this->setTxPolarity(j["txPolarity"]);
+            }
+
+            // Merge contiguous pages of device-to-host DMA buffers into larger descriptors: "auto" (default, only if
+            // the firmware says that it can take them), true or false to force it
+            if (j.contains("mergeDmaRead")) {
+                if (j["mergeDmaRead"].is_string() && j["mergeDmaRead"] == "auto") {
+                    this->setMergeDmaReadAuto();
+                } else if (j["mergeDmaRead"].is_boolean()) {
+                    this->setMergeDmaRead(j["mergeDmaRead"]);
+                } else {
+                    throw std::runtime_error("mergeDmaRead must be \"auto\", true or false");
+                }
+            }
+
+            // Largest merged descriptor in bytes, 4096 to 32768 (default 32768)
+            if (j.contains("mergedDescBytes")) {
+                this->setMergedDescBytes(j["mergedDescBytes"]);
             }
 
             if (j.contains("rxWaitTime")) {
