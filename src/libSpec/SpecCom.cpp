@@ -7,6 +7,7 @@
 // #          Modified for SPEC card
 // ################################
 
+#include <algorithm>
 #include <cstdlib>
 #include <unistd.h>
 #include <iostream>
@@ -115,20 +116,60 @@ void SpecCom::readBlock(uint32_t off, uint32_t *val, size_t words) {
     this->readBlock(bar0, off, val, words);
 }
 
+namespace {
+// Largest transfer per DMA descriptor: one 4 KB page, or with merged device-to-host lists up to 32 KB.
+// The limit is 32768 and not the 65528 bytes the firmware length field would allow: a single descriptor much
+// above 40 KB lets the transmit FIFO in front of the PCIe core fill up, and the firmware then loses beats
+// under back-pressure (malformed TLP; it crashed a test host with a 60 KB limit).
+constexpr uint32_t kPageDescBytes = 4096;
+constexpr uint32_t kMergedDescBytes = 32768;
+
+// A register read that gets no answer from the card (PCIe link down, device gone) returns all ones
+bool cardNotResponding(uint32_t status) { return status == 0xFFFFFFFFu; }
+
+// Length of the next descriptor for a segment at 'addr' with 'remaining' bytes left. A TLP or read request
+// must not cross a 4 KB boundary, so a descriptor either starts on a 4 KB boundary or ends at the next one.
+// The firmware does not carry into the high word of the host address, so it must not cross a 4 GB boundary.
+uint64_t nextDescLength(uint64_t addr, uint64_t remaining, uint32_t max_bytes) {
+    uint64_t n = std::min<uint64_t>(remaining, max_bytes);
+    if (addr & 0xFFF) n = std::min<uint64_t>(n, 0x1000 - (addr & 0xFFF));
+    n = std::min<uint64_t>(n, 0x100000000ULL - (addr & 0xFFFFFFFFULL));
+    return n;
+}
+
+// Number of descriptors prepDmaList() creates for this buffer (a merged segment becomes several).
+size_t countDescriptors(UserMemory *um, uint32_t max_bytes) {
+    size_t count = 0;
+    for (unsigned int i = 0; i < um->getSGcount(); i++) {
+        uint64_t addr = um->getSGentryAddress(i);
+        uint64_t remaining = um->getSGentrySize(i);
+        while (remaining > 0) {
+            const uint64_t n = nextDescLength(addr, remaining, max_bytes);
+            addr += n;
+            remaining -= n;
+            count++;
+        }
+    }
+    return count;
+}
+}  // namespace
+
 int SpecCom::writeDma(uint32_t off, uint32_t *data, size_t words) {
     int status = this->getDmaStatus(); 
     if ( status == DMAIDLE || status == DMADONE || status == DMAABORTED) {
         UserMemory *um = &spec->mapUserMemory(data, words*4, false);
-        KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*um->getSGcount());
+        KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*std::max<size_t>(countDescriptors(um, descLimit(true)), 1));
 
         struct dma_linked_list *llist = this->prepDmaList(um, km, off, 1);
 
-        this->writeBlock(bar0, DMACSTARTR, (uint32_t*) &llist[0], sizeof(struct dma_linked_list)/sizeof(uint32_t));
+        this->writeBlock(bar0, DMACSTARTR, (uint32_t*) &llist[0], kDmaDescWords);
         this->startDma();
 
+        bool timeout = false;
         if (spec->waitForInterrupt(0) < 1) {
             slog->error("Interrupt timeout during DMA, aborting transfer!");
             this->abortDma();
+            timeout = true;
         }
 
         // Ackowledge interrupt
@@ -139,22 +180,34 @@ int SpecCom::writeDma(uint32_t off, uint32_t *data, size_t words) {
 
         delete km;
         delete um;
-        return 0;
+        status = this->getDmaStatus();
+        if (cardNotResponding(status)) {
+            slog->error("DMA status register reads all ones: the card does not respond (PCIe link down?)");
+            return 1;
+        }
+        return (timeout || status == DMAERROR || status == DMAABORTED) ? 1 : 0;
     } else {
-        slog->error("DMA Transfer aborted (Status = 0x{:x})", status);
+        if (cardNotResponding(status))
+            slog->error("DMA status register reads all ones: the card does not respond (PCIe link down?)");
+        else
+            slog->error("DMA Transfer aborted (Status = 0x{:x})", status);
         return 1;
     }
 }
 
+// With merged lists (setMergeDmaRead(), on by default) physically contiguous pages are merged into one
+// segment and split into descriptors of up to 32 KB instead of one descriptor per 4 KB page. The gaps
+// between descriptors cost about half of the device-to-host bandwidth with 4 KB pages. Merging only has
+// an effect if the buffer is physically contiguous (e.g. hugepages, or with an IOMMU).
 int SpecCom::readDma(uint32_t off, uint32_t *data, size_t words) {
     int status = this->getDmaStatus(); 
     if ( status == DMAIDLE || status == DMADONE || status == DMAABORTED) {
-        UserMemory *um = &spec->mapUserMemory(data, words*4, false);
-        KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*um->getSGcount());
+        UserMemory *um = &spec->mapUserMemory(data, words*4, getMergeDmaRead());
+        KernelMemory *km = &spec->allocKernelMemory(sizeof(struct dma_linked_list)*std::max<size_t>(countDescriptors(um, descLimit(false)), 1));
 
         struct dma_linked_list *llist = this->prepDmaList(um, km, off, 0);
         
-        this->writeBlock(bar0, DMACSTARTR, (uint32_t*) &llist[0], sizeof(struct dma_linked_list)/sizeof(uint32_t));
+        this->writeBlock(bar0, DMACSTARTR, (uint32_t*) &llist[0], kDmaDescWords);
         this->startDma();
 
         if (spec->waitForInterrupt(0) < 1) {
@@ -172,6 +225,10 @@ int SpecCom::readDma(uint32_t off, uint32_t *data, size_t words) {
         delete km;
         delete um;
         status = this->getDmaStatus(); 
+        if (cardNotResponding(status)) {
+            slog->error("DMA status register reads all ones: the card does not respond (PCIe link down?)");
+            return 1;
+        }
         if (status == DMAABORTED || status == DMAERROR) {
             slog->error("DMA Transfer aborted (Status = 0x{:x})", status);
             return 1;
@@ -179,7 +236,10 @@ int SpecCom::readDma(uint32_t off, uint32_t *data, size_t words) {
             return 0;
         }
     } else {
-        slog->error("DMA Transfer aborted (Status = 0x{:x})", status);
+        if (cardNotResponding(status))
+            slog->error("DMA status register reads all ones: the card does not respond (PCIe link down?)");
+        else
+            slog->error("DMA Transfer aborted (Status = 0x{:x})", status);
         return 1;
     }
 }
@@ -211,6 +271,7 @@ void SpecCom::init() {
     // Get FW info
     fw_vers = readSingle(SPEC_GREG | SPEC_GREG_FWVERS);
     fw_ident = readSingle(SPEC_GREG | SPEC_GREG_FWIDENT);
+    fw_caps = decodeSpecCaps(readSingle(SPEC_GREG | SPEC_GREG_CAPS));
     if (fw_ident == 0xFFFFFFFF || fw_vers == 0xFFFFFFFF) {
         slog->error("Could not read FW version or identifier!");
     } else {
@@ -219,6 +280,7 @@ void SpecCom::init() {
         slog->info("Firmware Hash: {}", static_cast<std::string>(status["firmware_hash"]));
         slog->info("Firmware Version: {}", static_cast<std::string>(status["firmware_vers"]));
         slog->info("Firmware Identifier: {}", static_cast<std::string>(status["firmware_identifier"]));
+        slog->info("Merged DMA reads (auto): {}", fw_caps.long_burst ? "on" : "off, firmware lacks long bursts");
         slog->info("FPGA card: {}", static_cast<std::string>(status["fpga_card"]));
         slog->info("FE Chip Type: {}", static_cast<std::string>(status["fe_chip_type"]));
         slog->info("FMC Card Type: {}", static_cast<std::string>(status["fmc_card_type"]));
@@ -312,13 +374,15 @@ struct dma_linked_list* SpecCom::prepDmaList(UserMemory *um, KernelMemory *km, u
     struct dma_linked_list *llist = (struct dma_linked_list*) km->getBuffer();
     uint32_t dev_off = off*4;
     unsigned int j = 0;
+    const uint32_t max_desc_bytes = descLimit(write);
     for (unsigned int i=0; i<um->getSGcount(); i++) {
-        int sg_size = um->getSGentrySize(i);
-        uint32_t sg_addr_h = ((uint64_t)um->getSGentryAddress(i) >> 32);
-        uint32_t sg_addr_l = ((um->getSGentryAddress(i)) & 0xFFFFFFFF);
+        uint64_t sg_addr = um->getSGentryAddress(i);
+        uint64_t sg_size = um->getSGentrySize(i);
+        if (sg_size == 0) continue;
         do {
-            uint32_t fixed_size = sg_size;
-            if (sg_size > 4096) fixed_size = 4096;
+            const uint32_t sg_addr_h = sg_addr >> 32;
+            const uint32_t sg_addr_l = sg_addr & 0xFFFFFFFF;
+            const uint32_t fixed_size = nextDescLength(sg_addr, sg_size, max_desc_bytes);
             llist[j].carrier_start = dev_off;
             //llist[j].carrier_start = 0;
             dev_off += fixed_size;
@@ -330,6 +394,7 @@ struct dma_linked_list* SpecCom::prepDmaList(UserMemory *um, KernelMemory *km, u
             llist[j].host_next_l = (uint32_t)((uint64_t)next & 0xFFFFFFFF);
             llist[j].host_next_h = (uint32_t)((uint64_t)next >> 32);
             llist[j].attr = 0x1 + (write << 1); // L2P, not last
+            llist[j].pad = 0;
 #if 0
             std::cout << "Linked List Entry [" << std::dec << j << std::hex << "]:" << std::endl;
             std::cout << "  Carrier Start: 0x" << llist[j].carrier_start << std::endl;
@@ -340,10 +405,8 @@ struct dma_linked_list* SpecCom::prepDmaList(UserMemory *um, KernelMemory *km, u
             std::cout << "  Host Next H    0x" << llist[j].host_next_h << std::endl;
             std::cout << "  Attribute      0x" << llist[j].attr << std::endl;
 #endif
-            sg_size = sg_size - fixed_size;
-            sg_addr_l = sg_addr_l + fixed_size;
-            // Prevent overflow
-            sg_addr_h = sg_addr_h + ((uint64_t)(sg_addr_l + fixed_size) >> 32);
+            sg_size -= fixed_size;
+            sg_addr += fixed_size;
             j++;
         } while (sg_size > 0);
     }
@@ -417,6 +480,47 @@ void SpecCom::flushDma() {
         this->writeSingle(SPEC_GREG | SPEC_GREG_SOFTRST, SOFTRST_BRAM_CNT);
     }
 
+}
+
+uint32_t SpecCom::descLimit(bool write) const {
+    // Writes keep one descriptor per page: larger ones need the P2L address fix in the firmware
+    return (!write && getMergeDmaRead()) ? merged_desc_bytes : kPageDescBytes;
+}
+
+void SpecCom::setMergeDmaRead(bool merge) {
+    merge_mode = merge ? MergeMode::On : MergeMode::Off;
+    if (merge && spec != nullptr && !fw_caps.long_burst) {
+        slog->warn("Merged DMA reads forced on, but the firmware does not say that it handles long DMA bursts: "
+                   "data can be lost or the host can crash");
+    }
+}
+
+void SpecCom::setMergedDescBytes(uint32_t bytes) {
+    merged_desc_bytes = std::clamp<uint32_t>(bytes & ~0xFFFu, kPageDescBytes, kMergedDescBytes);
+}
+
+DmaStats SpecCom::getDmaStats() {
+    DmaStats s;
+    // Feature mask (older firmware reads 0; without it the counter registers must not be read: 0x10..0x13 alias
+    // the control registers there, and 0xA..0xD read 0xDEADBEEF without the TLP counters)
+    const uint32_t features = readSingle(SPEC_GREG | SPEC_GREG_FEATURES);
+    s.tlp_128 = readSingle(SPEC_GREG | SPEC_GREG_STAT_TLP_128);
+    s.has_tlp = s.tlp_128 != 0xDEADBEEF;
+    s.has_cycles = (features & 0x2) != 0;
+    if (s.has_tlp) {
+        s.tlp_256 = readSingle(SPEC_GREG | SPEC_GREG_STAT_TLP_256);
+        s.tlp_512 = readSingle(SPEC_GREG | SPEC_GREG_STAT_TLP_512);
+        s.tlp_other = readSingle(SPEC_GREG | SPEC_GREG_STAT_TLP_OTHER);
+    } else {
+        s.tlp_128 = 0;
+    }
+    if (s.has_cycles) {
+        s.busy = readSingle(SPEC_GREG | SPEC_GREG_STAT_BUSY);
+        s.starved = readSingle(SPEC_GREG | SPEC_GREG_STAT_STARVED);
+        s.backpressure = readSingle(SPEC_GREG | SPEC_GREG_STAT_BACKPRESS);
+        s.header_wait = readSingle(SPEC_GREG | SPEC_GREG_STAT_HDRWAIT);
+    }
+    return s;
 }
 
 std::string SpecCom::getSpecIdentHw(uint32_t fw_ident) {

@@ -12,6 +12,7 @@
 #include "LoggingConfig.h"
 #include "PirateSpeak.h"
 
+#include "LoadJson.h"
 #include "ScanHelper.h"
 #include "ScanOpts.h"
 
@@ -93,6 +94,7 @@ std::string ScanConsoleImpl::parseConfig(const std::vector<std::string> &args) {
     }
     result["config"] = scanConsoleConfig;
     result["runCounter"] = ScanHelper::newRunCounter();
+    result["mask_opt"] = options.mask_opt;
     std::string str = result.dump();
     return str;
 }
@@ -120,7 +122,7 @@ int ScanConsoleImpl::init(ScanOpts options) {
     scanOpts=std::move(options);
     runCounter = ScanHelper::newRunCounter();
     if(!scanOpts.logCfgPath.empty()) {
-        loggerConfig = ScanHelper::openJsonFile(scanOpts.logCfgPath).get<logging::LoggingConfig>();
+        loggerConfig = JsonHelper::openJsonFile(scanOpts.logCfgPath).get<logging::LoggingConfig>();
     } else {
         // default log setting
         loggerConfig = logging::defaultConfig();
@@ -150,9 +152,9 @@ int ScanConsoleImpl::loadConfig() {
     scanCfg=scanConsoleConfig["scanCfg"];
     if(scanOpts.dbUse) {
         try {
-            dbCfg = ScanHelper::openJsonFile(scanOpts.dbCfgPath);
-            userCfg = ScanHelper::openJsonFile(scanOpts.dbUserCfgPath);
-            siteCfg = ScanHelper::openJsonFile(scanOpts.dbSiteCfgPath);
+            dbCfg = JsonHelper::openJsonFile(scanOpts.dbCfgPath);
+            userCfg = JsonHelper::openJsonFile(scanOpts.dbUserCfgPath);
+            siteCfg = JsonHelper::openJsonFile(scanOpts.dbSiteCfgPath);
         }catch (std::runtime_error &e) {
             logger->critical("#ERROR# failed to load database config: {}", e.what());
             return -1;
@@ -189,6 +191,7 @@ int ScanConsoleImpl::loadConfig(const char *config){
     json j = json::parse(config);
     scanConsoleConfig = j["config"];
     runCounter=j["runCounter"];
+    scanOpts.mask_opt = j.value("mask_opt", -1);
     ctrlCfg=scanConsoleConfig["ctrlConfig"];
     chipConfig=scanConsoleConfig["chipConfig"];
     scanCfg=scanConsoleConfig["scanCfg"];

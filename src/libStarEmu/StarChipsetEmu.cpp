@@ -4,7 +4,7 @@
 #include <random>
 
 #include "AbcNames.h"
-#include "ScanHelper.h"
+#include "LoadJson.h"
 #include "StarPackets.h"
 #include "logging.h"
 
@@ -228,7 +228,7 @@ StarChipsetEmu::StarChipsetEmu(ClipBoard<RawData>* rx,
   if (not json_emu_file_path.empty()) {
     json jEmu;
     try {
-      jEmu = ScanHelper::openJsonFile(json_emu_file_path);
+      jEmu = JsonHelper::openJsonFile(json_emu_file_path);
     } catch (std::runtime_error &e) {
       logger->error("Error opening emulator config: {}", e.what());
       throw(std::runtime_error("StarChipsetEmu::StarChipsetEmu failure"));

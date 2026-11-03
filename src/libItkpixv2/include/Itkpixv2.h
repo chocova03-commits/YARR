@@ -70,7 +70,7 @@ class Itkpixv2 : public FrontEnd, public Itkpixv2Cfg, public Itkpixv2Cmd{
         uint8_t readChipId();
 
         void runRingOsc(uint16_t duration, bool isBankB);
-        yarrStatus confAdc(uint16_t MONMUX, bool doCur = false) override;
+        yarrStatus confAdc(uint16_t MONMUX, bool doCur = false, unsigned adcSleep_us = 1000) override;
     protected:
     private:
 };
