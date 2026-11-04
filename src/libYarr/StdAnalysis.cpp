@@ -1142,15 +1142,6 @@ void ScurveFitter::end() {
         output->pushData(std::move(sigMap[uid]));
         output->pushData(std::move(chiDist[uid]));
         output->pushData(std::move(timeDist[uid]));
-<<<<<<< HEAD
-=======
-
-        output->pushData(std::move(thrMap_raw[uid]));
-        output->pushData(std::move(sigMap_raw[uid]));
-        output->pushData(std::move(norMap_raw[uid]));
-        output->pushData(std::move(ofsMap_raw[uid]));
-        output->pushData(std::move(fit_statusMap_raw[uid]));
->>>>>>> 6d59abaa (first commit for main branch)
     }
 }
 
